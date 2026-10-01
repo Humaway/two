@@ -2326,8 +2326,8 @@ Object.assign(ANIMS, (() => {
 // DRONE_INSTANCED below. All of it is warmed at boot (ART_WARM_KIT rides on the first character built).
 const PROPS = {};
 const DRONE_LIGHTS = { patrol: 0x6fc8ff, curious: 0xffb020, escort: 0xff3b30, yes: 0xffd21f, white: 0xe8f6ff, green: 0x5ae08a, off: null };
-const lightMat = (() => { const M = {}; return (st) => M[st] || (M[st] = (() => { const c = st in DRONE_LIGHTS ? DRONE_LIGHTS[st] : DRONE_LIGHTS.patrol; return c == null ? mat(0x23272e) : mat(0x000000, { emissive: c, emissiveIntensity: 1.25 }); })()); })();   // cached: setLight allocates nothing
-const PK = (() => {
+const droneLightMat = (() => { const M = {}; return (st) => M[st] || (M[st] = (() => { const c = st in DRONE_LIGHTS ? DRONE_LIGHTS[st] : DRONE_LIGHTS.patrol; return c == null ? mat(0x23272e) : mat(0x000000, { emissive: c, emissiveIntensity: 1.25 }); })()); })();   // cached: setLight allocates nothing
+const ART_KIT = (() => {
   const C = new THREE.Color(), XF = new THREE.Matrix4(), E = new THREE.Euler(), Q = new THREE.Quaternion(), V = new THREE.Vector3(), S = new THREE.Vector3();
   // colour every vertex: a hex, or fn(x, y, z, nx, ny, nz) -> colour
   function paint(g, hex, fn) {
@@ -2371,11 +2371,11 @@ const PK = (() => {
   return { paint, place, kit, helix, cached, screen, lights };
 })();
 // light materials are tagged so clones can find their light meshes; setLight swaps materials (no per-drone material)
-for (const st in DRONE_LIGHTS) lightMat(st).userData.light = true;
-const setLights = (o, st) => { const m = lightMat(st); for (const l of o.userData.lights) l.material = m; o.userData.state = st; };
+for (const st in DRONE_LIGHTS) droneLightMat(st).userData.light = true;
+const droneSetLight = (o, st) => { const m = droneLightMat(st); for (const l of o.userData.lights) l.material = m; o.userData.state = st; };
 
 (() => {
-  const { kit, helix, cached, screen } = PK, PI = Math.PI, H = PI / 2, TAU = PI * 2, LT = () => lightMat('patrol');
+  const { kit, helix, cached, screen } = ART_KIT, PI = Math.PI, H = PI / 2, TAU = PI * 2, LT = () => droneLightMat('patrol');
   const font = (px, w = 'bold') => `${w} ${px}px Arial, sans-serif`;
   // ---- Des: the chrome kettle on a phone plan
   const desPaint = (mode) => (c, w, h) => {
@@ -2458,7 +2458,7 @@ const setLights = (o, st) => { const m = lightMat(st); for (const l of o.userDat
       k.tube([[0.0, 0.03, -0.035], [0.0, 0.02, -0.06], [0.01, 0.006, -0.08], [0.03, 0.004, -0.1], [0.05, 0.004, -0.11]], 0.003, 12, '#1c1c1e');
       return k.done();
     });
-    g.userData.lights = PK.lights(g); g.userData.setLight = (st) => setLights(g, st); if (o.light) g.userData.setLight(o.light);
+    g.userData.lights = ART_KIT.lights(g); g.userData.setLight = (st) => droneSetLight(g, st); if (o.light) g.userData.setLight(o.light);
     return g;
   };
   // ---- hover-cars: about a foot off the road; underside glow, lights, indicators (Turning left. Are you sure?)
@@ -2469,21 +2469,21 @@ const setLights = (o, st) => { const m = lightMat(st); for (const l of o.userDat
       k.box(4.1, 0.5, 1.72, col, 0, y0 + 0.27, 0); k.box(4.2, 0.18, 1.6, col, 0, y0 + 0.1, 0);
       k.box(2.2, 0.48, 1.52, col, 0, y0 + 0.74, -0.25); k.box(2.22, 0.36, 1.54, dk, 0, y0 + 0.74, -0.25);   // cabin + glass band
       k.box(0.06, 0.4, 1.4, dk, 0, y0 + 0.74, 0.88, 0.5, 0, 0); k.box(0.06, 0.38, 1.4, dk, 0, y0 + 0.72, -1.36, -0.45, 0, 0);
-      k.box(1.5, 0.06, 1.62, shadeHex(col, 0.85), 0, y0 + 1.0, -0.25);
+      k.box(1.5, 0.06, 1.62, artShade(col, 0.85), 0, y0 + 1.0, -0.25);
       k.box(0.12, 0.1, 1.74, trim, 0, y0 + 0.1, 2.08); k.box(0.12, 0.1, 1.74, trim, 0, y0 + 0.1, -2.08);
       for (const [x, z] of [[0.62, 1.45], [-0.62, 1.45], [0.62, -1.45], [-0.62, -1.45]]) k.cyl(0.32, 0.36, 0.08, 10, '#3a3d44', x, y0 - 0.02, z);   // hover pads
-      for (const sx of [-1, 1]) { k.box(0.32, 0.1, 0.04, '#fffbe8', sx * 0.6, y0 + 0.36, 2.06, 0, 0, 0, LT()); k.box(0.3, 0.08, 0.04, '#ff3030', sx * 0.62, y0 + 0.38, -2.06, 0, 0, 0, lightMat('escort')); }
+      for (const sx of [-1, 1]) { k.box(0.32, 0.1, 0.04, '#fffbe8', sx * 0.6, y0 + 0.36, 2.06, 0, 0, 0, LT()); k.box(0.3, 0.08, 0.04, '#ff3030', sx * 0.62, y0 + 0.38, -2.06, 0, 0, 0, droneLightMat('escort')); }
       for (const [x, z] of [[0.62, 1.45], [-0.62, 1.45], [0.62, -1.45], [-0.62, -1.45]]) k.cyl(0.26, 0.26, 0.02, 10, '#ffffff', x, y0 - 0.07, z, 0, 0, 0, LT());
       return k.done();
     });
     const glow = [];
     g.traverse((m) => { if (m.isMesh && m.material === LT()) glow.push(m); });
-    g.userData.lights = glow; g.userData.setGlow = (st) => setLights(g, st);
+    g.userData.lights = glow; g.userData.setGlow = (st) => droneSetLight(g, st);
     for (const sx of [1, -1]) {   // indicators: separate tiny meshes (shared geometry) so they can blink
-      const b = new THREE.Mesh(sharedGeo('car_blink' + sx, () => PK.place(new THREE.BoxGeometry(0.14, 0.08, 0.06), sx * 0.86, 0.66, 2.04)), lightMat('off')); b.name = sx > 0 ? 'blinkL' : 'blinkR'; g.add(b);
+      const b = new THREE.Mesh(artSharedGeo('car_blink' + sx, () => ART_KIT.place(new THREE.BoxGeometry(0.14, 0.08, 0.06), sx * 0.86, 0.66, 2.04)), droneLightMat('off')); b.name = sx > 0 ? 'blinkL' : 'blinkR'; g.add(b);
     }
     const bL = g.getObjectByName('blinkL'), bR = g.getObjectByName('blinkR');
-    g.userData.blink = (side, on = true) => { bL.material = on && side === 'L' ? lightMat('curious') : lightMat('off'); bR.material = on && side === 'R' ? lightMat('curious') : lightMat('off'); };
+    g.userData.blink = (side, on = true) => { bL.material = on && side === 'L' ? droneLightMat('curious') : droneLightMat('off'); bR.material = on && side === 'R' ? droneLightMat('curious') : droneLightMat('off'); };
     return g;
   };
   PROPS.hover_scooter = (o = {}) => {
@@ -2496,14 +2496,14 @@ const setLights = (o, st) => { const m = lightMat(st); for (const l of o.userDat
       k.box(0.14, 0.55, 0.12, wh, 0, 0.62, 0.62, -0.25, 0, 0); k.box(0.62, 0.035, 0.035, dk, 0, 0.94, 0.7);   // stem, bars
       for (const sx of [-1, 1]) k.box(0.06, 0.045, 0.045, '#111', sx * 0.3, 0.94, 0.7);
       k.box(0.22, 0.12, 0.05, col, 0, 0.76, 0.7); k.box(0.12, 0.05, 0.03, '#fffbe8', 0, 0.42, 0.72, 0, 0, 0, LT());
-      k.box(0.22, 0.05, 0.03, '#ff3030', 0, 0.42, -0.72, 0, 0, 0, lightMat('escort'));
+      k.box(0.22, 0.05, 0.03, '#ff3030', 0, 0.42, -0.72, 0, 0, 0, droneLightMat('escort'));
       k.cyl(0.22, 0.26, 0.06, 12, dk, 0, 0.2, 0.32); k.cyl(0.22, 0.26, 0.06, 12, dk, 0, 0.2, -0.36);
       k.cyl(0.18, 0.18, 0.02, 12, '#ffffff', 0, 0.165, 0.32, 0, 0, 0, LT()); k.cyl(0.18, 0.18, 0.02, 12, '#ffffff', 0, 0.165, -0.36, 0, 0, 0, LT());
       return k.done();
     });
     Object.assign(g.userData, { seat: [0, 0.65, -0.02], pillion: [0, 0.65, -0.36], bars: [0, 0.94, 0.7], feet: [0.13, 0.44, 0.4] });
     g.userData.lights = []; g.traverse((m) => { if (m.isMesh && m.material === LT()) g.userData.lights.push(m); });
-    g.userData.setGlow = (st) => setLights(g, st);
+    g.userData.setGlow = (st) => droneSetLight(g, st);
     return g;
   };
   PROPS.hover_trolley = () => {
@@ -2518,7 +2518,7 @@ const setLights = (o, st) => { const m = lightMat(st); for (const l of o.userDat
       k.plane(0.34, 0.13, '#ffffff', 0, 0.7, 0.432, 0, 0, 0, sc.mat);
       return k.done();
     });
-    g.userData.lights = []; g.traverse((m) => { if (m.isMesh && m.material === LT()) g.userData.lights.push(m); }); g.userData.setGlow = (st) => setLights(g, st);
+    g.userData.lights = []; g.traverse((m) => { if (m.isMesh && m.material === LT()) g.userData.lights.push(m); }); g.userData.setGlow = (st) => droneSetLight(g, st);
     return g;
   };
   // ---- padded bollards: a steel post sleeved in quilted cream foam
@@ -2551,7 +2551,7 @@ const setLights = (o, st) => { const m = lightMat(st); for (const l of o.userDat
       return k.done();
     });
     g.userData.screen = sc; g.userData.show = (msg) => sc.paint(kioskPaint(msg));
-    g.userData.lights = PK.lights(g); g.userData.setLight = (st) => setLights(g, st);
+    g.userData.lights = ART_KIT.lights(g); g.userData.setLight = (st) => droneSetLight(g, st);
     return g;
   };
   // ---- the display security tether: a grey coil with the broken cradle clip on the end
@@ -2607,7 +2607,7 @@ const setLights = (o, st) => { const m = lightMat(st); for (const l of o.userDat
   PROPS.ukulele = () => cached('ukulele', () => {   // body at the origin, neck along +X (the left hand); stickers on the front
     const k = kit(), wood = '#c88a4a';
     k.lathe([[0.001, -0.012], [0.07, -0.012], [0.074, 0.0], [0.07, 0.012], [0.001, 0.012]], 12, wood, 0, 0, 0, null, null, 1.3, 1);
-    k.add(PK.place(new THREE.LatheGeometry([[0.001, -0.012], [0.058, -0.012], [0.06, 0], [0.058, 0.012], [0.001, 0.012]].map(([r, y]) => new THREE.Vector2(r, y)), 12), 0.1, 0, 0), wood);
+    k.add(ART_KIT.place(new THREE.LatheGeometry([[0.001, -0.012], [0.058, -0.012], [0.06, 0], [0.058, 0.012], [0.001, 0.012]].map(([r, y]) => new THREE.Vector2(r, y)), 12), 0.1, 0, 0), wood);
     k.cyl(0.018, 0.018, 0.026, 10, '#2a1a10', 0.04, 0, 0.0, H, 0, 0);
     k.box(0.22, 0.012, 0.03, '#5a3a22', 0.27, 0, 0); k.box(0.06, 0.014, 0.04, '#5a3a22', 0.4, 0, 0);
     for (const [x, z, c] of [[-0.05, 0.03, '#ff5ab0'], [0.02, -0.03, '#ffd21f'], [-0.07, -0.02, '#5ac8ff'], [0.11, 0.02, '#7ae05a']]) k.box(0.022, 0.003, 0.018, c, x, 0.0125, z, 0, x * 9, 0);
@@ -2629,8 +2629,8 @@ const setLights = (o, st) => { const m = lightMat(st); for (const l of o.userDat
   PROPS.coat_thrown = (o = {}) => cached('coat_thrown|' + (o.col || '#a8865a'), () => {   // the trench in flight / over a drone: a draped cloth
     const k = kit(), c = o.col || '#a8865a', geo = new THREE.SphereGeometry(0.55, 10, 6, 0, TAU, 0, PI * 0.62);
     const p = geo.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); p.setY(i, p.getY(i) * 0.7 + 0.06 * Math.sin(x * 9) * Math.cos(z * 7)); }
-    geo.computeVertexNormals(); k.add(geo, null, null, (x, y, z) => (Math.sin(x * 13 + z * 7) > 0.6 ? shadeHex(c, 0.82) : c));
-    const inner = geo.clone(); inner.scale(0.97, 0.97, 0.97); if (inner.index) inner.setIndex(new THREE.BufferAttribute(inner.index.array.slice().reverse(), 1)); k.add(inner, shadeHex(c, 0.5));
+    geo.computeVertexNormals(); k.add(geo, null, null, (x, y, z) => (Math.sin(x * 13 + z * 7) > 0.6 ? artShade(c, 0.82) : c));
+    const inner = geo.clone(); inner.scale(0.97, 0.97, 0.97); if (inner.index) inner.setIndex(new THREE.BufferAttribute(inner.index.array.slice().reverse(), 1)); k.add(inner, artShade(c, 0.5));
     return k.done();
   });
   PROPS.foam = () => {   // safety foam: soft white quilted blobs; grow(k 0..1) blooms it up to the chest
@@ -2642,7 +2642,7 @@ const setLights = (o, st) => { const m = lightMat(st); for (const l of o.userDat
   PROPS.parts = (id, o) => { const g = PROPS[id](o || {}), out = []; g.traverse((m) => { if (m.isMesh) out.push({ geometry: m.geometry, material: m.material }); }); return out; };
   Object.defineProperty(PROPS, 'parts', { enumerable: false }); Object.defineProperty(PROPS, 'quiltMat', { enumerable: false });
 })();
-function shadeHex(c, k) { return '#' + new THREE.Color(c).multiplyScalar(k).getHexString(); }
+function artShade(c, k) { return '#' + new THREE.Color(c).multiplyScalar(k).getHexString(); }
 
 // ------------------------------------------------------------ drones
 // buildDrone(kind) -> Group, origin at the drone's centre, facing +Z; the caller bobs and moves it (and keeps a blob
@@ -2653,7 +2653,7 @@ function shadeHex(c, k) { return '#' + new THREE.Color(c).multiplyScalar(k).getH
 // noise: setClaw(k 0 closed .. 1 open); cleaning: brush (spin it: brush.rotation.y); door: screen + show(text).
 const DRONE_KINDS = ['courtesy', 'guardian', 'popup', 'cleaning', 'noise', 'fun', 'lifeguard', 'door'];   // (boot warms each)
 const buildDrone = (() => {
-  const { kit, cached, screen } = PK, PI = Math.PI, H = PI / 2, LT = () => lightMat('patrol');
+  const { kit, cached, screen } = ART_KIT, PI = Math.PI, H = PI / 2, LT = () => droneLightMat('patrol');
   const WH = '#eef1f4', GR = '#c3cad3', VIS = '#1a2028';
   // the pod: a lathed egg, a dark visor band with the light "eye", a soft light ring underneath
   function pod(k, s = 1, body = WH, low = GR) {
@@ -2692,25 +2692,25 @@ const buildDrone = (() => {
     const sc = kind === 'door' ? screen('door_drone', 128, 64, doorPaint('WELCOME!')) : null;
     const g = cached('drone_' + kind, () => { const k = kit(); BUILD[kind](k, sc); return k.done(); });
     const u = g.userData;
-    u.kind = kind; u.lights = PK.lights(g); u.state = 'patrol'; u.setLight = (st) => setLights(g, st);
+    u.kind = kind; u.lights = ART_KIT.lights(g); u.state = 'patrol'; u.setLight = (st) => droneSetLight(g, st);
     u.radius = kind === 'guardian' ? 0.36 : kind === 'cleaning' ? 0.27 : 0.22;
     if (kind === 'guardian') {
-      const sh = new THREE.Mesh(sharedGeo('shield', () => new THREE.IcosahedronGeometry(0.5, 1)), mat(0x9fd8ff, { emissive: 0x3a8ac8, emissiveIntensity: 0.7, transparent: true, opacity: 0.26, side: THREE.DoubleSide, key: 'shield' }));
+      const sh = new THREE.Mesh(artSharedGeo('shield', () => new THREE.IcosahedronGeometry(0.5, 1)), mat(0x9fd8ff, { emissive: 0x3a8ac8, emissiveIntensity: 0.7, transparent: true, opacity: 0.26, side: THREE.DoubleSide, key: 'shield' }));
       sh.name = 'shield'; g.add(sh); u.shield = sh; u.setShield = (on) => { sh.visible = !!on; };
     }
     if (kind === 'popup' || kind === 'fun') {
-      const len = kind === 'fun' ? 4 : 2.5, bm = new THREE.Mesh(sharedGeo('beam_' + kind, () => { const c = new THREE.ConeGeometry(kind === 'fun' ? 1.1 : 0.7, len, 12, 1, true); c.rotateX(-H); c.translate(0, 0, len / 2 + 0.2); return c; }),
+      const len = kind === 'fun' ? 4 : 2.5, bm = new THREE.Mesh(artSharedGeo('beam_' + kind, () => { const c = new THREE.ConeGeometry(kind === 'fun' ? 1.1 : 0.7, len, 12, 1, true); c.rotateX(-H); c.translate(0, 0, len / 2 + 0.2); return c; }),
         mat(0x000000, { emissive: kind === 'fun' ? 0xffe68a : 0x9fd8ff, emissiveIntensity: 0.8, transparent: true, opacity: 0.14, side: THREE.DoubleSide, key: 'beam_' + kind }));
       bm.name = 'beam'; bm.visible = false; if (kind === 'fun') bm.rotation.x = 0.55; g.add(bm); u.beam = bm; u.setBeam = (on) => { bm.visible = !!on; };
     }
     if (kind === 'noise') {                   // three fingers on pivots round the hub: setClaw(1) open .. 0 closed
-      const fg = sharedGeo('claw_finger', () => { const k = kit(); k.box(0.016, 0.09, 0.02, '#4a5260', 0, -0.045, 0); k.box(0.014, 0.06, 0.018, '#3a3e44', 0, -0.1, 0.018, 0.6, 0, 0); return k.done().children[0].geometry; });
+      const fg = artSharedGeo('claw_finger', () => { const k = kit(); k.box(0.016, 0.09, 0.02, '#4a5260', 0, -0.045, 0); k.box(0.014, 0.06, 0.018, '#3a3e44', 0, -0.1, 0.018, 0.6, 0, 0); return k.done().children[0].geometry; });
       const piv = [];
       for (let i = 0; i < 3; i++) { const p = new THREE.Object3D(); p.position.set(0, -0.23, 0); p.rotation.y = i * PI * 2 / 3; const f = new THREE.Mesh(fg, mat(0xffffff)); f.position.z = 0.035; p.add(f); g.add(p); piv.push(f); }
       u.setClaw = (kk) => { for (const f of piv) f.rotation.x = -0.15 - 0.75 * kk; }; u.setClaw(0.3);
     }
     if (kind === 'cleaning') {
-      const br = new THREE.Mesh(sharedGeo('brush', () => { const k = kit(); k.cyl(0.18, 0.2, 0.025, 12, '#3a3e44', 0, -0.065, 0); k.box(0.36, 0.02, 0.03, '#5a6068', 0, -0.07, 0); k.box(0.03, 0.02, 0.36, '#5a6068', 0, -0.07, 0); return k.done().children[0].geometry; }), mat(0xffffff));
+      const br = new THREE.Mesh(artSharedGeo('brush', () => { const k = kit(); k.cyl(0.18, 0.2, 0.025, 12, '#3a3e44', 0, -0.065, 0); k.box(0.36, 0.02, 0.03, '#5a6068', 0, -0.07, 0); k.box(0.03, 0.02, 0.36, '#5a6068', 0, -0.07, 0); return k.done().children[0].geometry; }), mat(0xffffff));
       br.name = 'brush'; g.add(br); u.brush = br;
     }
     if (sc) { u.screen = sc; u.show = (t) => sc.paint(doorPaint(t)); }
@@ -2718,7 +2718,7 @@ const buildDrone = (() => {
   };
 })();
 // one geometry per name, built on first use and shared by every clone (drone shells, beams, claw fingers)
-const sharedGeo = (() => { const m = new Map(); return (n, fn) => m.get(n) || (m.set(n, fn()), m.get(n)); })();
+const artSharedGeo = (() => { const m = new Map(); return (n, fn) => m.get(n) || (m.set(n, fn()), m.get(n)); })();
 
 // DRONE_INSTANCED: the courtesy pod for fleets (the L30 hangar's hundreds, the roof ring of 400, the title ring).
 // geo + mat: the body (lights excluded) in one vertex-coloured material, for an InstancedMesh with per-instance
@@ -2730,11 +2730,11 @@ const DRONE_INSTANCED = (() => {
   let G = null, LG = null, LM = null;
   const build = () => {
     if (G) return;
-    const k = PK.kit(), PI = Math.PI, H = PI / 2;
+    const k = ART_KIT.kit(), PI = Math.PI, H = PI / 2;
     k.lathe([[0.001, -0.17], [0.08, -0.16], [0.17, -0.1], [0.21, -0.02], [0.206, 0.04], [0.17, 0.11], [0.1, 0.16], [0.001, 0.175]], 12, null, 0, 0, 0, null, (x, y) => (y < -0.06 ? '#c3cad3' : '#eef1f4'));
     k.arc(0.212, 0.07, 8, -0.95, 1.9, '#1a2028', 0, 0.03, 0); k.cyl(0.012, 0.016, 0.03, 6, '#c3cad3', 0, 0.185, 0);
     G = k.done().children[0].geometry;
-    const l = PK.kit(); l.box(0.12, 0.022, 0.012, '#ffffff', 0, 0.035, 0.208); l.torus(0.08, 0.013, 4, 12, '#ffffff', 0, -0.165, 0, H, 0, 0);
+    const l = ART_KIT.kit(); l.box(0.12, 0.022, 0.012, '#ffffff', 0, 0.035, 0.208); l.torus(0.08, 0.013, 4, 12, '#ffffff', 0, -0.165, 0, H, 0, 0);
     LG = l.done().children[0].geometry; LG.deleteAttribute('color');
     LM = new THREE.MeshBasicMaterial({ color: 0xffffff });
   };
@@ -2767,7 +2767,7 @@ function ART_WARM_KIT() {
   for (const id in PROPS) { try { g.add(PROPS[id]()); } catch (e) { console.warn('TWO: prop ' + id, e); } }
   const fleet = DRONE_INSTANCED.make(2, { tint: 0xffd21f, state: 'yes' }); g.add(fleet.group);
   const plain = new THREE.InstancedMesh(DRONE_INSTANCED.geo, DRONE_INSTANCED.mat, 1); plain.setMatrixAt(0, new THREE.Matrix4()); g.add(plain);
-  for (const st in DRONE_LIGHTS) { const m = new THREE.Mesh(sharedGeo('warm_dot', () => new THREE.BoxGeometry(0.01, 0.01, 0.01)), lightMat(st)); g.add(m); }
+  for (const st in DRONE_LIGHTS) { const m = new THREE.Mesh(artSharedGeo('warm_dot', () => new THREE.BoxGeometry(0.01, 0.01, 0.01)), droneLightMat(st)); g.add(m); }
   g.traverse((o) => { o.visible = true; });
   return g;
 }
