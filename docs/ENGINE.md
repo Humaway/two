@@ -1,5 +1,9 @@
 # ENGINE — index and quick reference
 
+> **TWO's engine has since moved on** (engine phase + integration): where this page or a manual disagrees with
+> `docs/ARCHITECTURE.md` §5 (CRASH `fov`/`zoom`, OTS, LOW/HIGH `size`, `liveMax` 3 by default, the split's live right
+> half, `camR.aspect`, line numbers), **ARCHITECTURE §5 and the source headers win**.
+
 TWO runs on RUE's engine: one HTML file, Three.js r186 and synthesised audio and textures. The manuals in
 `docs/engine/` document that engine from `ref/rue/` with `file:line` citations. TWO's `src/` engine fragments are
 verbatim copies (renames only: `RUE_TEST` → `TWO_TEST`, `'rue.save'` → `'two.save'`, log prefix `RUE:` → `TWO:`) with

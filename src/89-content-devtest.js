@@ -136,6 +136,16 @@
         await c.hotspots.trigger('dev_lift');
         c.state.flags.dev_lifted = true;
       } }],
+      // ---- 6b. an eased tracking override (the boss camera): mutate a 'fixed' override in place, damped; ease out
+      ['roam', { until: 'dev_cam', auto: async (c) => {
+        const o = { pos: [4.0, 2.7, -1.2], look: 'player', fov: 55, lag: 1.5, lookLag: 1, ease: 1 };
+        c.cam.override('fixed', o);
+        player.actor.moveTo([-1.0, 0, -9.5]);
+        for (let k = 0; k < 30; k++) { o.pos[0] = 4.0 - k * 0.12; await c.wait(0.1); }   // the lens rides its rail, allocation-free
+        c.cam.override(null, { ease: 0.8 }); await c.wait(1);
+        log('override ' + c.cam.name);
+        c.state.flags.dev_cam = true;
+      } }],
       ['swap', false], ['follow', null],
       // ---- 7. audio: every set bed and room (docs/sets ambience), "two" muffled (first verse), the laugh, the voicemail
       ['do', async (c) => {
@@ -171,7 +181,7 @@
     title: 'Lineup', set: SET, env: 'day', timeCard: false, hud: null,
     steps: [
       ['do', async (c) => {
-        const ids = Object.keys(LOOKS).filter((k) => LOOKS[k]), per = 12;
+        const ids = Object.keys(LOOKS).filter((k) => LOOKS[k]), per = 8;
         const rows = Math.ceil(ids.length / per);
         log('lineup ' + ids.length);
         for (let r = 0; r < rows; r++) {
@@ -179,11 +189,11 @@
           AR.clear(); AR.show(true);
           const row = ids.slice(r * per, r * per + per);
           row.forEach((id, i) => {
-            const x = -2.0 + (i - (row.length - 1) / 2) * 0.95;
+            const x = -2.0 + (i - (row.length - 1) / 2) * 0.9;
             c.world.spawn('lu_' + id, [x, 0, 11.5, 0], { look: id });
             AR.add({ id: 'lu_' + id, kind: 'name', text: id, on: 'lu_' + id, size: 0.8 });
           });
-          c.cam.shot({ shot: 'CAM', pos: [-2.0, 1.35, 19.6], look: [-2.0, 0.95, 11.5], fov: 42 });
+          c.cam.shot({ shot: 'CAM', pos: [-2.0, 1.2, 17.3], look: [-2.0, 0.92, 11.5], fov: 40 });
           c.ui.letterbox(false);
           await c.wait(2.5);
         }

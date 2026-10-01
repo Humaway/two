@@ -40,6 +40,9 @@ every line of dialogue is final and word for word.** This file is the contract b
   [--w 1280 --h 720]` writes one PNG per view (`cam-<name>.png`, `anchor-<name>.png`), prints a table of
   calls/tris/textures/geometries per view, flags every view over **300 draw calls**, and exits 1 on any console error.
   Build with your set file in `--mine` first. Read the PNGs.
+- **Engine test**: `node tools/run.mjs --file out/<you>.html --q "autoplay=1&fast=1&speed=8&scene=DEV&stop=DEV"` (and
+  without `fast=1`, with `--shots`) runs `src/89-content-devtest.js`, which exercises every TWO engine API (§5) on the
+  store set; `scene=DEV_LINEUP&stop=DEV_LINEUP` lines up every look with its id for a screenshot.
 - **Boot warm-up** (`99-main.js`): audio, every `SETS` entry, every `LOOKS` entry (one rig each, its portrait baked;
   `LOOKS[id].warm = n` pre-builds `n` rigs for a look seen twice at once, and `world.spawn` takes them from the pool),
   and every drone model, from the first hook that exists: `DRONES.warm(warmObject)` (systems builds its own pool and
@@ -121,7 +124,7 @@ Extras (look ids, spawned by sets or content): `cust26_a…`, `local40_a…`, `s
 | `21-set-hq-top.js` | `hq_top` | P, 3.3–3.6 |
 | `22-set-hq-roof.js` | `hq_roof` | 3.2 roof, 3.7, A1, B1 |
 | `23-set-foreshore26.js` | `foreshore26` | A2 |
-| `24-set-safe-room.js` | `safe_room` | the Safe Room fail state (13.7), credits vignettes may borrow other sets |
+| `24-set-safe-room.js` | `safe_room` | optional: `safeRoom()` in 33-systems draws its own padded room and Quiet Corner (§5.7), so the fail state needs no set; built per `docs/sets/safe_room.md` it is a standalone set only |
 
 ### 3.3 Scenes
 
@@ -174,7 +177,9 @@ the Starlight sneak are **roam** gameplay built from `33-systems.js`, not mini-g
 ### 3.8 Flags
 
 Lower-case, prefixed by scene: `s11_polished`, `s13_wired`, `s25_laugh` … Story-wide flags without a prefix:
-`santa` (Luka wears the disguise), `chip_off` (Chase (2040)'s chip forced off), `headphones` (Chase wears them).
+`santa` (Luka wears the disguise), `chip_off` (Chase (2040)'s chip forced off), `headphones` (Chase wears them),
+`hurt` (Chase's torn polo and blood), `bandaged`, `lanyard_snapped`, `tut_swap` (the SWAP prompt has been shown). The
+rigs re-dress from `state.flags` and `state.inventory` (`tether`, `nadia_lanyard`) every time an actor is spawned.
 
 ## 4. Sets
 
@@ -186,42 +191,208 @@ allocation**. Every set's header comment documents its layout (metres, axes) and
 may also use raw coordinates. Look: low-poly PS1, **clean — no vertex snapping, no wobble, no affine warping**.
 Palettes in spec §14. Under 300 draw calls.
 
-## 5. TWO-specific engine APIs (provided by the engine phase; everyone else codes against these)
+## 5. TWO-specific engine APIs (implemented: this section is the reference everyone codes against)
 
-- **Speakers**: `CHARACTERS[id] = { name, voice, actor?, silhouette? }`. `say('manager', …)` animates actor `luka40`.
-  `ui.nameGlitch(fromId, toId)` — one-frame glitch swapping the visible name label (3.3 reveal).
-- **Tags**: `say(id, text, { tag })` shows a small italic tag after the name: `off`, `whisper`, `muffled`, `quietly`,
-  `down the line`, `on the PA`, `filtered`, `gruff`, `together`, …
-- **Barks**: `bark(id, text, o) → Promise` — a non-blocking line in a corner box with portrait over gameplay (boss lines,
-  scooter chase, drones in stealth). Never pauses play.
-- **Pop-ups**: `popup({ style: 'safesense', msg, title?, buttons, at, w, dur, emptySlot? })` — the 2040 SafeSense look
-  (rounded translucent white glass, blue glow, pill buttons, two-note chirp). `emptySlot: true` draws the empty
-  button-shaped space where NO should be. Default style stays JARVIS (2026).
-- **HUD** (top-right pill): `hud.set({ noService: true, quiet: '46:58:00', samples: true, bars: 0..4 })`;
-  `hud.hack(pct|null)` big centre-top HACK % bar; `hud.quiet(str)` updates the countdown.
-- **Time cards**: scenes have `time` (e.g. `'Tuesday 22 December 2026, 11:31'`) and `place` (`'Optus Redcliffe'`);
-  the flow shows a small time card at scene start unless `timeCard: false`. Act cards come from `ACTS`.
-- **Swap**: `playable` may list three ids; SWAP cycles in that order. The swap indicator shows the next one.
-  `flow.follow` becomes a list: the non-active playables follow (or `hold` a position when told).
-- **Chip View** (`chip.*` in 33-systems): only when the active character is `chase40` and `chip.allowed`.
-  Hold CHIP (Q / LB / CHIP button) → blue tint + scanlines, `AR.*` labels become visible, `chip.signal` fills
-  (≈6 s to full; `chip.rate` per scene), full → `emit('signal:full')` (drones turn to him, soft fail).
-  `chip.forceOff(true)` for scenes where the chip must stay off. `AR.add({ id, at:[x,y,z], text, kind, w?, color? })`,
-  `AR.remove(id)`, `AR.clear()`; kinds: `sign`, `price`, `name`, `code`, `tag`, `ad`, `path` (a floor polyline),
-  `thought`. Cloud+ ads are added automatically whenever Chip View is on (spec 1.7).
-- **Drones** (`DRONES.*`): `spawn(id, { at:[x,y,z], path:[[x,z],…], speed, cone:{ len, half }, kind:'courtesy'|'guardian'|'popup'|'cleaning'|'noise'|'fun', face })`,
-  `get(id)`, `remove(id)`, `clear()`, `lure(at, sampleId)`, states `patrol → curious (amber) → escort (red)`,
-  `stealth.begin({ checkpoints })` / `stealth.end()`; capture → `safeRoom()` (13.7) → retry at the last zone
-  checkpoint with drones reset. Courtesy drones are white pods with a soft blue light (amber/red by state).
-- **Samples**: hotspot `{ sample: 'kettle' }` records when `state.active === 'chase'`: hold YES 1 s, a small waveform
-  card shows the take, `learnSample(id)`. `state.samples` is the collected list.
-- **Holds**: `strengthHold({ who:'luka', label, dur })` strain meter (roller door, brass plate); two-person switches
-  via hotspot `{ pair: 'valves', … }` + "Hold this" context action (spec §9).
-- **Audio**: `music(cue, { fade, cut })`; `AUDIO.song({ pattern, from, to, muffled, bleed })` plays "two" from the
-  sequencer pattern (sections INTRO VERSE CHORUS VERSE2 BRIDGE CHORUS OUTRO, 92 bpm, B minor → D major final chorus);
-  `AUDIO.laugh()` (or `LAUGH_CLIP` if set), `AUDIO.voicemail()` (or `VOICEMAIL_CLIP`).
-- **State**: `{ scene, flags, inventory, active, samples, pattern, hack, choice, quiet, santa, … }`;
-  `profile.endingsSeen = { A, B }`; options add `storyMode`, `holdToPress`.
+Every call below is safe while `flow.skipping` (it finishes at once, or drops what is only cosmetic) and has an
+autoplay path. **`src/89-content-devtest.js`** (scene `DEV`: `?autoplay=1&scene=DEV&stop=DEV`; `DEV_LINEUP` lines up
+every look) exercises all of it: read it for working examples. Rue's APIs (`docs/engine/*.md`) still apply unless
+changed here.
+
+### 5.1 Speakers, dialogue, barks
+
+- `CHARACTERS[id] = { name, voice, actor?, silhouette?, duo? }` (§3.1). `say('manager', …)` animates actor `luka40`;
+  `speakerActor(id)` → the actor id. `duo: ['chase', 'chase40']` (speaker `chases`): both mouths, a split portrait, both
+  blips. Voice fields: `wave f len gap filter soft tumble mono pure ring band hiss`.
+- Line steps: `{ say: id, text, tag, expr, act, speed, auto, name, portrait: false, censor }`. `tag` is the small italic
+  tag after the name: `off`, `whisper`, `muffled`, `quietly`, `down the line`, `on the PA`, `filtered`, `gruff`,
+  `together`, …
+- `ui.nameGlitch(fromId, toId)`, step `{ nameGlitch: [from, to] }`: the label and portrait glitch for a frame or two;
+  later `say(toId)` lines carry the new name (3.3: `['manager', 'luka40']`).
+- `bark(id, text, o = {}) → Promise`: a non-blocking corner line with a portrait over gameplay, queued in order.
+  `o: { name, tag, portrait: false, speed: 'slow' | 'normal' | 'fast', hold (s after typing), now (drop the queue) }`.
+  Never takes YES, never ducks music, never makes `say.busy()` true. `bark.clear()`, `bark.busy()`. Step
+  `{ bark: id, text, tag?, wait?: true | secs }` (not awaited unless `wait`). A skip, a scene change or `flow:stop`
+  drops every bark.
+
+### 5.2 Pop-ups
+
+`popup(spec) → { el, done: Promise<button index | -1>, close(), progress(pct), setMsg(text), moon(on) }`. spec:
+`style: 'jarvis'` (default, 2026) `| 'safesense'` (2040: rounded translucent glass, blue glow, pill buttons, two-note
+chirp), `msg`, `title`, `icon: 'warn' | 'error' | 'info' | 'none'`, `buttons = ['OK']`, `at: 'center' | [x, y]` (0..1)
+`| { actor } | { pos: [x, y, z] }` (pinned to a world point, hidden behind the camera), `w`, `dur`, `spinner`,
+`progress: { from, to, dur }`, `dodge`, `cls`, `shake`, `ding: false`, `z`, `emptySlot` (the dashed empty space where
+NO should be), `note` (small text under the message), `moon` (the Do Not Disturb moon). `popup.clear()`,
+`popup.count()`, `popup.prewarm(n)`. Step `{ popup: spec, wait: true }` → `flow.result` = the index. Autoplay presses
+the first button after 0.3 s.
+
+### 5.3 HUD, time cards, UI bits
+
+- HUD (top-right pill: NO SERVICE, or "Optus" with bars · QUIET IN · Samples): `hud.set({ noService, quiet:
+  'hh:mm:ss' | seconds, samples: true (the live count) | n | false, bars: 0..4 | null, hack } | null)` (null hides it
+  all and clears those fields); `hud.quiet(str | seconds | null)`; `hud.samples(n | true | false)`; `hud.bars(n)`;
+  `hud.noService(on)`; `hud.hack(pct 0..100 | null, { stalled, back })` (the big centre-top HACK bar; writes
+  `state.hack`); `hud.animate({ bars, hack }, dur) → Promise` (whole steps); `hud.show()`, `hud.hide()`,
+  `hud.refresh()`. The model is `state.noService`, `state.quiet`, `state.bars`, `state.hack` and `state.hud = { samples,
+  hack }`. Steps: `{ hud: {…} | null, anim }`, `{ quiet: 'hh:mm:ss' | null }` (applied when skipping too).
+- Time cards: scene `time` + `place` → `ui.timeCard(time, place, dur = 3)` at scene start (after an act card), not
+  awaited, unless the scene says `timeCard: false`. Step `{ timeCard: 'Thursday 24 December 2026, 18:58', place?,
+  wait? }`. It sits low left and moves above the dialogue box while someone talks.
+- `ui.title(text, dur, { logo })` (the text `'two'` shows the logo), `ui.flash(dur, color)` (Reduce Flashing: a slow
+  dim bloom), `ui.chipView(on)`, `ui.signal(v 0..1 | null)`, `ui.meter(label | null, v)`, `ui.sampleCard(id)`,
+  `ui.prompt('SWAP — Tab')` (pills for YES/NO/SWAP/CHIP/HOLD). New cards: `person`, `take`, `discography`,
+  `buglist40`; every card paints at 2× (helpers: `CARDS._kit`).
+
+### 5.4 Flow: scenes, steps, the party, samples, endings
+
+- Scene fields add `time`, `place`, `timeCard: false`, `follow: true | id | [ids]` (start with followers), `next: id |
+  (state) => id`, `branch: 'A' | 'B'`; `grants` also takes `hack`, `choice`, `quiet`, `noService`, `removeItems` and
+  `state: {…}`.
+- Scene steps add `['playable', ids]` (who SWAP cycles mid-scene) and `['follow', true | id | [ids] | null]`.
+- Cutscene steps add `{ bark }`, `{ nameGlitch }`, `{ timeCard }`, `{ quiet }` and `{ slowmo: 0.3, dur: 1.5 }` (slow
+  motion for `dur` on-screen seconds, not awaited; `wait`s inside it are game time, so `{ wait: 0.5 }` lasts 1.7 s at
+  0.3; it ends with the cutscene; nothing while skipping). `flow.slowmo` is the factor.
+- SWAP: `playable` may list three ids; SWAP (Tab / Y / the SWAP button) cycles them in order, skipping anyone not on
+  this set, and `emit('swap', id)`. `flow.follow` is null, an id or a list: the non-active playables follow (the one you
+  leave takes the new one's place). `flow.swapNext()` (code, autoplay) → the new id or null; `flow.setFollow(x)`;
+  `flow.holdPos(id, on = true)` (leaves the follow list); `player.wait(id, on = true)` (stays in the party but holds
+  its spot: "Hold this"); `player.waiting(id)`; `player.follower(id | [ids] | null)`; `player.followers`.
+- Samples: a hotspot `{ sample: 'kettle' }` records when `state.active === 'chase'`: hold YES `CONFIG.record` (1 s; a
+  press with `options.holdToPress`), the take card shows, `flow.learnSample(id)` (also callable from code),
+  `emit('sample:add', id)`. `hotspots.trigger(id)` records too (autoplay). `state.samples` keeps the order. A kettle
+  hotspot with `des: true` has DES say "Tea?" first.
+- Endings: after 3.7 the flow goes to A1 / B1 by `state.choice` (else `&ending`, else A); A2 / B2 → C;
+  `profile.endingsSeen[A | B]` is set (and saved) when A1 / B1 starts; `emit('ending', 'A' | 'B')`.
+- Mini-games: `api.fail()` counts a failure (a `{ failed }` result counts once); after two in a scene `flow.skipOffer`
+  turns on and Pause → "Skip this mini-game" calls `flow.skipMinigame()` (finishes `{ skipped: true,
+  ...m.skipResult }`; never for `noSkip`). `flow.minigameId`.
+- Events: `flow:stop` (every scene change and quit: systems clear themselves), `scene:end`, `swap`, `sample:add`,
+  `ending`, `minigame:skipoffer`, `signal:full`, `stealth:capture`, `stealth:retry`, `stealth:checkpoint`, `lure`,
+  `chip:view`, `saferoom`.
+- Input: CHIP is an action (Q / LB / the CHIP touch button, shown only while Chase (2040) can use it):
+  `input.pressed('chip')`, `input.held('chip')`. Every hold-to-confirm reads `input.holding(a)` (with
+  `options.holdToPress` a press latches until `input.unlatch(a)`, NO, or 5 s).
+
+### 5.5 World and camera
+
+- Shots, `cam.shot(step)` (names case-insensitive, spaces = hyphens: `'crash zoom'`, `'top-down'`): ECU CLOSE MID WIDE
+  TWO THREE TOP INSERT JARVIS POV CAM SET, plus LOW HIGH OTS LOCKED and the moves PUSH PULL TRACK PAN TILT CRANE ORBIT
+  WHIP CRASH, framed at `size` (default MID). TWO's options: `half: 'right'` (the right half of a split), `roll: deg`
+  (180 = upside down), `shake: amp | { amp, dur }` (also `cam.shake(amp = 0.04, dur = 0.45)`; none by default); OTS
+  `over: id` / `from: id` / `on: [subject, shoulder]`, `shoulder: 'left' | 'right'`, `angle: 'low' | 'high'`; CRASH
+  `zoom: fov` (the lens it punches to; `fov` is the starting lens); ORBIT `spin: true` (keeps turning after `dur`;
+  with `ease: 'in'` it speeds up: the idea engine); CRANE `dir: 'down'` (from 2 m above down to the framing; numeric
+  `from` / `to` = metres of rise); JARVIS `on` optional; WHIP blurs for 0.2 s (`world.whipBlur` px, 0 = off). Framing
+  never leaves the lens inside or behind a wall (`userData.noOcclude` lets rays through a mesh); narrow screens keep the
+  16:9 horizontal field (`world.fitNarrow`): don't use Rue's `fit()` helper.
+- `cam.override(mode, opts)`: `'follow' { dist, height, lag, fov, look }`, `'fixed' { pos, look: [x, y, z] | 'player' |
+  actorId, fov, lag, lookLag }` (a mini-game may mutate the `pos` / `look` arrays in place every tick for a tracking
+  camera, e.g. the boss's `bossCam`; `lag` / `lookLag` are damping time constants in seconds), `'set' { name }`, or
+  `null`. `opts.ease: secs` blends from the current view into it instead of cutting (also `cam.override(null, { ease })`).
+- Set cams may have `ease: true | secs`: chained corridor cameras ease (0.25 s) instead of cutting when both have it.
+- Split screen: `world.split({ left: { set, shot | cam, env }, right: { set, shot | cam, env }, ratio = 0.5 }, { slide,
+  dur = 0.6 })` (step `{ split: {…}, slide }`): two live sets, each half with its own moving shot (`cam.shot({ …,
+  half: 'right' })` recuts the right one); `world.split(null, { slide, keep: 'left' | 'right' })` closes it (`keep:
+  'right'` makes the right set current, shot and all). `cam.project(v, 'right')`. Spawn into the right set with
+  `{ spawn: id, at, set: rightSetId }`.
+- Sets: `world.liveMax = 3` (the default); a set not on screen for more than two scenes is disposed when a scene
+  starts; `world.prebuild(id) → Promise` builds over three frames (in a cutscene's last shot or under a fade);
+  `world.prop / anchor / mark(name, setId?)`. `world.envName` = the current set's env preset name. `world.torchAuto` is
+  reset to `true` whenever a set is shown (a set that parks the spot as a lamp sets it `false` again in its
+  `dress` / `update`).
+- Colliders are live: a set may push, splice or move boxes in its `colliders` array (or write a box's numbers in place)
+  at runtime (pushed bins and racks, doors that open); collisions, drone cones and `lineClear` read them every tick.
+  Splice a box out to remove it.
+- Helpers: `world.actorsIn(x, z, r, out)`, `world.colliders`, `world.collide(actorOrId, x, z)`, `world.resolve(x, z, r,
+  out)`, `world.lineClear(x0, z0, x1, z1, pad)`, `world.floorAt(x, z)`, `actor.moveTo(where, { collide: true })`.
+- TWO's one-shot anims (`ANIM_ONE` in 04-art: `tether_throw`, `chip_ping`, `coat_throw`, `put_headphones_on`,
+  `get_up_hurt`, `brush_shoulder`, `pull_cracker`, `stumble`, `bow`, `hands_halt`) play once and go back, like `nod`.
+  Wardrobe: `a.rig.show(name, on)`, `a.rig.dress(state)` (automatic on spawn), `a.rig.chip('on' | 'off' | 'ping' |
+  'amber' | 'red' | 'dim')`, `a.rig.badgeFlip(on)`, `a.rig.face.mark(kind, on)`, `a.rig.face.browLift(k)`.
+
+### 5.6 Chip View, AR, the Signal (`chip`, `AR`)
+
+- Only when `state.active === 'chase40'`, in a roam, `chip.allowed` and not forced off: hold CHIP → blue tint and
+  scanlines, AR labels, the Cloud+ ads placed in view (automatic), his chip light on; `chip.signal` fills at
+  `chip.rate` (1/6 per s: ~6 s; faster in `chip.hot = [{ at: [x, z] | box: [x0, z0, x1, z1], r, mul }]`) and drains at
+  `chip.drainRate` on release; full → `emit('signal:full', { who: 'chase40' })` (stealth on: the drones turn to him,
+  Safe Room; else `DRONES.alert`). All of it resets every scene.
+- `chip.forceOff(on = true, msg)` (CHIP only shows a toast; his light goes dark), `chip.lightOn(on | null)`,
+  `chip.show(on)` (the view for POV shots / cutscenes, no Signal), `chip.peek(sec = 1.5) → Promise` (autoplay's CHIP),
+  `chip.reset()`.
+- `AR.add({ id?, kind = 'sign', text, title?, at: where | on: actorId | prop: name, oy, w, color, size = 1, maxD }) →
+  id`; kinds `sign price name code tag ad thought popup path` (`path`: `{ points: [[x, z] | [x, y, z], …], loop, w }`,
+  a crawling dashed floor line; a patrolling drone's route shows as `path:<droneId>`). `AR.set(id, patch)`,
+  `AR.remove(id)`, `AR.clear()`, `AR.show(true | false | null)` (null = follow Chip View). A `where` is a mark, actor,
+  anchor, prop, `[x, z]` or `[x, y, z]`. Labels belong to the set they were made in.
+
+### 5.7 Drones, stealth, the Safe Room (`DRONES`, `stealth`, `safeRoom`)
+
+- `DRONES.spawn(id, { path: [[x, z], …], loop, speed = 1, pause = 0.5, at, face, hover = 1.55, kind = 'courtesy' |
+  'guardian' | 'popup' | 'cleaning' | 'noise' | 'fun' | 'lifeguard' | 'door', cone: { len = 3.2, half = 0.42 } | false,
+  sweep (deg), sweepPeriod = 5, showPath = true, ai = true }) → { id, kind, obj, x, z, yaw, st }` (3+ points loop, 2
+  ping-pong, none = parked at `at` facing `face`). States `patrol` (blue) → `curious` (amber, '?') → `escort` (red;
+  needs `stealth.active`) → the hug → capture. Cones are floor fans clipped by the set's live colliders and by
+  `DRONES.cover(id, box | null)` boxes (`DRONES.walls = false`: cover boxes only).
+- `DRONES.get(id)`, `remove(id)`, `clear()`, `all`, `reset()`, `pause(on)`, `calm()`, `alert(who)`, `turn(who)`,
+  `goTo(id, at, { speed, then }) → Promise`, `face(id, where)`, `release(id)`, `light(id, state)`, `state(id)`,
+  `inCone(id, who) → bool`, `claw(id, k = 1, dur = 0.4)` (the noise drone's claw, 0 closed … 1 open; the model is
+  `DRONES.get(id).obj` for a prop to follow), `zap(droneId, actorId, { line }) → Promise` (1.6's static),
+  `lines = { escort, laugh }`.
+- `DRONES.lure(at, sampleId, { r, dur, line, over, y, disc = 0.6 }) → thenable { n, ids, done }`: drones within
+  `SAMPLES[id].lure.r` (or `r`) investigate for `lure.dur` (or `dur`) and go back; they hover a metre short of it (`over`:
+  right above it; `y`: at that height); while they investigate their cone collapses to a disc of radius `disc`
+  (`false` keeps the cone) lying on the lure's surface when `at` is `[x, y, z]`; the laugh gets DRONE: "Excuse me!
+  Someone is having too much fun!". `DRONES.lureMenu(at, { fallback, test, …lure options }) → Promise<sampleId |
+  null>` (Chase picks one of `state.samples`).
+- `stealth.begin({ checkpoints: [{ id, box: [x0, z0, x1, z1] | zone: camName, at: where | { luka: where, … } }],
+  onCapture(who), onRetry(key), variant: 'room' | 'quiet', safeRoom: false (fade and retry), targets: [ids],
+  escortAfter = 1.4, forgetAfter = 2, escortSpeed = 3.6, zoneR = 16, autoCapture })`, `stealth.end()`,
+  `stealth.capture(who, o) → Promise`, `stealth.softFail(who) → Promise`, `stealth.checkpoint()`, `stealth.active /
+  busy / captures`. Without checkpoints the party's positions are saved whenever the player enters a new zone. Under
+  autoplay drones never go past curious unless `autoCapture`.
+- `safeRoom({ variant: 'room' | 'quiet', who, onRetry }) → Promise` (13.7): drawn by 33-systems over the hidden set (no
+  set load; the HUD hides): white, the padded room, DRONE "You are not in trouble. ^ You are in danger.", SafeSense
+  "Would you like to try again? [YES]", retry at the checkpoint with drones reset. ~4 s plus the YES.
+
+### 5.8 Holds and two-person switches
+
+- `strengthHold({ who = 'luka', label = 'Lift', dur = 1.6, keep, at, anim, onProgress(k), onFull(), onRelease(full),
+  autoHold }) → thenable { k, full, held, done, cancel() }` (resolves true when lifted): hold YES, the strain meter
+  fills, letting go rewinds it, a tap or NO gives up (false); `keep`: it stays up only while held (the roller door).
+  Call it from a hotspot's `do`.
+- `pairSwitch({ id, ends: [{ id, at, r, stand }, { … }] (or it adopts the scene's hotspots `{ id, at, pair: id }`),
+  label = 'Turn', who: [ids], hold = 0.5, keep, onDone(), onChange(n) }) → thenable { id, done, end(), auto() }`: at a
+  free end YES ("Hold this") sends the nearest partner there (he stays: `player.wait`), else the player holds it and can
+  SWAP away; YES at the other end does it. A hotspot with only `pair` does nothing until `pairSwitch({ id })` adopts it.
+  `pairSwitch.get(id)`, `pairSwitch.clear()`.
+
+### 5.9 Audio
+
+- `sfx(name, { vol, rate, lp, at, pan, when, offset }) → seconds`; `music(cue, { fade, cut })`, `music.silence(on)`;
+  cues in §3.7 (`music('two')` plays `state.pattern`; `'credits'` adds the 1987 coda).
+- `AUDIO.song({ pattern, samples, from, to, muffled, bleed, speaker, gain, fade, coda, dest, onEnd }) → { t, duration,
+  section, sectionAt(t), playing, stop(fade), ready, done }`: "two" from the sequencer pattern (sections `INTRO VERSE
+  CHORUS VERSE2 BRIDGE CHORUS OUTRO`, 92 bpm, B minor → D major final chorus; `from` / `to` = section names or
+  indices). `AUDIO.bakeSong(pattern) → Promise<AudioBuffer>`; `AUDIO.seq.play(pattern, samples, onStep(step, bar), {
+  section, bars, muffled, speaker, gain })` (+ `.stop()`, `.section(name)`, `.playing`); `AUDIO.hit(sampleId | null,
+  lane, { chord, vol })`; `AUDIO.TWO` (bpm, sections, lead, `defaultPattern(samples)`, …). Pattern: `{ lanes: [sampleId |
+  null × 4], steps: [[bool × 16] × 4], lead?: [bool …], bridge: 'laugh' }` (lane 0 hats, 1 snare, 2 texture, 3 chords).
+- `AUDIO.laugh(o) → seconds` (`LAUGH_CLIP` if set), `AUDIO.voicemail(text?, { vol, cps }) → { dur, clip, stop, done }`
+  (`VOICEMAIL_CLIP`), `AUDIO.pudding({ loops, bars, speaker, onEnd })`, `AUDIO.note(midi, o)`, `AUDIO.playSample(id,
+  o)`, `AUDIO.sampleBuffer(id)`, `AUDIO.peaks(id, n)`, `AUDIO.muffle(hz | null, dur)`, `AUDIO.ringing(on, { vol, fade
+  })`, `AUDIO.warm(cues)`, `AUDIO.now()`.
+- Beds: `AUDIO.loop(name, { vol, fade, rate, lp, at, bus }) → { stop(f), vol(v), rate(r), pos(x, y, z) }`; a set's
+  `ambience: { rain: true | 'glass' | 'roof' | 'street' | 'heavy', loops: [name | [name, vol] | { name, vol, lp, at }],
+  room }` (or `AUDIO.ambience(a)` + `AUDIO.setRoom(room)` from `dress`). Every loop name in `docs/sets/*.md` exists
+  (`AUDIO.loopNames()`); some bake in the background after boot and fade in when ready. A music cue name also works as
+  a loop, heard through a small speaker (`'radio'`, `'hold'`, `'walkman'`, `'uke'`, `'choir'`, `'lift'`). Rooms
+  (`AUDIO.rooms`): `none room small carriage hall atrium wet lane`.
+
+### 5.10 State, options, profile
+
+`state = { scene, flags, inventory, active, samples, names, bugs, pattern, hack, choice, quiet, noService, battery,
+bars, hud }` (Luka's disguise is `flags.santa`, §3.8); `options` add `storyMode` and `holdToPress`; `profile = {
+completed, seenPrologue, endingsSeen: { A, B } }`. Saves are versioned and merged over `newState()`.
 
 ## 6. Content files (scenes + cutscenes, word for word)
 
