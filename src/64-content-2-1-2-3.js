@@ -36,7 +36,12 @@
     if (!a) return;
     c.ui.card(null);
     a.eyePos(V1);
-    const ry = a.rotY + (o.yaw || 0), d = o.dist || 0.95, pu = o.push ?? 0.12, ly = V1.y - 0.05 + (o.ly || 0);
+    const turning = !!(a.fc && a.fc.on);
+    if (turning) {   // mid-turn (a face step is not awaited): frame where the turn ends
+      const dr = a.fc.a1 - a.rotY, dx = V1.x - a.pos.x, dz = V1.z - a.pos.z, cs = Math.cos(dr), sn = Math.sin(dr);
+      V1.x = a.pos.x + dx * cs + dz * sn; V1.z = a.pos.z - dx * sn + dz * cs;
+    }
+    const ry = (turning ? a.fc.a1 : a.rotY) + (o.yaw || 0), d = o.dist || 0.95, pu = o.push ?? 0.12, ly = V1.y - 0.05 + (o.ly || 0);
     const sx = Math.sin(ry), sz = Math.cos(ry), y = V1.y + (o.dy ?? -0.02), lx = V1.x + (o.lx || 0), lz = V1.z + (o.lz || 0);
     c.cam.shot({ shot: 'CAM', pos: [V1.x + sx * d, y, V1.z + sz * d], look: [lx, ly, lz], fov: o.fov || 36,
       to: { pos: [V1.x + sx * (d - pu), y, V1.z + sz * (d - pu)], look: [lx, ly, lz], fov: o.fov || 36 }, dur: o.dur || 7, ease: 'linear' });
@@ -102,7 +107,7 @@
   if (!ANIMS.s22_beard_up) {
     ANIMS.s22_beard_up = (r, t, p) => {
       const k = K(); if (!k) return ANIMS.idle(r, t, p);
-      if (r.seated || p.kneel) k.kneel(r, t); else k.base(r, t);
+      if (p.kneel) k.kneel(r, t); else k.base(r, t);
       const u = k.once(t, p, 0.8), a = u < 0.5 ? k.ez(u / 0.5) : k.ez((1 - u) / 0.5), d = r.d;
       k.arm(r, -1, 0.04 + 0.06 * (1 - a), (d.headC - 0.22) * a - 0.05 * (1 - a), 0.14 + 0.16 * a, 1, -1, -0.3);
       r.parts.handR.rotation.set(-0.6 * a, 0, 0.3);
@@ -114,7 +119,7 @@
     ANIMS.s23_finger = (r, t, p) => {
       const k = K(); if (!k) return ANIMS.idle(r, t, p);
       k.base(r, t);
-      const u = k.ez(k.once(t, p, 3.2)), P_ = r.parts;
+      const u = k.ez(Math.min(1, t / 3.3)), P_ = r.parts;
       P_.torso.rotation.x += 0.32; P_.head.rotation.x = 0.42; P_.head.rotation.y = -0.25 + 0.5 * u;
       k.arm(r, -1, 0.28 - 0.38 * u, -0.06, 0.5, 1, -0.6, -0.4);
       P_.handR.rotation.set(0.9, 0, 0.2);
@@ -331,7 +336,7 @@
     cx.strokeStyle = 'rgba(95,178,255,.55)'; cx.lineWidth = 4; K_.rr(cx, w * 0.05 + 4, h * 0.08 + 4, w * 0.9 - 8, h * 0.84 - 8, 36); cx.stroke();
     cx.textBaseline = 'middle'; cx.textAlign = 'left';
     cx.fillStyle = '#5a8ab8'; cx.font = `italic 28px ${K_.SYS}`; cx.fillText('SafeSense', w * 0.1, h * 0.2);
-    cx.fillStyle = '#1c2a3e'; cx.font = `bold 92px ${K_.SYS}`; cx.fillText('MAX 40 dB', w * 0.1, h * 0.45);
+    cx.fillStyle = '#1c2a3e'; cx.font = `bold 72px ${K_.SYS}`; cx.fillText('MAX 40 dB', w * 0.1, h * 0.45);
     cx.fillStyle = '#5a6a7e'; cx.font = `30px ${K_.SYS}`; cx.fillText('for your safety', w * 0.1, h * 0.66);
     // the LED
     cx.fillStyle = green ? '#3ad16a' : '#e53935'; cx.shadowColor = cx.fillStyle; cx.shadowBlur = 24; cx.beginPath(); cx.arc(w * 0.13, h * 0.82, 14, 0, 7); cx.fill(); K_.noShadow(cx);
@@ -370,6 +375,28 @@
     cx.fillStyle = g; K_.rr(cx, x, y, pw, ph, 12); cx.fill();
   };
   CARDS.s23_plaque.size = [960, 380];
+
+  // 2.3: the music slate held up between them: Luka's number, the voicemail greeting playing
+  CARDS.s23_voicemail = (cx, w, h) => {
+    const K_ = CARDS._kit;
+    K_.tilt(cx, w, h, 0.03);
+    K_.shadow(cx, 30, 12); cx.fillStyle = '#16191f'; K_.rr(cx, w * 0.05, h * 0.06, w * 0.9, h * 0.88, 30); cx.fill(); K_.noShadow(cx);
+    const sx = w * 0.09, sy = h * 0.12, sw = w * 0.82, sh = h * 0.76;
+    cx.save(); K_.rr(cx, sx, sy, sw, sh, 10); cx.clip();
+    cx.fillStyle = '#0e1626'; cx.fillRect(sx, sy, sw, sh);
+    cx.fillStyle = '#16233a'; cx.fillRect(sx, sy, sw, 46);
+    cx.textBaseline = 'middle'; cx.textAlign = 'left'; cx.fillStyle = '#bfe6ff'; cx.font = `bold 22px ${K_.SYS}`; cx.fillText('SLATE', sx + 20, sy + 24);
+    cx.textAlign = 'right'; cx.font = `20px ${K_.SYS}`; cx.fillText('8:52 am', sx + sw - 20, sy + 24);
+    cx.textAlign = 'center'; cx.fillStyle = '#ffffff'; cx.font = `bold 46px ${K_.SYS}`; cx.fillText('Luka', sx + sw / 2, sy + sh * 0.3);
+    cx.fillStyle = '#9fb6c8'; cx.font = `24px ${K_.SYS}`; cx.fillText('Voicemail greeting', sx + sw / 2, sy + sh * 0.43);
+    cx.fillStyle = '#bfe6ff'; K_.seedOf('vm');
+    for (let x = sx + 40; x < sx + sw - 40; x += 7) { const a = 6 + Math.abs(Math.sin(x * 0.045) * 26 + Math.sin(x * 0.17) * 10) * (0.55 + K_.rnd() * 0.45); cx.fillRect(x, sy + sh * 0.64 - a / 2, 4, a); }
+    cx.fillStyle = 'rgba(14,22,38,.55)'; cx.fillRect(sx + sw * 0.46, sy + sh * 0.5, sw * 0.5, sh * 0.28);   // not played yet past here
+    cx.fillStyle = '#ffffff'; cx.fillRect(sx + sw * 0.46, sy + sh * 0.5, 3, sh * 0.28);
+    cx.fillStyle = '#9fb6c8'; cx.font = `22px ${K_.MONO}`; cx.fillText('0:03 / 0:06', sx + sw / 2, sy + sh * 0.88);
+    cx.restore();
+  };
+  CARDS.s23_voicemail.size = [760, 520];
 
   // ---------------------------------------------------------- the limiter keypad (Rue's Alarm keypad, 2040 SafeSense)
   // ['minigame', 'keypad', { digits: 4, code: '2032', shot, onKey(d), test }] -> { ok: true, code } | { cancel: true }.
@@ -479,7 +506,7 @@
   // [WIDE · from inside, through the balcony door]
   const DAWN_WIDE = glideCam([-0.55, 1.95, -3.3], [-2.65, 0.95, 1.4], 54, { pos: [-1.05, 1.78, -2.55], look: [-2.75, 1.05, 1.35], fov: 49 }, 8);
   // Chase on the couch (asleep, then sitting up): a loose close that holds both head heights
-  const COUCH_CLOSE = glideCam([-1.0, 1.2, -1.42], [-1.62, 1.04, -2.42], 40, { pos: [-1.08, 1.18, -1.56], look: [-1.62, 1.06, -2.42], fov: 38 }, 8);
+  const COUCH_CLOSE = glideCam([-1.0, 1.2, -1.42], [-1.62, 1.02, -2.42], 40, { pos: [-1.08, 1.24, -1.56], look: [-1.62, 1.18, -2.42], fov: 38 }, 8);
   // over Chase's right shoulder on the couch: Luka through the glass, Chase's head at the frame's edge
   const COUCH_OTS = glideCam([-1.02, 1.42, -3.25], [-2.95, 1.0, 1.2], 40, { pos: [-1.05, 1.4, -3.05], look: [-2.95, 1.02, 1.2], fov: 37 }, 6);
   // the room from the corner (the gameplay camera's own angle: control hands over without a jump)
@@ -492,7 +519,8 @@
   const BAL_LIGHT = { hemi: [0xdccfdc, 0x4a3e46, 1.0], dir: [0xffc8b4, 0.6, [2, 5, -9]], spot: [0xffb0a0, 1.4] };
   const PLAN_WIDE = glideCam([2.3, 1.72, -0.22], [2.3, 0.85, -1.55], 62, { pos: [2.3, 1.66, -0.32], look: [2.3, 0.86, -1.55], fov: 60 }, 8);
   const PLAN_TOP = glideCam([2.3, 1.5, -0.84], [2.3, 0.76, -0.97], 40, { pos: [2.3, 1.38, -0.88], look: [2.3, 0.76, -0.97], fov: 40 }, 6);
-  const BOX = glideCam([-0.85, 1.32, -4.55], [-1.7, 0.2, -5.4], 42, { pos: [-0.95, 1.18, -4.75], look: [-1.7, 0.2, -5.4], fov: 40 }, 5);
+  // from the foot of the bed, past the box: Luka's face as he kneels to it
+  const BOX = glideCam([-2.15, 1.45, -4.05], [-1.45, 0.72, -5.35], 46, { pos: [-2.1, 1.38, -4.15], look: [-1.45, 0.72, -5.35], fov: 44 }, 5);
   const SANTA_MID = glideCam([0.35, 1.58, -4.3], [-1.05, 1.42, -5.4], 40, { pos: [0.1, 1.56, -4.5], look: [-1.05, 1.44, -5.4], fov: 38 }, 7);
 
   function reset21(c) {
@@ -717,7 +745,7 @@
       const ch = act(c, 'chase'), l = act(c, 'luka'), c4 = act(c, 'chase40');
       const bd = P(c, 'balcony_door'); if (bd) bd.userData.open(1);
       if (c4) c4.place([-0.2, 0, -5.2, PI]);                       // gone back to the bedroom
-      if (l) { l.place('s21_bal_luka'); l.hold('tea_towel', 'R'); l.play('polish'); l.setExpr('tired'); }
+      if (l) { l.place([-3.0, 0, 1.1, 0.95]); l.hold('tea_towel', 'R'); l.play('polish'); l.setExpr('tired'); }
       const t = P(c, 'teas'); if (t) t.userData.state('bench');
       if (ch) { ch.place([-1.75, 0, -1.2, 0.2]); ch.play('idle'); ch.hold('teas', 'R'); ch.play('carry_mug'); ch.setExpr('neutral'); }
     } },
@@ -825,9 +853,13 @@
     { expr: [['chase40', 'neutral']] },
     CLOSE('chase40', { yaw: 0.3, dist: 1.0, fov: 36, push: 0.1, dur: 6, dy: 0 }),
     say('chase40', 'You need a disguise.'),
-    // Control to Luka (up from the table)
+    { wait: 0.4 },
+    // Control to Luka (up from the table, under a short dip to the kitchen's own angle)
+    { fade: 'out', dur: 0.35 },
+    { shot: 'CAM', pos: [-0.6, 2.35, -0.3], look: [1.6, 0.9, -1.9], fov: 58 },
     unseat('luka'), unseat('chase'), unseat('chase40'),
     { place: 'luka', at: [1.15, 0, -1.75, -2.5] }, { place: 'chase', at: [2.2, 0, -2.3, 0] }, { place: 'chase40', at: [3.05, 0, -1.6, -1.2] },
+    { fade: 'in', dur: 0.5 },
   ];
 
   // Luka puts on the hat and the beard, over his real beard. [MID · Luka turns round]
@@ -865,20 +897,21 @@
   const S22_FLAGS = ['s22_code', 's22_plate', 's22_green', 's22_played', 's22_sneak', 's22_out'];
   const DRONE = 'd22';
   const DRONE_HOME = [10.0, 0, -31.0];
-  const PIANO_TOP = [8.3, 1.34, -20.0];
+  const PIANO_TOP = [8.35, 1.34, -21.6];          // where the drone hangs: just past the piano's south end, clear of the bench lenses
   const POCKET = [11.1, -35.2, 14.3, -30.8];
   const inBox = (b, x, z) => x >= b[0] && x <= b[2] && z >= b[1] && z <= b[3];
   const TAG = new THREE.Vector3(8.3, 1.55, -19.1);
   const S22 = { phase: '', guardT: 0, upd: null, listening: false, handle: null };
-  const LANE_TRACK = glideCam([8.6, 1.75, -1.2], [8.5, 1.3, -14.0], 44, { pos: [8.55, 1.7, -7.6], look: [8.5, 1.35, -30.0], fov: 40 }, 6.5, 'out');
+  const LANE_TRACK = glideCam([9.75, 1.85, -1.6], [8.4, 1.3, -14.0], 44, { pos: [9.3, 1.75, -5.4], look: [8.5, 1.35, -30.0], fov: 40 }, 6.5, 'linear');
   const STATUES = glideCam([8.5, 1.7, -23.5], [8.5, 1.45, -33.8], 34, { pos: [8.5, 1.65, -25.2], look: [8.5, 1.5, -33.8], fov: 32 }, 7);
   const DRONE_END = glideCam([8.4, 1.55, -25.8], [10.0, 1.9, -31.0], 38, { pos: [8.6, 1.6, -26.6], look: [10.0, 1.9, -31.0], fov: 36 }, 5);
+  const PLATE_LENS = { shot: 'CAM', pos: [9.75, 1.45, -16.9], look: [8.25, 0.85, -19.0], fov: 46 };   // Luka heaving the brass plate up
   const KEYPAD = { shot: 'CAM', pos: [8.36, 1.1, -18.66], look: [8.37, 0.88, -19.12], fov: 32 };
   const AR_TAG = glideCam([7.2, 1.62, -16.9], [8.3, 1.5, -19.1], 38, { pos: [7.45, 1.6, -17.4], look: [8.3, 1.5, -19.1], fov: 34 }, 3);
-  const PIANO_CAM = { shot: 'CAM', pos: [7.15, 2.0, -19.95], look: [9.55, 1.2, -19.95], fov: 42 };   // the mirror, from behind the piano
-  const LANE_BAY = glideCam([9.75, 1.32, -19.25], [-17.0, 4.0, 380], 22, { pos: [9.75, 1.32, -19.15], look: [-17.0, 4.0, 380], fov: 20 }, 7);
-  const HISS = glideCam([7.75, 1.25, -23.3], [7.0, 1.0, -21.5], 40, { pos: [7.62, 1.2, -23.0], look: [7.0, 1.0, -21.5], fov: 38 }, 5);
-  const EXIT_WIDE = glideCam([7.0, 2.7, -27.6], [11.6, 0.9, -32.6], 50, { pos: [7.2, 2.6, -28.2], look: [12.0, 0.9, -32.8], fov: 48 }, 8);
+  const LANE_BAY = glideCam([9.75, 1.32, -19.25], [-17.0, 7.0, 380], 22, { pos: [9.75, 1.32, -19.15], look: [-17.0, 7.0, 380], fov: 20 }, 7);
+  // from the lane's end (in front of the statues), up the lane to the piano; then panning with Chase into the pocket
+  const EXIT_WIDE = { shot: 'CAM', pos: [7.5, 2.3, -32.5], look: [8.7, 1.0, -20.5], fov: 40 };
+  const EXIT_PAN = { shot: 'CAM', pos: [7.5, 2.3, -32.5], look: [8.0, 1.0, -24.5], fov: 44, to: { pos: [7.6, 2.2, -32.6], look: [12.2, 1.0, -32.6], fov: 50 }, dur: 3.6, ease: 'linear' };
 
   function reset22(c) { for (const f of S22_FLAGS) delete c.state.flags[f]; }
   function duties22() {
@@ -952,13 +985,16 @@
     a.place('s22_piano_chase'); a.play('sit', { h: 0.48 }); a.rig.seated = true;
   }
   // the drone over the piano, transfixed: its cone collapses onto the lid while the piano plays
-  // (no sample sound: Chase's playing is the lure; dur long enough to outlast any sneak). The cone collapses over ~0.4 s,
-  // so it is done under a cutscene, or with the sneakers behind it (they start behind the piano, the cone faces the lane)
+  // the drone hovers over the piano's south end, held there facing Chase at the keys (amber, its cone across the bench):
+  // a drone held 'idle' by DRONES.face doesn't scan, so the others can slip past behind it along the west wall. If the
+  // piano stops, it is released and turns back to its post (and scans on the way). (A lure would do, but its cone's
+  // collapse sweeps a wide, short fan for ~0.4 s that catches anyone crouched right beside the piano.)
+  const CHASE_SEAT = [9.45, 0, -20.3];
   function droneOnPiano(c) {
-    const d = DRONES.get(DRONE); if (!d || d.st === 'lured') return;
-    const go = () => { if (flow.sceneId === '2.2') DRONES.lure(PIANO_TOP, 's22_quiet', { r: 60, dur: 9999, over: true, y: 2.2, disc: 0.5 }); };
-    if (Math.hypot(d.x - PIANO_TOP[0], d.z - PIANO_TOP[2]) > 0.3) DRONES.goTo(DRONE, [PIANO_TOP[0], 0, PIANO_TOP[2]], { speed: 200 }).then(go);
-    else go();
+    const d = DRONES.get(DRONE); if (!d) return;
+    const hold = () => { if (flow.sceneId !== '2.2') return; DRONES.face(DRONE, CHASE_SEAT); DRONES.light(DRONE, 'curious'); };
+    if (Math.hypot(d.x - PIANO_TOP[0], d.z - PIANO_TOP[2]) > 0.3) DRONES.goTo(DRONE, [PIANO_TOP[0], 0, PIANO_TOP[2]], { speed: 200 }).then(hold);
+    else hold();
   }
   // the sneak: Chase plays on (verse + chorus, round and round) while the others slip past along the west wall
   function sneakOn(c) {
@@ -970,13 +1006,13 @@
     S22.phase = 'sneak';
     c.state.flags.s22_sneak = true;
     const l = act(c, 'luka'), c4 = act(c, 'chase40');
-    if (l) { l.rig.seated = false; l.place('s22_luka_hide'); l.play('idle'); }
+    if (l) { l.rig.seated = false; l.place(LUKA_HIDE); l.play('idle'); }
     if (c4) { c4.rig.seated = false; c4.place(SNEAK_C40); c4.play('idle'); }
     sneakOn(c);
-    stealth.end();
+    // (stealth is already off since the piano: stealth.end() would calm the lured drone back to its post)
     stealth.begin({
       targets: ['luka', 'chase40'], escortAfter: 1.4, forgetAfter: 1.8,
-      checkpoints: [{ id: 'sneak', box: [1.4, -36, 15, -2], at: { luka: 's22_luka_hide', chase40: SNEAK_C40, chase: 's22_piano_chase' } }],
+      checkpoints: [{ id: 'sneak', box: [1.4, -36, 15, -2], at: { luka: LUKA_HIDE, chase40: SNEAK_C40, chase: 's22_piano_chase' } }],
       onRetry: () => sneakOn(c),
     });
   }
@@ -987,10 +1023,14 @@
   async function playPiano(c) {
     stealth.end();
     S22.phase = 'piano';
-    await c.runSteps([{ move: 'chase', to: 's22_piano_chase' }, { face: 'chase', to: -H, dur: 0.2 }]);
+    c.flow.setFollow(null);   // the others step back to watch
+    await c.runSteps([
+      { move: 'luka', to: [7.3, 0, -16.9, 2.6], nowait: true }, { move: 'chase40', to: 's22_c40_edge', nowait: true },
+      { move: 'chase', to: 's22_piano_chase' }, { face: 'chase', to: -H, dur: 0.2 },
+    ]);
     seatChase(c);
     c.music(null, { fade: 0.6 });
-    const r = await c.flow.minigame('piano', { continue: true, drone: DRONE });
+    const r = await c.flow.minigame('piano', { continue: true, drone: DRONE, droneTo: [PIANO_TOP[0], 0, PIANO_TOP[2]] });
     S22.handle = (r && r.handle) || MINIGAMES.piano.handle || null;
   }
 
@@ -1028,12 +1068,15 @@
         do: async (c) => {
           await c.runSteps([{ move: 'luka', to: 's22_plate_luka' }]);
           const pl = P(c, 'limiter_plate');
+          if (!sk(c)) c.cam.shot(PLATE_LENS);
           const ok = await strengthHold({ who: 'luka', label: 'Lift', dur: 1.6, at: [8.3, 0, -19.2], anim: 'lift_strain',
             onProgress: (k) => { if (pl) pl.userData.lift(k); }, onFull: () => { if (pl) pl.userData.prop(true); } });
-          if (!ok) { if (pl) pl.userData.lift(0); return; }   // let go: the plate drops back
+          if (!ok) { if (pl) pl.userData.lift(0); await c.cam.release(0.4); return; }   // let go: the plate drops back
           if (pl) pl.userData.prop(true);
           c.state.flags.s22_plate = true;
           c.sfx('clunk', { vol: 0.4 });
+          await c.wait(0.6);
+          await c.cam.release(0.6);
         } },
       // the keypad under the plate: whoever's active types 2032
       { id: 'h22_keypad', at: 's22_keypad', r: 0.85, verb: 'Type', when: (s) => !!s.flags.s22_plate && !s.flags.s22_green,
@@ -1146,15 +1189,26 @@
 
   // Cutscene — "2.2_piano" (triggers when Chase first finishes the phrase, before the sneak; the drone is still
   // drifting toward the piano).
+  // The bench is east of the keys (both Chases face -X): faces read from the front corners of the bench, low, past the
+  // piano's ends (the lid is 1.34 m high: seated heads sit just under it from anywhere behind the piano).
+  // faces from over the piano's lid (body x 8.0..8.6, lid 1.3 m): the keys' point of view, the lens just above the lid
+  const CH_FACE = glideCam([8.42, 1.52, -20.08], [9.4, 1.1, -20.3], 36, { pos: [8.5, 1.5, -20.12], look: [9.4, 1.1, -20.3], fov: 34 }, 8);
+  const C40_FACE = glideCam([8.42, 1.52, -19.82], [9.4, 1.1, -19.6], 36, { pos: [8.5, 1.5, -19.78], look: [9.4, 1.1, -19.6], fov: 34 }, 8);
+  // turned to each other along the bench: from over the lid's far corner, so the one turned toward it is near frontal
+  const TURN_CH = glideCam([8.42, 1.56, -19.32], [9.4, 1.1, -20.3], 36, { pos: [8.5, 1.55, -19.4], look: [9.4, 1.1, -20.3], fov: 35 }, 7);
+  const TURN_C40 = glideCam([8.42, 1.56, -20.58], [9.4, 1.1, -19.6], 36, { pos: [8.5, 1.55, -20.5], look: [9.4, 1.1, -19.6], fov: 35 }, 7);
+  const MIRROR = glideCam([11.45, 1.5, -19.95], [9.3, 1.0, -19.95], 40, { pos: [11.2, 1.48, -19.95], look: [9.3, 1.0, -19.95], fov: 39 }, 10);   // from behind: the same slumped backs
+  const BOTH_FRONT = glideCam([7.25, 2.62, -19.95], [9.45, 1.12, -19.95], 44, { pos: [7.35, 2.56, -19.95], look: [9.45, 1.12, -19.95], fov: 43 }, 8);   // high over the lid: both faces
+  const LUKA_HIDE = [7.0, 0, -21.5, 1.02];        // crouched behind the piano's south end, facing the bench
   const PIANO_SHOTS = [   // [bar, shot]: cut on the music (Chase's playing-on runs 6x under autoplay)
-    [4, glideCam([10.45, 1.75, -20.95], [8.6, 0.98, -20.05], 40, { pos: [10.2, 1.65, -20.7], look: [8.6, 0.98, -20.05], fov: 38 }, 9)],                // over his shoulder at the keys
-    [7, glideCam([8.95, 0.62, -18.4], [9.6, 2.1, -29.0], 40, { pos: [8.9, 0.62, -18.6], look: [9.0, 2.2, -24.5], fov: 40 }, 9)],                     // low: the drone drifting up the lane
-    [10, glideCam([5.9, 1.25, -23.6], [7.05, 1.0, -21.4], 40, { pos: [6.1, 1.2, -23.2], look: [7.05, 1.0, -21.4], fov: 38 }, 8)],                  // Luka crouched behind the piano
+    [4, glideCam([10.45, 1.75, -20.95], [8.6, 0.98, -20.05], 40, { pos: [10.2, 1.65, -20.7], look: [8.6, 0.98, -20.05], fov: 38 }, 9)],                 // over his shoulder at the keys
+    [7, glideCam([7.1, 0.62, -27.6], [9.2, 1.75, -20.2], 44, { pos: [7.15, 0.62, -27.2], look: [9.0, 1.85, -20.6], fov: 42 }, 9)],                      // low: the drone drifting up the lane toward him
+    [10, glideCam([7.85, 1.3, -20.92], [7.0, 1.15, -21.5], 42, { pos: [7.78, 1.28, -20.97], look: [7.0, 1.15, -21.5], fov: 40 }, 8)],                   // Luka crouched behind the piano, listening
     [12, { shot: 'CAM', pos: [11.0, 0.9, -25.0], look: [9.0, 1.1, -19.0], fov: 46, to: { pos: [10.6, 4.6, -26.5], look: [8.6, 1.0, -19.0], fov: 50 }, dur: 9, ease: 'linear' }],   // crane up: the lane, the festoon
-    [16, glideCam([12.2, 1.35, -19.4], [9.4, 1.15, -20.3], 34, { pos: [11.5, 1.3, -19.6], look: [9.4, 1.15, -20.3], fov: 32 }, 10)],              // verse 2: in front of him, a slow push
-    [19, glideCam([9.6, 0.75, -17.6], [8.3, 2.3, -20.0], 46, { pos: [9.8, 0.7, -17.9], look: [8.3, 2.2, -20.0], fov: 44 }, 7)],                     // the drone over the piano, amber
-    [21, glideCam([5.9, 1.75, -14.3], [8.6, 1.2, -19.8], 40, { pos: [6.15, 1.72, -14.7], look: [8.6, 1.2, -19.8], fov: 38 }, 8)],                   // over Chase (2040)'s shoulder: Chase small at the piano
-    [23, glideCam([11.1, 1.3, -20.1], [9.45, 1.22, -20.3], 34, { pos: [10.75, 1.28, -20.15], look: [9.45, 1.22, -20.3], fov: 32 }, 6)],             // close: the last bars of verse 2
+    [16, glideCam([8.42, 1.54, -20.08], [9.4, 1.24, -20.3], 36, { pos: [8.5, 1.52, -20.12], look: [9.4, 1.24, -20.3], fov: 34 }, 8)],                                                                                                                                       // verse 2: his face
+    [19, glideCam([9.95, 0.75, -18.9], [8.35, 1.95, -21.6], 46, { pos: [10.05, 0.72, -19.1], look: [8.35, 1.95, -21.6], fov: 44 }, 7)],                // the drone at the piano, amber
+    [21, glideCam([5.9, 1.75, -14.3], [8.6, 1.2, -19.8], 40, { pos: [6.15, 1.72, -14.7], look: [8.6, 1.2, -19.8], fov: 38 }, 8)],                    // over Chase (2040)'s shoulder: Chase small at the piano
+    [23, glideCam([8.5, 1.52, -20.15], [9.4, 1.24, -20.3], 31, { pos: [8.56, 1.5, -20.17], look: [9.4, 1.24, -20.3], fov: 29 }, 6)],                    // close: the last bars of verse 2
   ];
   function pianoMontage(c) {
     if (sk(c)) return;
@@ -1170,11 +1224,12 @@
       if (h) await waitUntil(() => c.flow.skipping || !h.playing);
     })();
   }
+  const look = (id, yaw, dur = 9) => ({ do: (c) => { const a = act(c, id); if (a && !sk(c)) a.play('glance', { yaw, dur, loop: false }); } });
   CUTSCENES['2.2_piano'] = [
     // under the first cut: Luka crouched behind the piano, Chase (2040) at the edge of the lane
     { do: (c) => {
       const l = act(c, 'luka'), c4 = act(c, 'chase40');
-      if (l) { l.rig.seated = false; l.place('s22_luka_hide'); l.play('kneel'); l.setExpr('stunned'); }
+      if (l) { l.rig.seated = false; l.place(LUKA_HIDE); l.play('kneel'); l.setExpr('stunned'); }
       if (c4) { c4.rig.seated = false; c4.place('s22_c40_edge'); c4.play('idle'); c4.setExpr('neutral'); }
       const ch = act(c, 'chase'); if (ch && !sk(c)) { ch.setExpr('hum'); }
     } },
@@ -1185,62 +1240,76 @@
     { wait: 1.2 },
     // [CLOSE · Chase (2040), at the edge of the lane] He's gone very still.
     { expr: [['chase40', 'still']] },
-    glideCam([7.8, 1.6, -14.2], [6.6, 1.55, -15.4], 36, { pos: [7.62, 1.59, -14.38], look: [6.6, 1.55, -15.4], fov: 34 }, 7),
+    CLOSE('chase40', { yaw: 0.3, dist: 1.15, fov: 34, push: 0.12, dur: 8 }),
     { wait: 1.6 },
     slow('chase40', "Where'd you get that?"),
-    { face: 'chase', to: 'chase40', dur: 0.6 },
-    CLOSE('chase', { yaw: 0.5, dist: 1.0, fov: 36, push: 0.08, dur: 7 }),
+    look('chase', 1.05),
+    TURN_CH,
     say('chase', "It's track two. I've been working on it since October."),
-    CLOSE('chase40', { yaw: -0.35, dist: 1.0, fov: 36, push: 0.1, dur: 8 }),
+    CLOSE('chase40', { yaw: 0.3, dist: 1.05, fov: 34, push: 0.1, dur: 8 }),
     slow('chase40', "I know. ^ I'm still working on it."),
     // [TWO-SHOT · the two Chases] Chase (2040) sits down on the other end of the piano bench. Mirror composition:
     // the same posture, the same slumped shoulders, fourteen years apart.
-    { face: 'chase', to: -H, dur: 0.5 },
-    PIANO_CAM,
-    { move: 'chase40', to: [10.05, 0, -18.9] },
+    MIRROR,
+    { move: 'chase40', to: [10.05, 0, -18.7] },
     { move: 'chase40', to: [9.95, 0, -19.6] },
     { face: 'chase40', to: -H, dur: 0.4 },
     { place: 'chase40', at: 's22_piano_c40' },
     { act: [['chase40', 's22_slump', { h: 0.48 }], ['chase', 's22_slump', { h: 0.48 }]] },
     { expr: [['chase40', 'sad'], ['chase', 'sad']] },
-    { wait: 1.8 },
+    { wait: 2.0 },
     say('chase', "It's the bridge. The second verse goes into the bridge and it's—"),
+    BOTH_FRONT,
     say('chases', '—not right.', { tag: 'together' }),
     // (Beat.)
     { wait: 0.8 },
+    { act: [['chase40', 'sit_bench', { h: 0.48 }], ['chase', 'sit_bench', { h: 0.48 }]] },
+    TURN_CH,
+    look('chase', 1.1, 3),
     say('chase', "Why don't you just finish it?"),
+    TURN_C40,
+    look('chase40', -1.1, 3),
     say('chase40', "Why don't YOU?"),
     // (Chase looks at the keys. A long pause, 3 s.)
-    glideCam([11.0, 1.3, -20.45], [9.45, 1.18, -20.3], 34, { pos: [10.7, 1.28, -20.4], look: [9.45, 1.16, -20.3], fov: 32 }, 7),
+    { act: [['chase', 's22_slump', { h: 0.48 }]] },
+    glideCam([8.47, 1.46, -20.0], [9.35, 1.0, -20.3], 34, { pos: [8.55, 1.44, -20.05], look: [9.35, 1.0, -20.3], fov: 31 }, 8),   // looking down at the keys
     { wait: 3.0 },
+    { act: [['chase', 'sit_bench', { h: 0.48 }]] },
+    CH_FACE,
     slow('chase', "…Because if I finish it and it's bad, that's it. That's what I am. ^ As long as it's not finished, it could still be good."),
-    glideCam([11.0, 1.3, -19.45], [9.45, 1.2, -19.6], 34, { pos: [10.7, 1.28, -19.5], look: [9.45, 1.18, -19.6], fov: 32 }, 12),
+    C40_FACE,
     slow('chase40', "Yeah. ^ I've been 'could still be good' for fourteen years. ^ It's not good. It's just not finished."),
-    PIANO_CAM,
+    BOTH_FRONT,
+    look('chase', 1.1, 3.5),
     say('chase', 'Did you ever play it? Anywhere?'),
-    glideCam([11.0, 1.3, -19.45], [9.45, 1.2, -19.6], 34, { pos: [10.75, 1.28, -19.5], look: [9.45, 1.18, -19.6], fov: 32 }, 12),
+    C40_FACE,
     slow('chase40', '2031. Redcliffe Festival. Pudding was on the bill. Ten past four, the little stage by the jetty. ^ I pulled out the night before.'),
-    glideCam([11.0, 1.3, -20.45], [9.45, 1.18, -20.3], 34, { pos: [10.8, 1.28, -20.4], look: [9.45, 1.16, -20.3], fov: 32 }, 6),
+    TURN_CH,
+    look('chase', 1.1, 2.5),
     say('chase', 'Why?'),
-    PIANO_CAM,
+    C40_FACE,
     say('chase40', "The bridge wasn't right."),
     { expr: [['chase', 'stunned']] },
     { act: [['chase', 'sit_bench', { h: 0.48 }]] },
+    BOTH_FRONT,
+    look('chase', 1.2, 4),
     say('chase', 'You cancelled a GIG because of a BRIDGE?'),
     // CHASE (2040): (looking down the lane toward the bay, where the Ted Smout Bridge is visible on the horizon)
-    { do: (c) => { const a = act(c, 'chase40'); if (a && !sk(c)) a.play('glance', { yaw: 1.25, dur: 9 }); } },
+    { act: [['chase40', 'sit_bench', { h: 0.48 }]] },
+    look('chase40', 1.25, 9),
     { wait: 0.6 },
     LANE_BAY,
     { wait: 0.8 },
     slow('chase40', '…I cancel everything because of a bridge.'),
     // LUKA: (hissing from behind the piano, through the Santa beard)
+    { place: 'luka', at: LUKA_HIDE },
     { act: [['luka', 'kneel']] },
     { expr: [['luka', 'worried']] },
-    HISS,
+    CLOSE('luka', { yaw: -0.45, dist: 0.95, fov: 38, push: 0.08, dur: 6 }),
     beard('slip'),
     { do: (c) => droneOnPiano(c) },
     say('luka', 'Can the bridge talk happen on the other side of the drone?', { tag: 'hissing', speed: 'fast' }),
-    { act: [['luka', 's22_beard_up', { kneel: true, dur: 0.8 }]] },
+    { act: [['luka', 's22_beard_up', { kneel: true, dur: 0.8, loop: false }]] },
     { wait: 0.35 },
     beard('on'),
     { wait: 0.5 },
@@ -1257,11 +1326,13 @@
     { wait: 0.8 },
     { do: (c) => { if (MINIGAMES.piano.stop) MINIGAMES.piano.stop(); const d = DRONES.get(DRONE); if (d) { DRONES.face(DRONE, [9.45, 0, -20.3]); DRONES.light(DRONE, 'curious'); } } },
     { sfx: 'drone_q', vol: 0.4, at: [8.3, 2.2, -20.0] },
+    { wait: 0.5 },
     unseat('chase'),
     { move: 'chase', to: [9.5, 0, -21.4], run: true },
-    { move: 'chase', to: [7.1, 0, -22.0], run: true },
-    { move: 'chase', to: [7.1, 0, -31.2], run: true },
-    { move: 'chase', to: [12.0, 0, -32.6] },
+    { move: 'chase', to: [7.5, 0, -22.6], run: true },
+    EXIT_PAN,
+    { move: 'chase', to: [8.4, 0, -30.2], run: true },
+    { move: 'chase', to: [12.0, 0, -32.5] },
     { face: 'luka', to: 'chase', dur: 0.4 },
     { wait: 0.4 },
     { move: 'luka', to: [14.0, 0, -32.6], nowait: true },
@@ -1280,11 +1351,14 @@
   const PATH_WIDE = { shot: 'CAM', pos: [-304.0, 1.7, -30.0], look: [-306.0, 1.0, -8.0], fov: 22 };   // locked, long lens
   const BENCH_FRONT = glideCam([-299.65, 1.22, 3.1], [-300.0, 0.9, 0.05], 40, { pos: [-299.7, 1.18, 2.7], look: [-300.0, 0.9, 0.05], fov: 40 }, 8);
   const SIT_WIDE = glideCam([-295.6, 1.55, 4.8], [-300.6, 0.75, -2.2], 46, { pos: [-295.9, 1.5, 4.5], look: [-300.6, 0.75, -2.2], fov: 45 }, 9);
-  const BEHIND = { shot: 'CAM', pos: [-297.6, 2.0, -14.5], look: [-301.0, 0.8, 3.0], fov: 44 };   // locked, from behind the bench
+  const BEHIND = { shot: 'CAM', pos: [-298.6, 1.62, -11.0], look: [-300.4, 0.8, 1.0], fov: 40 };   // locked, from behind the bench
+  const ELBOW = [-300.35, 0, -8.4, 0.1];           // Chase (2040) on the path, behind them
   const THREE_SHOT = glideCam([-300.0, 0.98, 3.6], [-300.0, 0.86, 0.05], 40, { pos: [-300.0, 0.97, 3.25], look: [-300.0, 0.86, 0.05], fov: 40 }, 12);
-  const RAIL = glideCam([-301.3, 1.08, -0.78], [-300.85, 0.87, -0.24], 30, { pos: [-300.7, 1.08, -0.78], look: [-300.25, 0.87, -0.24], fov: 30 }, 3.4);
+  // over the seat, down onto the top rail: his hand sliding along it, the shine, his head bowed behind
+  const RAIL = glideCam([-300.62, 1.22, 0.36], [-300.82, 0.9, -0.24], 36, { pos: [-300.36, 1.2, 0.33], look: [-300.45, 0.9, -0.24], fov: 34 }, 3.4);
   const SEAT = glideCam([-300.3, 1.5, -0.5], [-300.25, 0.47, 0.05], 34, { pos: [-300.3, 1.35, -0.45], look: [-300.25, 0.47, 0.06], fov: 32 }, 4);
-  const PLAQUE = { shot: 'INSERT', at: 's23_plaque', card: ['s23_plaque', {}] };
+  // from beside his shoulder (the parade anchor's lens sits inside whoever reads the plaque); the card covers it
+  const PLAQUE = { shot: 'CAM', pos: [-300.48, 1.02, -0.6], look: [-300.0, 0.84, -0.27], fov: 30, card: ['s23_plaque', {}] };
   const STORM = (u) => ({ do: (c) => { const s = P(c, 'storm_clouds'); if (s) s.userData.build(u); } });
 
   function open23(c) {
@@ -1316,7 +1390,7 @@
       { id: 'h23_rail', at: [-301.0, 0, -0.72], r: 0.6, flag: 's23_rail',
         steps: [
           { place: 'luka', at: [-300.55, 0, -0.72, 0] },
-          { act: [['luka', 's23_finger', { dur: 3.2, loop: false }]] },
+          { act: [['luka', 's23_finger', { dur: 3.6, loop: false }]] },
           RAIL,
           { do: (c) => railRun(c) },
           { sfx: 'glass_squeak', vol: 0.18 },
@@ -1369,7 +1443,7 @@
     { place: 'luka', at: 's23_luka_stop' }, { place: 'chase', at: 's23_chase_stop' },
     { face: 'luka', to: 'chase40', dur: 0.6 }, { face: 'chase', to: 'chase40', dur: 0.6 },
     { expr: [['chase40', 'still']] },
-    CLOSE('chase40', { yaw: 0.6, dist: 1.2, fov: 36, push: 0.1, dur: 8 }),
+    CLOSE('chase40', { yaw: -0.7, dist: 1.2, fov: 36, push: 0.1, dur: 8 }),
     { wait: 0.6 },
     slow('chase40', "…I don't come here."),
     CLOSE('chase', { yaw: -0.4, dist: 1.1, fov: 36, push: 0.08, dur: 6 }),
@@ -1377,7 +1451,7 @@
     // (Chase (2040) nods at the bench. Doesn't move.)
     { face: 'chase40', to: [-300.0, 0, 0.0], dur: 0.6 },
     { act: [['chase40', 'nod', { dur: 0.9 }]] },
-    glideCam([-306.6, 1.55, -9.6], [-300.0, 0.6, 0.0], 34, { pos: [-306.4, 1.55, -9.3], look: [-300.0, 0.6, 0.0], fov: 32 }, 6),   // over his shoulder: the bench
+    glideCam([-306.6, 1.6, -9.1], [-300.0, 0.6, 0.0], 30, { pos: [-306.5, 1.6, -8.9], look: [-300.0, 0.6, 0.0], fov: 28 }, 6),   // past them, the bench
     { wait: 2.4 },
     { face: 'luka', to: [-300.0, 0, 0.0], dur: 0.6 },
   ];
@@ -1394,7 +1468,7 @@
     { place: 'luka', at: 's23_seat_luka' },
     seat('luka', 0.45, 'sit_bench'),
     { wait: 0.8 },
-    { act: [['luka', 's22_beard_up', { dur: 0.8 }]] },
+    { act: [['luka', 's22_beard_up', { dur: 0.8, loop: false }]] },
     { wait: 0.3 },
     beard('chin'),
     { expr: [['luka', 'still']] },
@@ -1414,7 +1488,7 @@
     say('luka', '…Yeah. ^ It is.'),
     // [WIDE · locked, from behind the bench, the bay and the bridge ahead] The two of them. Behind, on the path, Chase
     // (2040) stands holding his own elbow.
-    { place: 'chase40', at: 's23_c40_elbow' },
+    { place: 'chase40', at: ELBOW },
     { act: [['chase40', 's23_elbow']] },
     { expr: [['chase40', 'sad']] },
     BEHIND,
@@ -1422,7 +1496,7 @@
     { wait: 3.0 },
     // Chase (2040) walks over, slowly, and sits on Luka's other side. Three on the bench.
     { act: [['chase40', 'idle']] },
-    { move: 'chase40', to: [-301.5, 0, -1.2], speed: 1.1 },
+    { move: 'chase40', to: [-301.45, 0, -1.2], speed: 1.1 },
     { move: 'chase40', to: [-301.4, 0, 0.75], speed: 1.1 },
     { move: 'chase40', to: [-300.64, 0, 0.6], speed: 1.1 },
     { face: 'chase40', to: 0, dur: 0.4 },
@@ -1436,23 +1510,23 @@
     CLOSE('luka', { yaw: 0.0, dist: 1.0, fov: 36, push: 0.08, dur: 6 }),
     glance('luka', 'chase40', 1.0), { wait: 0.4 },
     say('luka', 'Tell me.'),
-    CLOSE('chase40', { yaw: -0.25, dist: 1.0, fov: 36, push: 0.16, dur: 22 }),
+    CLOSE('chase40', { yaw: -0.45, dist: 1.0, fov: 36, push: 0.16, dur: 22 }),
     slow('chase40', "It was a Sunday. Christmas Eve. Storm coming in off the bay. ^ You rang me at six in the morning. 'Can you come in? Need to get the servers out before it hits. I'll do it, I just need another pair of hands.'"),
     CLOSE('luka', { yaw: 0.1, dist: 0.95, fov: 36, push: 0.08, dur: 6 }),
     { expr: [['luka', 'sad']] },
     slow('luka', '…I rang you.'),
-    CLOSE('chase40', { yaw: -0.25, dist: 0.95, fov: 36, push: 0.12, dur: 12 }),
+    CLOSE('chase40', { yaw: -0.45, dist: 0.95, fov: 36, push: 0.12, dur: 12 }),
     slow('chase40', 'Lightning hit the substation at twenty to eleven. The whole place went up. ^ You got me out first. Dragged me out by the lanyard.'),
     // (He touches the scorch mark on his lanyard strap.)
     { act: [['chase40', 'lanyard', { still: true }]] },
     { shot: 'INSERT', at: 'chase40', dist: 0.75 },
     { wait: 1.8 },
     { act: [['chase40', 'sit_bench', { h: 0.45 }]] },
-    CLOSE('chase40', { yaw: -0.25, dist: 0.92, fov: 36, push: 0.12, dur: 10 }),
+    CLOSE('chase40', { yaw: -0.45, dist: 0.92, fov: 36, push: 0.12, dur: 10 }),
     slow('chase40', 'Then you looked back at the door. Four people still in there. And you said—'),
     CLOSE('luka', { yaw: 0.1, dist: 0.9, fov: 36, push: 0.06, dur: 6 }),
     slow('luka', "'I'll do it.'", { tag: 'quietly' }),
-    CLOSE('chase40', { yaw: -0.25, dist: 0.9, fov: 36, push: 0.12, dur: 12 }),
+    CLOSE('chase40', { yaw: -0.45, dist: 0.9, fov: 36, push: 0.12, dur: 12 }),
     slow('chase40', "'I'll do it.' ^ You got all four out. ^ Then the roof came down."),
     // (Silence. Water. The bell buoy.)
     glideCam([-300.0, 1.1, 5.5], [-300.0, 0.9, 0.05], 36, { pos: [-300.0, 1.05, 5.1], look: [-300.0, 0.9, 0.05], fov: 36 }, 8),
@@ -1465,17 +1539,17 @@
     say('chase', 'Luka—'),
     CLOSE('luka', { yaw: 0.1, dist: 0.88, fov: 36, push: 0.1, dur: 8 }),
     slow('luka', 'I rang you and asked you to come in, and you got hurt.'),
-    CLOSE('chase40', { yaw: -0.25, dist: 0.95, fov: 36, push: 0.08, dur: 8 }),
+    CLOSE('chase40', { yaw: -0.45, dist: 0.95, fov: 36, push: 0.08, dur: 8 }),
     slow('chase40', 'I got a hand. ^ You got a bench.'),
     THREE_SHOT,
     { wait: 0.8 },
     say('chase', 'What was the funeral like?'),
-    CLOSE('chase40', { yaw: -0.25, dist: 1.0, fov: 36, push: 0.18, dur: 20 }),
+    CLOSE('chase40', { yaw: -0.45, dist: 1.0, fov: 36, push: 0.18, dur: 20 }),
     slow('chase40', "Half of Redcliffe. Margaret came in a wheelchair. ^ I wrote your eulogy forty-one times. Never got it right. On the day, I stood up there for four minutes and didn't say anything. ^ Then I sat down."),
     CLOSE('chase', { yaw: 0.25, dist: 0.95, fov: 36, push: 0.06, dur: 6 }),
     say('chase', '…What would you have said?'),
     // CHASE (2040): (a long beat, 3 s)
-    CLOSE('chase40', { yaw: -0.25, dist: 0.95, fov: 34, push: 0.12, dur: 8 }),
+    CLOSE('chase40', { yaw: -0.45, dist: 0.95, fov: 34, push: 0.12, dur: 8 }),
     { wait: 3.0 },
     slow('chase40', "…Doesn't matter now."),
     // [CLOSE · Chase (2040)] He takes out his music slate, taps it, and holds it up between them. A voicemail greeting
@@ -1483,14 +1557,14 @@
     { do: (c) => { const a = act(c, 'chase40'); if (a && a.rig.attach.slate) { a.rig.show('slate', true); const s = a.rig.attach.slate.userData; if (s && s.list) s.list('Luka', ['Voicemail', 'Greeting', '▶ 0:06']); } } },
     { act: [['chase40', 's23_slate', { h: 0.45 }]] },
     { sfx: 'tap_pay', vol: 0.2 },
-    glideCam([-300.95, 1.12, 1.25], [-300.55, 1.0, 0.25], 36, { pos: [-300.9, 1.1, 1.05], look: [-300.55, 1.0, 0.25], fov: 34 }, 8),
+    Object.assign({ card: ['s23_voicemail', {}] }, glideCam([-300.7, 1.12, 1.35], [-300.45, 1.0, 0.3], 36, { pos: [-300.68, 1.1, 1.15], look: [-300.45, 1.0, 0.3], fov: 34 }, 8)),
     { wait: 0.6 },
     { do: (c) => { if (!sk(c) && c.AUDIO && c.AUDIO.voicemail) c.AUDIO.voicemail(); } },
     say('voicemail', VM, { tag: 'tinny' }),
     { wait: 0.6 },
     CLOSE('luka', { yaw: 0.1, dist: 0.88, fov: 36, push: 0.08, dur: 7 }),
     slow('luka', '…I recorded that last week.'),
-    CLOSE('chase40', { yaw: -0.25, dist: 0.95, fov: 36, push: 0.08, dur: 7 }),
+    CLOSE('chase40', { yaw: -0.45, dist: 0.95, fov: 36, push: 0.08, dur: 7 }),
     slow('chase40', "I've listened to it about four thousand times."),
     // (Chase laughs. Chase (2040) laughs. Luka doesn't.)
     THREE_SHOT,
@@ -1500,11 +1574,11 @@
     { act: [['chase', 'sit_bench', { h: 0.45 }], ['chase40', 'sit_bench', { h: 0.45 }]] },
     { expr: [['chase', 'sad'], ['chase40', 'neutral']] },
     wear('chase40', 'slate', false),
-    CLOSE('chase40', { yaw: -0.25, dist: 0.95, fov: 36, push: 0.1, dur: 12 }),
+    CLOSE('chase40', { yaw: -0.45, dist: 0.95, fov: 36, push: 0.1, dur: 12 }),
     slow('chase40', 'Kept paying for your number. Thirty-five dollars a month. ^ JARVIS still sends codes to it. Bug off the old list.'),
     CLOSE('luka', { yaw: 0.1, dist: 0.9, fov: 36, push: 0.06, dur: 6 }),
     say('luka', "'Sends MFA codes to dead phones.'"),
-    CLOSE('chase40', { yaw: -0.25, dist: 0.95, fov: 36, push: 0.1, dur: 12 }),
+    CLOSE('chase40', { yaw: -0.45, dist: 0.95, fov: 36, push: 0.1, dur: 12 }),
     slow('chase40', "That's how I found out about Monday. A login code came through for an account I didn't have. Called QUIET. ^ So I logged in."),
     // LUKA: (after a while)
     THREE_SHOT,
@@ -1512,7 +1586,7 @@
     { wait: 1.8 },
     glance('luka', 'chase40', 1.0), { wait: 0.4 },
     slow('luka', 'What was I like? ^ After I got promoted. Before.'),
-    CLOSE('chase40', { yaw: -0.25, dist: 0.95, fov: 36, push: 0.1, dur: 9 }),
+    CLOSE('chase40', { yaw: -0.45, dist: 0.95, fov: 36, push: 0.1, dur: 9 }),
     slow('chase40', 'Careful. ^ You got so careful.'),
     // [WIDE · locked, behind the bench] The three of them looking at the bay, the bridge on the horizon, storm clouds
     // building behind it. Hold 3 s.
@@ -1520,7 +1594,7 @@
     { shot: 'CAM', pos: [-298.5, 2.0, -13.0], look: [-300.5, 0.7, 4.0], fov: 40 },
     { wait: 3.0 },
     // LUKA: (pulling the Santa beard back up)
-    { act: [['luka', 's22_beard_up', { dur: 0.8 }]] },
+    { act: [['luka', 's22_beard_up', { dur: 0.8, loop: false }]] },
     { wait: 0.3 },
     beard('on'),
     say('luka', 'Right. ^ Rue.'),
