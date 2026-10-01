@@ -9,7 +9,7 @@ every line of dialogue is final and word for word.** This file is the contract b
 - Source lives in `src/NN-name.(html|js)` fragments. `node tools/build.mjs` concatenates them (sorted by name) into
   **`two.html`** (the deliverable: one self-contained file; the only external fetch is Three.js r186 from jsDelivr
   through the import map). Use `--out <path>` to build somewhere else (always do this when other people may be building
-  at the same time: `node tools/build.mjs --out out/<you>.html`).
+  at the same time: `node tools/build.mjs --out out/<you>.html --mine <your files>`: only your files come from the working tree, every other tracked fragment from the last commit, so a colleague's half-finished edit can't break your build).
 - **Engine fragments** (`00–09`, `30–39`, `99`) share one module scope and may declare top-level names.
   **Leaf fragments** (`10–29` sets, `40–59` mini-games, `60–89` content) must not declare top-level names that others
   rely on: they only register into the registries (`SETS.x = (() => {...})();`, `(() => { SCENES[...] = ...; })();`).
