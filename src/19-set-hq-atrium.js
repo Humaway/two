@@ -23,7 +23,7 @@
 //   (x 1…13, y 5.6…9.6) with Yes (Are you sure?) above it (x 4…10, y 10.3…12.55).
 //   Outside (built here, matching the valley's 2.8 street): the forecourt and canopy (x −8…8, z −11…−8, y 5.0–5.4), Ann
 //   St x −120…120 (road y −0.10, raised zebras E x −2…2 / W x −32…−28, kerb bollards every 2 m both sides, lamps at
-//   x −56…56 every 16 m both sides, the mall-head bollard row z 11.6, the mall's paving to z 110, four hover-cars), the
+//   x −56…56 every 16 m both sides (the N pair at ±8 moved to ±11.2, clear of the canopy), the mall-head bollard row z 11.6, the mall's paving to z 110, four hover-cars), the
 //   podium's stone faces (glass band 4.5–9.0); above y 13.5 SETS.valley.tower({ podium: 'none' }) and around it
 //   SETS.valley.skyline({ skip: ['TOWER', 'TRAFFIC'], sky: 'midday_storm' }) (fallback: a plain box tower with its own
 //   countdown + Yes, and a horizon band; never throws). Walkable outside: the forecourt x −10…10, z −11…−7.2 and zebra E.
@@ -32,8 +32,9 @@
 //   geometry (hq_floors' baked mode).
 //
 // ENV (first = default): atrium (party; spot = the tree lamp) · storm_ext (the crane; spot off) · lift (inside the car).
-// DRESS: dress('party31' | 'crane31' | 'lift31'); AUTO on a scene change: 3.1 -> party31 (+ reset(): gifts, crackers,
-//   goggles, pies back, doors shut, reader red, countdowns 01:58:00 running). crane31 brightens the interior seen through
+// DRESS: dress('party31' | 'crane31' | 'lift31'); AUTO when 3.1 (re)starts: party31 + reset() (gifts, crackers, goggles,
+//   pies back, doors shut, reader red, countdowns 01:58:00 running), applied on the set's first tick in the scene or just
+//   before content's first dress / lamp / reset call, whichever comes first (so content's own first dress wins). crane31 brightens the interior seen through
 //   the glass and pauses the interior's ambient animation; lift31 lights the car (lamp follows the env: lift -> car).
 //   With no scene (?setview) the dress follows the env. SETS.hq_atrium.reset() is the same reset content can call.
 // LAMP (the one spot): lamp('tree' | 'car' | 'off'); re-asserted every tick while lit (world.torchAuto = false).
@@ -940,7 +941,7 @@ SETS.hq_atrium = (() => {
       [-17.6, -16.5, -13.2, -16.3], [-13.3, -16.5, -13.1, -13.6],
       [-10.4, -11.0, -10.0, -7.2], [10.0, -11.0, 10.4, -7.2], [-40, -7.5, -2, -7.2], [2, -7.5, 40, -7.2],
       [-2.3, -7.2, -2.0, 7.2], [2.0, -7.2, 2.3, 7.2], [-2.0, 7.2, 2.0, 7.5],
-      [-8.15, -9.75, -7.85, -9.45], [7.85, -9.75, 8.15, -9.45]);
+      [-11.35, -9.75, -11.05, -9.45], [11.05, -9.75, 11.35, -9.45]);
     for (const x of GATES) COL.push([x - 0.12, -15.6, x + 0.12, -14.4]);
     for (let i = 0; i < 12; i++) { const [x, , z] = CROWD[i]; COL.push([x - 0.25, z - 0.25, x + 0.25, z + 0.25]); }
 
@@ -1071,7 +1072,7 @@ SETS.hq_atrium = (() => {
     R.bollards = instanced(bolGeo, M.vc, BOL); R.bollards.name = 'ext_bollards'; root.add(R.bollards);
     // street lamps (6.5 m, arms over the road), foam-wrapped to 1.8 m
     const LAMP = [];
-    for (const x of [-56, -40, -24, -8, 8, 24, 40, 56]) LAMP.push([x, 0, -9.6, 0, 1], [x, 0, 9.6, PI, 1]);
+    for (const x of [-56, -40, -24, -8, 8, 24, 40, 56]) LAMP.push([Math.abs(x) === 8 ? x * 1.4 : x, 0, -9.6, 0, 1], [x, 0, 9.6, PI, 1]);   // N ±8 -> ±11.2: clear of the canopy
     const postGeo = shapeGeo(() => {
       cyl(0.16, 0.18, 0.2, 8, 0x3a3e44, 0, 0.1, 0); cyl(0.07, 0.09, 6.5, 8, 0x4a5058, 0, 3.25, 0);
       cyl(0.15, 0.15, 1.8, 10, FOAM, 0, 1.1, 0); for (const y of [0.5, 1.1, 1.7]) cyl(0.155, 0.155, 0.03, 10, SEAM, 0, y, 0);
@@ -1282,6 +1283,15 @@ SETS.hq_atrium = (() => {
     S.lampUser = false; autoLamp(); autoAmb();
   }
 
+  // ---------------------------------------------------------- the scene's start (AUTO) vs content's own calls
+  // The first of: the set's first tick in the scene, or content's first dress / lamp / reset call, applies the scene's
+  // AUTO dress and starting state (so a dress('crane31') in 3.1's first step is never clobbered by the auto dress, and
+  // Continue, which restarts the scene at step 0, gets the gifts, crackers, pies and countdowns back).
+  const sceneNow = () => (typeof state !== 'undefined' && state ? state.scene : null);
+  function touch() { if (R.touched) return; R.touched = true; const a = AUTO[sceneNow()]; if (a) { reset(); dress(a); } }
+  if (typeof on === 'function') on('flow:stop', () => { R.scene = null; R.touched = false; });
+  const API = { dress(st) { touch(); dress(st); }, lamp(name) { touch(); lamp(name); }, reset() { touch(); reset(); } };
+
   // ---------------------------------------------------------- update(dt, ctx): ambient life, no allocation
   const HEROES = ['luka', 'chase', 'chase40'];
   let fr = 7; const frand = () => ((fr = (fr * 16807) % 2147483647) / 2147483647);
@@ -1326,8 +1336,8 @@ SETS.hq_atrium = (() => {
     if (!R.root) return;
     const t = ctx.t;
     // scene change -> the scene's dress (+ its starting state); with no scene (?setview) the dress follows the env
-    const sc = typeof state !== 'undefined' && state ? state.scene : null;
-    if (sc !== R.scene) { R.scene = sc; if (AUTO[sc]) { reset(); dress(AUTO[sc]); } }
+    const sc = sceneNow();
+    if (sc !== R.scene) { R.scene = sc; touch(); }
     if (ctx.env !== R.env) { R.env = ctx.env; if (SETVIEW() && !AUTO[sc]) dress(ENV_DRESS[R.env] || 'party31'); else { autoLamp(); autoAmb(); } }
     // countdowns (the wall and the facade tick in real time; repaint only when the second changes)
     R.count.update(dt); S.countSecs = R.count.secs;
@@ -1434,7 +1444,7 @@ SETS.hq_atrium = (() => {
       storm_ext: { bg: 0x47524f, fog: [0x56625f, 0.0032], hemi: [0xa8b6b0, 0x2a302e, 1.5], dir: [0xc8d6d2, 0.9, [-30, 60, 40]], spot: [0xffffff, 0], rain: 0 },
       lift: { bg: 0x101214, fog: [0x202428, 0.020], hemi: [0xe0e8f0, 0x6a6e74, 3.0], dir: [0xffffff, 0.6, [0, 10, 0]], spot: [0xfff6e8, 1.4], rain: 0 },
     },
-    build, dress, lamp, reset,
+    build, dress: API.dress, lamp: API.lamp, reset: API.reset,
     marks: {
       // outside / the entrance
       s31_ext_luka: [-1.1, 0, -4.0, PI], s31_ext_chase: [1.0, 0, -3.6, PI], s31_ext_c40: [0.0, 0, -4.8, PI],
