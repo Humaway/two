@@ -5,7 +5,7 @@
 // Usage: node tools/build.mjs [--out two.html] [--strict] [--quiet] [--mine 31-ui.js,00-head.html,...]
 //   --mine: isolation for parallel work. Only the listed fragments (and any leaf fragment not tracked by git) are read
 //   from the working tree; every other tracked fragment is read from the last commit (git HEAD), so someone else's
-//   half-finished edit can't break your build. Other people's untracked dev scenes (89-content-dev-*) are left out.
+//   half-finished edit can't break your build. Other people's untracked files (work in progress, dev scenes) are left out.
 import fs from 'fs';
 import path from 'path';
 import vm from 'vm';
@@ -22,7 +22,7 @@ try { headFiles = execSync('git ls-tree --name-only HEAD src/', { cwd: root, std
 let files = fs.readdirSync(srcDir).filter((f) => /^\d\d-.*\.(js|html)$/.test(f));
 if (mine) {
   for (const f of headFiles) if (!files.includes(f) && /^\d\d-.*\.(js|html)$/.test(f)) files.push(f);   // deleted locally by someone else: keep HEAD's
-  files = files.filter((f) => mine.has(f) || tracked.has(f) || !/^89-content-dev-/.test(f));
+  files = files.filter((f) => mine.has(f) || tracked.has(f));   // others' untracked work in progress stays out
 }
 files.sort();
 const read = (f) => {
