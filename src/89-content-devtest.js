@@ -85,7 +85,9 @@
       // ---- 4. Chip View: AR labels + Signal
       ['control', 'chase40'],
       ['roam', { until: 'dev_chip', auto: async (c) => {
-        AR.add({ id: 'dev_sign', kind: 'sign', text: 'OPTUS · 2040', at: [-2.0, 2.4, -14.2] });
+        AR.add({ id: 'dev_sign', kind: 'sign', text: 'OPTUS · 2040', at: [-2.0, 2.4, -14.2], w: 2.4 });   // the sets' ar lists: w in metres
+        AR.add({ id: 'dev_red', kind: 'sign', text: 'ALL CROSSINGS REQUIRE HUMAN CONFIRMATION', at: [0.8, 2.5, -1.2], w: 3, color: 0xff3a3a });
+        AR.add({ id: 'dev_arc', kind: 'path', arc: { c: [3.0, -3.0], r: 2.2, a0: -2.4, a1: -0.6 } });
         AR.add({ id: 'dev_price', kind: 'price', text: '$0.00 · FREE WITH CLOUD+', at: [-2.0, 1.6, -13.8] });
         AR.add({ id: 'dev_name', kind: 'name', text: 'LUKA · 39 · CUSTOMER', on: 'luka' });
         AR.add({ id: 'dev_code', kind: 'code', text: '1158', at: [-4.4, 1.6, -0.6] });

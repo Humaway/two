@@ -250,6 +250,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
       if (!L.on && !L.prop && !whereInto(o.at, L.at)) L.at.set(0, -999, 0);
       L.el.className = 'arl ' + kind;
       L.el.style.width = L.wm ? Math.round(L.wm * AR_PXM) + 'px' : o.w ? o.w + 'px' : '';
+      L.el.style.whiteSpace = o.w ? 'pre-wrap' : '';   // a fixed width wraps its text
       const col = typeof o.color === 'number' ? '#' + (o.color & 0xffffff).toString(16).padStart(6, '0') : o.color || '';   // 0xff3a3a or a CSS colour
       L.el.style.color = col; L.el.style.borderColor = col;
       lblText(L, o.text, o.title);
