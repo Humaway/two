@@ -1,3 +1,4 @@
 node_modules/
 /out/
 *.log
+src/89-content-dev-*.js
