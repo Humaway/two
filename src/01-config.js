@@ -220,7 +220,8 @@ const profile = { completed: false, seenPrologue: false, endingsSeen: { A: false
 const TEST = (() => {
   const q = new URLSearchParams(location.search), e = (q.get('ending') || '').toUpperCase();
   return { auto: q.has('autoplay'), scene: q.get('scene'), stop: q.get('stop'), speed: +q.get('speed') || 1, fast: q.has('fast'),
-    ending: e === 'A' || e === 'B' ? e : null, setview: q.get('setview'), env: q.get('env') };
+    ending: e === 'A' || e === 'B' ? e : null, setview: q.get('setview'), env: q.get('env'),
+    re: Math.max(1, +q.get('re') || (q.has('fast') ? 8 : 1)) };   // &re=N renders 1 frame in N under autoplay (fast runs default 8: logic is fixed-step, pixels are optional)
 })();
 window.TWO_TEST = { ready: false, done: false, scene: null, step: null, log: [] };
 const testLog = (msg) => { if (TEST.auto) TWO_TEST.log.push(msg); };

@@ -26,6 +26,7 @@ async function boot() {
     clock.step();
     if (hasWorld()) world.update(step);
   }
+  let reN = 0;
   function frame(now) {
     requestAnimationFrame(frame);
     const ms = now - last;
@@ -36,7 +37,7 @@ async function boot() {
     for (let n = 0; acc >= step && n < 12; n++) { tick(); acc -= step; }
     if (acc >= step) acc %= step; // more than 12 ticks behind: drop it rather than spiral
     renderer.info.reset();
-    if (hasWorld()) world.render(acc / step);
+    if (hasWorld() && (!TEST.auto || TEST.re === 1 || ++reN % TEST.re === 0)) world.render(acc / step);
     emit('render', acc / step);
     perf.draw();
     if (renderer.info.programs.length > progN) {   // every shader should have been compiled by the loader

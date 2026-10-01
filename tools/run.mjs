@@ -12,7 +12,7 @@ const file = path.resolve(opt('file', 'two.html'));
 const q = opt('q', 'autoplay=1&fast=1&speed=8');
 const timeout = +opt('timeout', 600) * 1000;
 const shots = opt('shots', null), every = +opt('every', 0);
-const W = +opt('w', 1280), H = +opt('h', 720);
+const W = +opt('w', shots ? 1280 : 640), H = +opt('h', shots ? 720 : 360);   // no screenshots: render small (the CPU renders WebGL here)
 const quiet = flag('quiet');
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const threeDir = path.join(root, 'node_modules/three');
