@@ -1,17 +1,56 @@
 // ============================================================ UI
-// All DOM UI in #ui: fades, letterbox, cards, prompts, dialogue (say/choose/ask), JARVIS pop-ups,
-// 1987 HUD, objective, portraits, inventory panel, menus, and the CARDS painters for INSERT close-ups.
+// All DOM UI in #ui: fades, letterbox, cards, prompts, dialogue (say/choose/ask), barks, JARVIS + SafeSense
+// pop-ups, TWO's HUD (NO SERVICE · QUIET IN · Samples, HACK %), Chip View + Signal, strain meter, sample takes,
+// time cards, objective, portraits, inventory panel, menus, and the CARDS painters for INSERT close-ups.
 // Per frame only transform / opacity / text change. Everything time-based runs on game ticks.
+
+// A recorded take's waveform, seeded by its id so it is the same every time (sample card + CARDS.take).
+function uiWave(cx, x, y, w, h, key, col, bars = 48) {
+  let s = 11; for (const c of String(key)) s = (s * 31 + c.charCodeAt(0)) % 2147483647;
+  const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  const bw = w / bars, mid = y + h / 2;
+  cx.fillStyle = col;
+  for (let i = 0; i < bars; i++) {
+    const env = Math.sin(Math.PI * (i + 0.5) / bars) ** 0.6, a = (0.12 + 0.88 * r()) * env * h * 0.48;
+    cx.fillRect(x + i * bw + bw * 0.18, mid - Math.max(1, a), bw * 0.64, Math.max(2, a * 2));
+  }
+}
+// Reduce Flashing helpers: is a CSS colour bright (a white flash), and its slow dim-bloom stand-in
+function uiRGB(c) {
+  c = String(c || '').trim().toLowerCase();
+  if (c === 'white') return [255, 255, 255];
+  let m = /^#([0-9a-f]{3})$/.exec(c);
+  if (m) return [...m[1]].map((h) => parseInt(h + h, 16));
+  m = /^#([0-9a-f]{6})/.exec(c);
+  if (m) return [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16));
+  m = /^rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)/.exec(c);
+  return m ? [+m[1], +m[2], +m[3]] : null;
+}
+const uiBright = (c) => { const v = uiRGB(c); return !!v && (0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]) / 255 > 0.72; };
+// speaker id -> the actor(s) whose mouths move: CHARACTERS[id].actor ('manager' -> 'luka40'); a duo (CHARACTERS[id].duo,
+// or Rue's 'a_b' + voice.also) -> both
+const speakerParts = (id) => { const ch = CHARACTERS[id]; return ch && Array.isArray(ch.duo) ? ch.duo : ch && ch.voice && ch.voice.also ? String(id).split('_') : null; };
+function speakerActors(id) {
+  const ids = (speakerParts(id) || [id]).slice();
+  for (let k = 0; k < ids.length; k++) { const c = CHARACTERS[ids[k]]; if (c && c.actor) ids[k] = c.actor; }
+  return ids;
+}
+const uiMute = (c, k = 0.62) => { const v = uiRGB(c) || [255, 255, 255], g = [96, 102, 118]; return `rgb(${v.map((x, i) => Math.round(x + (g[i] - x) * k)).join(',')})`; };
 
 const ui = (() => {
   const $ = (id) => document.getElementById(id);
   const root = $('ui'), fadeEl = $('fade'), flashEl = $('flash'), tcard = $('tcard'), acard = $('acard');
   const cardWrap = $('cardwrap'), cardCv = $('card'), toastEl = $('toast'), swapEl = $('swap'), promptEl = $('prompt');
+  const timeEl = $('timecard'), chipEl = $('chipview'), sigEl = $('signal'), sigBar = sigEl.querySelector('i');
+  const meterEl = $('meter'), meterLbl = meterEl.querySelector('span'), meterBar = meterEl.querySelector('i');
+  const takeEl = $('take'), takeCv = takeEl.querySelector('canvas'), takeLbl = takeEl.querySelector('span');
   const pB = document.createElement('b'), pS = document.createElement('span');
   promptEl.append(pB, pS);
   const tweens = [];
-  let lastPrompt, toastT = 0;
-  fadeEl._o = 1; flashEl._o = 0; tcard._o = 0; acard._o = 0;
+  let lastPrompt, toastT = 0, takeT = 0, tcTok = 0, flTok = 0, chipOn = false, chipable = false;
+  let sigV = -1, sigK = '', mtrV = -1, mtrL = null, mtrS = false;
+  fadeEl._o = 1; flashEl._o = 0; tcard._o = 0; acard._o = 0; timeEl._o = 0;
+  const CARD_SCALE = 2; // cards are painted at 2x for crisp text (spec 12) and fitted to the screen by CSS
 
   // opacity tween on game time; a new tween on the same element replaces (and resolves) the old one
   function fadeTo(el, to, dur) {
@@ -29,22 +68,39 @@ const ui = (() => {
 
     fade(to, dur = 0.5, color) {
       if (to === 'out') to = 1; else if (to === 'in') to = 0;
+      // Reduce Flashing: a fade UP to a bright colour (a white-out) never snaps, and goes to a soft grey instead of white
+      if (options.reduceFlashing && color && to > fadeEl._o && uiBright(color)) { color = uiMute(color, 0.3); if (dur > 0) dur = Math.max(dur, 1.2); }
       if (color) fadeEl.style.background = color; else if (to > 0) fadeEl.style.background = '#000';
-      if (options.reduceFlashing && dur > 0 && to > fadeEl._o && /^#f/i.test(color || '')) dur = Math.max(dur, 1.2); // Reduce Flashing: no snap to white
       return fadeTo(fadeEl, to, dur);
     },
+    // flash(dur, colour): a white (or orange…) flash. Reduce Flashing: a slow, dim bloom in a muted colour instead.
     flash(dur = 0.6, color = '#fff') {
-      flashEl.style.background = color;
+      const k = ++flTok;
       if (U.skipping()) return fadeTo(flashEl, 0, 0);
-      if (options.reduceFlashing) return fadeTo(flashEl, 0.35, dur * 0.4).then(() => fadeTo(flashEl, 0, dur * 1.2));
+      if (options.reduceFlashing) {
+        flashEl.style.background = uiMute(color);
+        return fadeTo(flashEl, 0.3, Math.max(0.45, dur * 0.6)).then(() => (k === flTok ? fadeTo(flashEl, 0, Math.max(1.2, dur * 1.6)) : undefined));
+      }
+      flashEl.style.background = color;
       flashEl._o = 1; flashEl.style.opacity = 1;
       return fadeTo(flashEl, 0, dur);
     },
     letterbox(on) { root.classList.toggle('lbon', !!on); },
-    async title(text, dur = 2.5) {
+    // the big centred title card; o.logo (or the text 'two') shows the game's logo: white, lowercase, hairline yellow rule
+    async title(text, dur = 2.5, o = {}) {
       if (U.skipping()) return;
       tcard.textContent = text;
+      tcard.classList.toggle('logo', o.logo ?? /^two$/i.test(String(text).trim()));
       await fadeTo(tcard, 1, 0.5); await wait(Math.max(0, dur - 1)); await fadeTo(tcard, 0, 0.5);
+    },
+    // ui.timeCard(time, place): small, low left, ~3 s in and out, never blocks (resolves when it has gone; nothing while skipping)
+    async timeCard(time, place, dur = 3) {
+      if (U.skipping() || !time) return;
+      const k = ++tcTok;
+      timeEl.children[0].textContent = time; timeEl.children[2].textContent = place || '';
+      await fadeTo(timeEl, 1, 0.6); if (k !== tcTok) return;
+      await wait(Math.max(0, dur - 1.2)); if (k !== tcTok) return;
+      await fadeTo(timeEl, 0, 0.6);
     },
     async actCard(text) {
       if (U.skipping()) return;
@@ -54,16 +110,18 @@ const ui = (() => {
       await fadeTo(acard, 1, 0.8); await wait(2.8); await fadeTo(acard, 0, 0.8);
     },
 
-    // paints CARDS[kind] into any canvas at the painter's native size; returns [w, h] or null
-    paintCard(cv, kind, data) {
+    // paints CARDS[kind] into any canvas at 2x the painter's native size (the painter still sees native w, h); returns [w, h] or null
+    paintCard(cv, kind, data, scale = CARD_SCALE) {
       const f = CARDS[kind];
       if (!f) { console.warn('TWO: no CARDS.' + kind); return null; }
-      const s = f.size || [800, 600];
-      if (cv.width !== s[0]) cv.width = s[0];
-      if (cv.height !== s[1]) cv.height = s[1];
+      const s = f.size || [800, 600], W = Math.round(s[0] * scale), H = Math.round(s[1] * scale);
+      if (cv.width !== W) cv.width = W;
+      if (cv.height !== H) cv.height = H;
       const cx = cv.getContext('2d');
-      cx.setTransform(1, 0, 0, 1, 0, 0); cx.clearRect(0, 0, s[0], s[1]);
+      cx.setTransform(1, 0, 0, 1, 0, 0); cx.clearRect(0, 0, W, H);
+      cx.setTransform(scale, 0, 0, scale, 0, 0);
       cx.save(); f(cx, s[0], s[1], data || {}); cx.restore();
+      cx.setTransform(1, 0, 0, 1, 0, 0);
       return s;
     },
     card(kind, data) {
@@ -79,8 +137,8 @@ const ui = (() => {
       if (text === lastPrompt) return;
       lastPrompt = text;
       if (!text) { promptEl.classList.add('off'); return; }
-      const m = /^(YES|NO)\b\s*(?:—\s*)?(.*)$/.exec(text);
-      pB.textContent = m ? m[1] : ''; pB.className = m && m[1] === 'NO' ? 'no' : ''; pB.style.display = m ? '' : 'none';
+      const m = /^(YES|NO|SWAP|CHIP|HOLD)\b\s*(?:—\s*)?(.*)$/.exec(text);   // 'YES — Examine', 'SWAP — Luka', 'CHIP — Chip View', 'HOLD — Lift'
+      pB.textContent = m ? m[1] : ''; pB.className = m && m[1] !== 'YES' ? m[1].toLowerCase() : ''; pB.style.display = m ? '' : 'none';
       pS.textContent = m ? m[2] : text;
       promptEl.classList.remove('off');
     },
@@ -92,6 +150,42 @@ const ui = (() => {
       swapEl.children[2].textContent = input.scheme === 'pad' ? 'Y' : input.scheme === 'touch' ? 'SWAP' : 'TAB';
       swapEl.classList.remove('off');
     },
+
+    // ---------------------------------------------------------- TWO: Chip View, Signal, strain meter, sample takes, name glitch
+    // Chip View visuals only (33-systems owns the logic): faint blue tint + scanlines over the world, under pop-ups and dialogue
+    chipView(on) { on = !!on; if (on === chipOn) return; chipOn = on; chipEl.classList.toggle('on', on); },
+    // Signal meter 0..1 (null hides). Safe to call every tick: the DOM is written only when the value moves.
+    signal(v) {
+      if (v == null) { if (sigV !== -1) { sigV = -1; sigEl.classList.add('off'); } return; }
+      v = v < 0 ? 0 : v > 1 ? 1 : v;
+      if (sigV === -1) sigEl.classList.remove('off');
+      if (Math.abs(v - sigV) < 0.004 && !(v === 1 && sigV !== 1)) return;
+      sigV = v; sigBar.style.transform = 'scaleX(' + v.toFixed(3) + ')';
+      const k = v >= 0.999 ? 'full' : v >= 0.7 ? 'warn' : '';
+      if (k !== sigK) { sigK = k; sigEl.className = k; }
+    },
+    // ui.meter(label, v 0..1 | null): strength / strain bar (roller door, brass plate, "Hold this"). Every-tick safe.
+    meter(label, v) {
+      if (v == null) { if (mtrV !== -1) { mtrV = -1; mtrL = null; meterEl.classList.add('off'); } return; }
+      v = v < 0 ? 0 : v > 1 ? 1 : v;
+      if (mtrV === -1) meterEl.classList.remove('off');
+      if (label !== mtrL) { mtrL = label; meterLbl.textContent = label || ''; }
+      if (Math.abs(v - mtrV) >= 0.004 || (v === 1 && mtrV !== 1)) { mtrV = v; meterBar.style.transform = 'scaleX(' + v.toFixed(3) + ')'; }
+      const s = v > 0.82; if (s !== mtrS) { mtrS = s; meterEl.classList.toggle('strain', s); }
+    },
+    // ui.sampleCard(id): the "take" card — a little waveform + the sample's label, ~2.6 s, never blocks
+    sampleCard(id, o = {}) {
+      if (U.skipping()) return;
+      const smp = (typeof SAMPLES !== 'undefined' && SAMPLES[id]) || {};
+      const cx = takeCv.getContext('2d');
+      cx.clearRect(0, 0, takeCv.width, takeCv.height);
+      uiWave(cx, 0, 0, takeCv.width, takeCv.height, id, '#ffd9d4');
+      takeLbl.textContent = o.label || smp.label || String(id);
+      takeEl.classList.remove('on'); void takeEl.offsetWidth; takeEl.classList.add('on');   // restart the playhead sweep
+      takeT = o.dur || 2.6;
+    },
+    // ui.nameGlitch(fromId, toId): the visible dialogue label (and portrait) switch with a one-frame glitch (3.3's reveal)
+    nameGlitch(fromId, toId) { if (!U.skipping()) say.glitch(fromId, toId); },
 
     // ---------------------------------------------------------- inventory panel (modal while open)
     inventoryPanel(spec) {
@@ -132,11 +226,12 @@ const ui = (() => {
     },
 
     reset() { // back to a clean screen (title, quit)
-      popup.clear(); U.card(null); U.prompt(null); objective(null); say.reset(); U.letterbox(false);
-      U.swapIndicator(null); U.inventoryPanel(null); document.getElementById('hud').classList.add('off');
-      fadeTo(flashEl, 0, 0); fadeTo(tcard, 0, 0); fadeTo(acard, 0, 0);
+      popup.clear(); U.card(null); U.prompt(null); objective(null); say.reset(); bark.clear(); U.letterbox(false);
+      U.swapIndicator(null); U.inventoryPanel(null); hud.hide(true);
+      U.chipView(false); U.signal(null); U.meter(null, null); takeT = 0; takeEl.classList.remove('on');
+      tcTok++; fadeTo(flashEl, 0, 0); fadeTo(tcard, 0, 0); fadeTo(acard, 0, 0); fadeTo(timeEl, 0, 0);
     },
-    init() { on('render', popup.render); },
+    init() { on('render', popup.render); popup.prewarm(16); on('flow:stop', () => bark.clear()); },
 
     update(dt) {
       for (let i = tweens.length - 1; i >= 0; i--) {
@@ -147,8 +242,14 @@ const ui = (() => {
         if (k >= 1) { tweens.splice(i, 1); w.res(); }
       }
       if (toastT > 0 && (toastT -= dt) <= 0) toastEl.classList.remove('show');
+      if (takeT > 0 && (takeT -= dt) <= 0) takeEl.classList.remove('on');
+      // the touch CHIP button exists only while Chase (2040) is the one you're playing (and his chip is allowed)
+      const cp = state.active === 'chase40' && typeof flow !== 'undefined' && flow.roaming === true &&
+        !(typeof chip !== 'undefined' && chip && (chip.allowed === false || chip.forced === true));
+      if (cp !== chipable) { chipable = cp; document.body.classList.toggle('chipable', cp); }
       objective.update();
       hud.update(dt);
+      bark.update(dt);
       if (inv.spec) { invUpdate(dt); return; }
       say.update(dt);
       popup.update(dt);
@@ -212,6 +313,7 @@ const { say, choose, ask } = (() => {
   const D = { mode: null, res: null, id: '', faceId: null, text: '', len: 0, i: 0, acc: 0, cps: 48, beats: [], bi: 0, pause: 0, typing: false,
     n: 0, fast: false, q: false, censor: false, cwait: false, auto: 0, after: 0, talk: [], sel: 0, n2: 0, dis: [], opt: null, shown: false, hide: 0 };
 
+  let glitchT = 0;
   const talk = (on) => { if (typeof world !== 'undefined' && world.talk) for (let k = 0; k < D.talk.length; k++) world.talk(D.talk[k], on); };
   const blip = (rising) => { if (typeof AUDIO !== 'undefined') AUDIO.blip(D.id, rising); };
   function showBox() {
@@ -234,7 +336,7 @@ const { say, choose, ask } = (() => {
     const ch = CHARACTERS[id];
     nameEl.textContent = opts.name || (ch && ch.name) || String(id).toUpperCase();
     tagEl.textContent = opts.tag || '';
-    box.classList.remove('noname');
+    box.classList.remove('noname', 'notext');
     if (opts.portrait === false) box.classList.add('noface');
     else { box.classList.remove('noface'); if (D.faceId !== id) { face.src = portraitURL(id); D.faceId = id; } }
   }
@@ -277,8 +379,7 @@ const { say, choose, ask } = (() => {
         q: /\?[\s…—"')]*$/.test(out), censor: o.censor || false, auto: o.auto || 0 });
       // censor: true | 'pop-up text'. A line already written up to the cut (ends in —) is typed in full.
       D.len = D.censor && !/—$/.test(out) ? Math.max(1, Math.floor(out.length * 0.75)) : out.length;
-      const ch = CHARACTERS[id];
-      D.talk = ch && ch.voice && ch.voice.also ? id.split('_') : [id];
+      D.talk = speakerActors(id);   // 'manager' moves luka40's mouth; duets move both
       node.data = ''; optsEl.classList.add('off'); more.classList.add('off');
       talk(true);
     });
@@ -323,7 +424,7 @@ const { say, choose, ask } = (() => {
     D.opt = o; D.dis = o.disabled || []; D.n2 = labels.length;
     if (ui.skipping()) return Promise.resolve(autoPick());
     return new Promise((res) => {
-      if (!D.shown) { node.data = ''; box.classList.add('noname', 'noface'); D.faceId = null; }
+      if (!D.shown) { node.data = ''; box.classList.add('noname', 'noface', 'notext'); D.faceId = null; }
       showBox(); more.classList.add('off');
       D.mode = 'choose'; D.res = res; D.after = 0;
       D.sel = 0; while (D.sel < labels.length - 1 && D.dis.includes(D.sel)) D.sel++;
@@ -336,7 +437,7 @@ const { say, choose, ask } = (() => {
     if (ui.skipping()) return Promise.resolve(autoAnswer());
     return new Promise((res) => {
       showBox(); more.classList.add('off');
-      box.classList.add('noname', 'noface'); D.faceId = null;
+      box.classList.add('noname', 'noface'); box.classList.remove('notext'); D.faceId = null;
       node.data = question;
       D.mode = 'ask'; D.res = res; D.after = 0;
       const dis = []; if (o.yesDisabled) dis.push(0); if (o.noDisabled) dis.push(1);
@@ -344,9 +445,20 @@ const { say, choose, ask } = (() => {
     });
   }
 
+  // 3.3's reveal: the label (and portrait) on screen switch from one speaker to another with a one-frame glitch.
+  // Later say(toId) lines simply show toId's own name (CHARACTERS[toId].name).
+  say.glitch = (fromId, toId) => {
+    const ch = CHARACTERS[toId];
+    if (!D.shown) { D.faceId = null; return; }
+    nameEl.textContent = (ch && ch.name) || String(toId).toUpperCase(); tagEl.textContent = '';   // (the filter drops away)
+    if (!box.classList.contains('noface')) { face.src = portraitURL(toId); D.faceId = toId; }
+    box.classList.add('glitch'); glitchT = 0.02; // one or two frames at 60 Hz (game time, so it pauses)
+    ui.sfx('glitch', { vol: 0.5 });
+  };
   say.busy = () => D.mode !== null && !D.cwait;
-  say.reset = () => { D.mode = null; D.res = null; D.cwait = false; talk(false); hideBox(); };
+  say.reset = () => { D.mode = null; D.res = null; D.cwait = false; talk(false); hideBox(); glitchT = 0; box.classList.remove('glitch'); };
   say.update = (dt) => {
+    if (glitchT > 0 && (glitchT -= dt) <= 0) box.classList.remove('glitch');
     if (D.mode === null) { if (D.shown && (D.hide += dt) > 0.07) hideBox(); return; }
     const skip = ui.skipping();
     if (D.mode === 'say') {
@@ -377,21 +489,106 @@ const { say, choose, ask } = (() => {
   return { say, choose, ask };
 })();
 
-// ------------------------------------------------------------ JARVIS pop-ups (pooled DOM)
+// ------------------------------------------------------------ barks: lines over gameplay that never pause it
+// bark(id, text, o) -> Promise (resolves when the line has been read): a corner box with portrait, name, tag and text
+// for the boss, the scooter chase and drones in stealth. Its own queue and typewriter on game time: it never touches the
+// dialogue box, never takes YES, never ducks the music and never makes say.busy() true, so pop-ups keep their input.
+// o: { name, tag, portrait: false, speed: 'slow'|'normal'|'fast', hold (s after typing), now (drop the queue, speak now) }.
+// Skipping (or a scene change) resolves and drops every bark.
+const bark = (() => {
+  const box = document.getElementById('bark'), face = box.querySelector('.face'), nameEl = box.querySelector('.who span'), tagEl = box.querySelector('.who i');
+  const node = document.createTextNode(''); box.querySelector('.txt').append(node);
+  const q = [];
+  let cur = null, shown = false, faceId = null, linger = 0;
+  const B = { text: '', len: 0, i: 0, acc: 0, cps: 48, beats: [], bi: 0, pause: 0, typing: false, hold: 0, t: 0, n: 0, fast: false, q: false, talk: [] };
+  const talk = (on) => { if (typeof world !== 'undefined' && world.talk) for (let k = 0; k < B.talk.length; k++) world.talk(B.talk[k], on); };
+  const sceneNow = () => (typeof flow !== 'undefined' ? flow.sceneId : null);
+
+  function bark(id, text, o = {}) {
+    if (ui.skipping()) return Promise.resolve();
+    return new Promise((res) => {
+      if (o.now) bark.clear();
+      q.push({ id, text: String(text ?? ''), o, res, scene: sceneNow() });
+    });
+  }
+  function begin(r) {
+    cur = r;
+    const o = r.o, ch = CHARACTERS[r.id];
+    nameEl.textContent = o.name || (ch && ch.name) || String(r.id).toUpperCase();
+    tagEl.textContent = o.tag || '';
+    if (o.portrait === false) box.classList.add('noface');
+    else { box.classList.remove('noface'); if (faceId !== r.id) { face.src = portraitURL(r.id); faceId = r.id; } }
+    let out = ''; const beats = [];   // '^' = a beat, as in say()
+    for (let k = 0; k < r.text.length; k++) {
+      const c = r.text[k];
+      if (c === '^') { if (r.text[k + 1] === ' ' && (out === '' || out.endsWith(' '))) k++; beats.push(out.length); continue; }
+      out += c;
+    }
+    const sp = o.speed || 'normal';
+    B.text = out; B.len = out.length; B.beats = beats; B.bi = 0; B.i = 0; B.acc = 0; B.pause = 0; B.typing = true; B.t = 0; B.n = 0;
+    B.cps = CONFIG.text[sp] * CONFIG.text[options.textSpeed] / CONFIG.text.normal; B.fast = sp === 'fast' || options.textSpeed === 'fast';
+    B.q = /\?[\s…—"')]*$/.test(out);
+    B.hold = o.hold ?? Math.min(4, 1.2 + out.length * 0.03);
+    if (TEST.auto) B.hold = Math.min(B.hold, 0.5);
+    B.talk = speakerActors(r.id);
+    node.data = '';
+    if (!shown) { shown = true; box.classList.add('on'); }
+    talk(true);
+  }
+  function end() {
+    const r = cur; cur = null; talk(false); linger = 0.25;
+    if (r) r.res();
+  }
+  bark.update = (dt) => {
+    if (!cur && !q.length) { if (shown && (linger -= dt) <= 0) { shown = false; box.classList.remove('on'); } return; }
+    if (ui.skipping()) { bark.clear(); return; }
+    const sc = sceneNow();
+    if (cur && cur.scene !== sc) { bark.clear(); return; }   // the scene moved on under it
+    if (!cur) { const r = q.shift(); if (r.scene !== sc) { r.res(); return; } begin(r); }
+    if (B.typing) {
+      if (B.pause > 0) { if ((B.pause -= dt) <= 0) talk(true); return; }
+      B.acc += dt * B.cps;
+      while (B.acc >= 1 && B.i < B.len) {
+        if (B.bi < B.beats.length && B.beats[B.bi] === B.i) { B.bi++; B.pause = CONFIG.beat; B.acc = 0; talk(false); return; }
+        const c = B.text.charCodeAt(B.i);
+        node.appendData(B.text[B.i]); B.i++; B.acc -= 1;
+        const letter = (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || (c >= 192 && c < 0x2000);
+        if (letter && (!B.fast || (B.n++ & 1) === 0) && typeof AUDIO !== 'undefined') AUDIO.blip(cur.id, B.q && B.i > B.len - 6);
+      }
+      if (B.i >= B.len) { B.typing = false; talk(false); }
+      return;
+    }
+    if ((B.t += dt) >= B.hold) end();
+  };
+  bark.clear = () => {
+    const r = cur; cur = null; talk(false);
+    if (r) r.res();
+    while (q.length) q.shift().res();
+    if (shown) { shown = false; box.classList.remove('on'); }
+  };
+  bark.busy = () => !!cur || q.length > 0;
+  return bark;
+})();
+
+// ------------------------------------------------------------ JARVIS (2026) + SafeSense (2040) pop-ups (pooled DOM)
+// popup(spec) -> { el, done, close, progress(v), setMsg(text), moon(on) }. spec.style: 'jarvis' (default: Rue's grey window,
+// blue bar, square buttons, ding) | 'safesense' (rounded translucent glass, blue glow, pill buttons, the two-note chirp).
+// spec.emptySlot: an inert button-shaped gap where NO should be. spec.note: small text under the message. spec.moon: the
+// Do Not Disturb moon. spec.at may also be { pos: [x, y, z] }: pinned to a world point (screens, the glass wall, Chip View).
 const popup = (() => {
   const layer = document.getElementById('pops');
   const pool = [], live = [], v3 = new THREE.Vector3();
   let seq = 0;
-  const HTML = '<div class="jv"><div class="jv-bar"><span class="jv-logo">JARVIS</span><span class="jv-t"></span><i class="jv-x">&times;</i></div>' +
-    '<div class="jv-body"><div class="ic"></div><div class="jv-msg"></div></div><div class="jv-spin"></div>' +
+  const HTML = '<div class="jv"><div class="jv-bar"><span class="jv-logo">JARVIS</span><span class="jv-t"></span><i class="jv-moon"></i><i class="jv-x">&times;</i></div>' +
+    '<div class="jv-body"><div class="ic"></div><div class="jv-msg"></div></div><div class="jv-note"></div><div class="jv-spin"></div>' +
     '<div class="jv-prog"><div><i></i></div><span></span></div><div class="jv-btns"></div></div>';
 
   function make() {
     const w = document.createElement('div'); w.className = 'jvw off'; w.innerHTML = HTML;
     const q = (s) => w.querySelector(s);
-    const p = { w, box: w.firstChild, title: q('.jv-t'), ic: q('.ic'), msg: q('.jv-msg'), spin: q('.jv-spin'), prog: q('.jv-prog'), bar: q('.jv-prog i'),
-      pct: q('.jv-prog span'), btns: q('.jv-btns'), bs: [], open: false, tok: 0, spec: null, res: null, age: 0, life: 0, n: 0, focus: 0, tickT: 0,
-      pr: null, prT: 0, actor: null, stack: false, z: 0 };
+    const p = { w, box: w.firstChild, logo: q('.jv-logo'), title: q('.jv-t'), ic: q('.ic'), msg: q('.jv-msg'), note: q('.jv-note'), spin: q('.jv-spin'), prog: q('.jv-prog'), bar: q('.jv-prog i'),
+      pct: q('.jv-prog span'), btns: q('.jv-btns'), bs: [], slot: null, open: false, tok: 0, spec: null, res: null, age: 0, life: 0, n: 0, focus: 0, tickT: 0,
+      pr: null, prT: 0, actor: null, wpos: null, hasPos: false, vis: true, stack: false, z: 0, px: 0, py: 0 };
     layer.append(w);
     return p;
   }
@@ -418,12 +615,19 @@ const popup = (() => {
   const place = (p, x, y) => { p.w.style.transform = `translate(${x}px,${y}px) translate(-50%,-50%)`; };
   function setProg(p, v) { p.bar.style.transform = `scaleX(${Math.max(0, Math.min(1, v / 100))})`; p.pct.textContent = Math.round(v) + '%'; }
   function track(p) {
-    if (typeof world === 'undefined' || typeof cam === 'undefined' || !world.actor) return;
-    const a = world.actor(p.actor);
-    if (!a) return;
-    a.headPos(v3);
+    if (typeof cam === 'undefined') return;
+    if (p.hasPos) v3.copy(p.wpos);
+    else {
+      if (typeof world === 'undefined' || !world.actor) return;
+      const a = world.actor(p.actor);
+      if (!a) return;
+      a.headPos(v3);
+    }
     const s = cam.project(v3);
-    if (s && s.visible !== false && (Math.abs(s.x - p.px) > 0.4 || Math.abs(s.y - p.py) > 0.4)) { p.px = s.x; p.py = s.y; place(p, s.x, s.y); }   // restyle only when the head moved
+    if (!s) return;
+    const vis = s.visible !== false;
+    if (p.hasPos && vis !== p.vis) { p.vis = vis; p.w.style.visibility = vis ? '' : 'hidden'; }   // a world point behind the lens: hide
+    if (vis && (Math.abs(s.x - p.px) > 0.4 || Math.abs(s.y - p.py) > 0.4)) { p.px = s.x; p.py = s.y; place(p, s.x, s.y); }   // restyle only when it moved
   }
   function close(p, i) {
     if (!p.open) return;
@@ -434,16 +638,18 @@ const popup = (() => {
   }
 
   function popup(spec) {
-    const s = spec || {}, p = pool.pop() || make();
+    const s = spec || {}, p = pool.pop() || make(), ss = s.style === 'safesense';
     p.open = true; p.spec = s; p.age = 0; p.life = s.dur || 0; p.tickT = 0;
-    p.box.className = 'jv' + (s.shake ? ' shake' : '') + (s.cls ? ' ' + s.cls : '');
+    p.box.className = 'jv' + (ss ? ' ss' : '') + (s.shake ? ' shake' : '') + (s.moon ? ' moon' : '') + (s.cls ? ' ' + s.cls : '');
     p.box.style.width = s.w ? s.w + 'px' : '';
-    const t = s.title ?? 'JARVIS';
-    p.title.textContent = t === 'JARVIS' ? '' : t;
-    const icon = s.icon || 'warn';
+    p.logo.textContent = ss ? 'SafeSense' : 'JARVIS';   // the pool reuses windows across styles
+    const t = s.title ?? (ss ? 'SafeSense' : 'JARVIS');
+    p.title.textContent = t === 'JARVIS' || t === 'SafeSense' ? '' : t;
+    const icon = s.icon || (ss ? 'none' : 'warn');
     p.ic.className = 'ic ' + icon;
     p.ic.textContent = icon === 'error' ? '✕' : icon === 'info' ? 'i' : icon === 'warn' ? '!' : '';
     p.msg.textContent = s.msg || '';
+    p.note.textContent = s.note || '';
     p.spin.classList.toggle('off', !s.spinner);
     p.pr = null; p.prog.classList.add('off');
     if (s.progress) {
@@ -458,13 +664,16 @@ const popup = (() => {
       b.textContent = labels[k]; b._d = 0; b._x = 0; b._y = 0; b.style.transform = '';
       p.btns.append(b);
     }
+    if (s.emptySlot) { if (!p.slot) { p.slot = document.createElement('span'); p.slot.className = 'ss-slot'; } p.btns.append(p.slot); }   // where NO should be
     if (p.n) focus(p, 0);
-    // position: centre (stacked +18 px per open unanchored pop-up), [x%, y%], or over an actor's head
-    p.actor = null; p.stack = false;
+    // position: centre (stacked +18 px per open unanchored pop-up), [x%, y%], over an actor's head, or pinned to a world point
+    p.actor = null; p.hasPos = false; p.stack = false;
+    if (!p.vis) { p.vis = true; p.w.style.visibility = ''; }
     let x = innerWidth / 2, y = innerHeight / 2;
     const at = s.at;
     if (Array.isArray(at)) { const k = at[0] <= 1 && at[1] <= 1 ? 1 : 0.01; x = at[0] * k * innerWidth; y = at[1] * k * innerHeight; }
     else if (at && at.actor) p.actor = at.actor;
+    else if (at && at.pos) { (p.wpos || (p.wpos = new THREE.Vector3())).set(at.pos[0], at.pos[1], at.pos[2]); p.hasPos = true; }
     else if (at !== 'center') {
       let n = 0; for (let i = 0; i < live.length; i++) if (live[i].stack) n++;
       x += (n % 14) * 18; y += (n % 14) * 18; p.stack = true;
@@ -474,15 +683,22 @@ const popup = (() => {
     p.w.style.zIndex = p.z;
     live.push(p);
     p.w.classList.remove('off'); // un-hiding restarts the CSS pop/shake animation
-    if (p.actor) track(p);
-    if (s.ding !== false) ui.sfx('ding');
+    if (p.actor || p.hasPos) track(p);
+    if (s.ding !== false) ui.sfx(ss ? 'ss_chirp' : 'ding');
     const tok = p.tok;
     const done = new Promise((r) => { p.res = r; });
-    return { el: p.w, done, close: () => { if (p.tok === tok) close(p, -1); } };
+    return {
+      el: p.w, done,
+      close: () => { if (p.tok === tok) close(p, -1); },
+      progress: (pct) => { if (p.tok !== tok) return; p.pr = null; p.prog.classList.remove('off'); setProg(p, pct); },   // drive the bar yourself (percent)
+      setMsg: (m) => { if (p.tok === tok) p.msg.textContent = m; },
+      moon: (on) => { if (p.tok === tok) p.box.classList.toggle('moon', on !== false); },
+    };
   }
 
   popup.clear = () => { while (live.length) close(live[live.length - 1], -1); };
   popup.count = () => live.length;
+  popup.prewarm = (n) => { for (let i = pool.length + live.length; i < n; i++) pool.push(make()); };   // build the DOM behind the loader, not mid-storm
   popup.update = (dt) => {
     const skip = ui.skipping();
     let top = null;
@@ -509,52 +725,114 @@ const popup = (() => {
       for (let k = 0; k < top.n; k++) { const t = top.bs[k].textContent; if (t === 'NO' || t === 'Cancel') { input.consume('no'); close(top, k); break; } }
     }
   };
-  popup.render = () => { for (let i = 0; i < live.length; i++) if (live[i].actor) track(live[i]); };
+  popup.render = () => { for (let i = 0; i < live.length; i++) if (live[i].actor || live[i].hasPos) track(live[i]); };
   return popup;
 })();
 
-// ------------------------------------------------------------ 1987 HUD (top right)
+// ------------------------------------------------------------ HUD (top right pill) + HACK % (centre top)
+// The model lives in the saved state; a falsy / null part is hidden:
+//   state.noService: true      the signal icon + NO SERVICE (once bars > 0 it reads "Optus": they're home)
+//   state.quiet: 'hh:mm:ss'    QUIET IN hh:mm:ss (story time; hud.quiet() also takes seconds for the boss's countdown)
+//   state.bars: 0..4           the signal icon's bars (the endings fill it to four)
+//   state.hud.samples: true (live count of state.samples) | n | false      Samples: n
+//   state.hud.hack: true + state.hack 0..100                               the big HACK % bar
+// hud.set(null) clears it all; hud.set({ noService, quiet, samples, bars, hack }) changes only the keys given
+// (Rue's `battery` is accepted and not drawn). hud.hide() hides both without touching the model; hud.show() brings
+// them back; hud.refresh() re-reads the state. Every setter is safe to call per tick (the DOM is written on change).
 const hud = (() => {
-  const el = document.getElementById('hud'), fill = el.querySelector('.bat i'), pct = el.querySelector('.pct'), ns = el.querySelector('.ns');
-  const bars = el.querySelectorAll('.bars i');
+  const el = document.getElementById('hud'), sig = el.children[0], qt = el.children[1], sm = el.children[2];
+  const barEls = sig.querySelectorAll('.bars i'), ns = sig.querySelector('.ns'), qtB = qt.querySelector('b'), smB = sm.querySelector('b');
+  const hackEl = document.getElementById('hack'), hackPct = hackEl.querySelector('.hd span'), hackBar = hackEl.querySelector('.bar i');
   const anims = [];
-  function show() {
-    const b = state.battery, s = state.bars;
-    if (b == null && s == null) { el.classList.add('off'); return; }
-    el.classList.remove('off');
-    fill.style.transform = `scaleX(${b > 0 ? Math.max(0.07, b / 100) : 0})`;
-    pct.textContent = (b ?? 0) + '%';
-    el.classList.toggle('low', (b ?? 0) <= 5);
-    for (let k = 0; k < 4; k++) bars[k].classList.toggle('on', k < (s || 0));
-    ns.classList.toggle('off', s !== 0 || b == null);
-    el.classList.toggle('nobat', b == null); // bars only (3.8): no battery, no "No Service"
+  let hidden = false, shownN = -1, qSec = -1, hackI = -1, hackR = -1, hackK = '';
+  const X = () => { let h = state.hud; if (!h || typeof h !== 'object') h = state.hud = { samples: false, hack: false }; return h; };
+  const two = (n) => (n < 10 ? '0' : '') + n;
+  const fmt = (q) => { if (q == null || q === false) return null; if (typeof q !== 'number') return String(q); q = Math.max(0, Math.round(q)); return two(Math.floor(q / 3600)) + ':' + two(Math.floor(q / 60) % 60) + ':' + two(q % 60); };
+  const sampOn = (v) => v === true || typeof v === 'number';
+  const count = (x) => (typeof x.samples === 'number' ? x.samples : state.samples ? state.samples.length : 0);
+  function render() {
+    const x = X(), b = state.bars || 0;
+    const s1 = !!state.noService || state.bars != null, s2 = state.quiet != null, s3 = sampOn(x.samples);
+    el.classList.toggle('off', hidden || !(s1 || s2 || s3));
+    sig.classList.toggle('off', !s1); qt.classList.toggle('off', !s2); sm.classList.toggle('off', !s3);
+    sig.classList.add('lead'); qt.classList.toggle('lead', !s1); sm.classList.toggle('lead', !s1 && !s2);   // no separator before the first part
+    for (let k = 0; k < 4; k++) barEls[k].classList.toggle('on', k < b);
+    ns.textContent = b > 0 ? 'Optus' : 'NO SERVICE'; ns.classList.toggle('ok', b > 0); ns.classList.toggle('off', !state.noService && !(b > 0));
+    qtB.textContent = state.quiet || '';
+    shownN = count(x); smB.textContent = shownN;
+    hackRender(true);
   }
+  function hackRender(force) {
+    const v = X().hack ? +state.hack || 0 : null;
+    if (v == null || hidden) { if (hackI !== -1 || force) { hackI = -1; hackR = -1; hackEl.classList.add('off'); } return; }
+    if (hackI === -1) hackEl.classList.remove('off');
+    const r = Math.round(Math.max(0, Math.min(100, v)) * 5) / 5, i = Math.floor(r);   // bar in 0.2% steps, label in whole percent
+    if (r !== hackR) { hackR = r; hackBar.style.transform = 'scaleX(' + (r / 100).toFixed(3) + ')'; }
+    if (i !== hackI) { hackI = i; hackPct.textContent = i + '%'; }
+  }
+  function settle() { for (let i = 0; i < anims.length; i++) anims[i].res(); anims.length = 0; }
+  const setHack = (v) => { const x = X(); if (v == null || v === false) x.hack = false; else { x.hack = true; if (typeof v === 'number') state.hack = v; } };
   return {
-    show,
+    show() { hidden = false; render(); },
+    hide(on = true) { hidden = !!on; render(); },
+    refresh: () => render(),
     set(v) {
-      anims.length = 0;
-      if (!v) { state.battery = null; state.bars = null; } else { if ('battery' in v) state.battery = v.battery; if ('bars' in v) state.bars = v.bars; }
-      show();
-    },
-    animate(v, dur = 1) { // counts one step at a time
-      const ps = [];
-      for (const key of ['battery', 'bars']) {
-        if (!(key in v)) continue;
-        if (ui.skipping()) { state[key] = v[key]; continue; }
-        const from = state[key] || 0, n = Math.abs(v[key] - from);
-        if (!n) continue;
-        ps.push(new Promise((res) => anims.push({ key, to: v[key], step: dur / n, t: 0, res })));
+      settle();
+      const x = X();
+      if (!v) { state.noService = false; state.quiet = null; state.bars = null; state.battery = null; x.samples = false; x.hack = false; }
+      else {
+        if ('noService' in v) state.noService = !!v.noService;
+        if ('quiet' in v) { state.quiet = fmt(v.quiet); qSec = -1; }
+        if ('samples' in v) x.samples = sampOn(v.samples) ? v.samples : false;
+        if ('bars' in v) state.bars = v.bars == null ? null : Math.max(0, Math.min(4, Math.round(v.bars)));
+        if ('hack' in v) setHack(v.hack);
+        if ('battery' in v) state.battery = v.battery;   // (Rue's 1987 battery: kept in state, not drawn in TWO)
       }
-      show();
+      hidden = false; render();
+    },
+    // QUIET IN: 'hh:mm:ss' or seconds (the boss's compressed countdown); null hides it
+    quiet(q) {
+      if (typeof q === 'number') { const r = Math.max(0, Math.round(q)); if (r === qSec && state.quiet != null) return; qSec = r; } else qSec = -1;
+      const f = fmt(q);
+      if (f === state.quiet) return;
+      const was = state.quiet != null; state.quiet = f;
+      if (was && f != null) qtB.textContent = f; else render();
+    },
+    samples(n) { X().samples = n === undefined ? true : sampOn(n) ? n : false; render(); },   // no argument: the live count
+    bars(n) { state.bars = n == null ? null : Math.max(0, Math.min(4, Math.round(n))); render(); },
+    noService(on = true) { state.noService = !!on; render(); },
+    // the big HACK % bar: pct 0..100 (also written to state.hack), null hides it. o: { stalled, back } (a bug stall / drifting backwards)
+    hack(pct, o) {
+      setHack(pct == null ? null : +pct);
+      const k = o && o.stalled ? 'stall' : o && o.back ? 'back' : '';
+      if (k !== hackK) { hackK = k; hackEl.classList.toggle('stall', k === 'stall'); hackEl.classList.toggle('back', k === 'back'); }
+      hackRender(false);
+    },
+    // count bars / hack a whole step at a time: hud.animate({ bars: 4 }, 2). Skipping jumps to the end.
+    animate(v, dur = 1) {
+      const ps = [];
+      if ('hack' in v && v.hack != null) X().hack = true;
+      for (const key of ['bars', 'hack']) {
+        if (!(key in v) || v[key] == null) continue;
+        const to = Math.round(v[key]);
+        if (ui.skipping()) { state[key] = to; continue; }
+        const from = Math.round(state[key] || 0), n = Math.abs(to - from);
+        state[key] = from;
+        if (!n) continue;
+        ps.push(new Promise((res) => anims.push({ key, to, step: dur / n, t: 0, res })));
+      }
+      render();
       return Promise.all(ps);
     },
     update(dt) {
       for (let i = anims.length - 1; i >= 0; i--) {
         const a = anims[i];
         a.t += dt;
-        while (a.t >= a.step && state[a.key] !== a.to) { a.t -= a.step; state[a.key] = (state[a.key] || 0) + Math.sign(a.to - (state[a.key] || 0)); show(); }
+        while (a.t >= a.step && state[a.key] !== a.to) { a.t -= a.step; state[a.key] += Math.sign(a.to - state[a.key]); render(); }
         if (state[a.key] === a.to) { anims.splice(i, 1); a.res(); }
       }
+      const x = state.hud;   // the live sample count (no allocation: compare, then write one text node)
+      if (x && x.samples === true && !hidden) { const n = state.samples ? state.samples.length : 0; if (n !== shownN) { shownN = n; smB.textContent = n; } }
     },
   };
 })();
@@ -579,26 +857,102 @@ const objective = (() => {
   return objective;
 })();
 
-// ------------------------------------------------------------ portraits (baked at boot from a 3D bust; face texture / silhouette fallback)
+// ------------------------------------------------------------ portraits (baked at boot from a 3D bust; painted / silhouette fallback)
+// Order: CHARACTERS[id].silhouette (THE MANAGER, FIGURE, VOICE: a silhouette until they're revealed) -> a painted stand-in
+// for speakers with no body (Des the kettle, SafeSense, drones, voices down the line; or CHARACTERS[id].portrait) -> a
+// baked bust -> a duo (split) -> the actor's look (CHARACTERS[id].actor) -> a live face texture -> a plain silhouette.
 const portraitURL = (() => {
-  const urls = {}, cvs = {}, S = 128;
+  const urls = {}, cvs = {}, sil = {}, S = 128, PI2 = Math.PI * 2;
   const alias = { student: 'student_a', voice: null, operator: null, assistant: null };
+  // speakers without a body: a painted portrait (CHARACTERS[id].portrait can name one of these kinds too)
+  const PAINT = { des: 'kettle', safesense: 'safesense', drone: 'drone', door_drone: 'drone', lifeguard: 'lifeguard', operator: 'line',
+    voicemail: 'line', margaret: 'line', voice1: 'line', voice2: 'line', train: 'pa', hovercar: 'car' };
   const blank = () => { const c = document.createElement('canvas'); c.width = c.height = S; return c; };
-  function bg(x) {
-    const g = x.createLinearGradient(0, 0, 0, S); g.addColorStop(0, '#34437a'); g.addColorStop(1, '#1b2448');
+  function bg(x, a = '#34437a', b = '#1b2448') {
+    const g = x.createLinearGradient(0, 0, 0, S); g.addColorStop(0, a); g.addColorStop(1, b);
     x.fillStyle = g; x.fillRect(0, 0, S, S);
   }
+  const arcs = (x, cx, cy, col = '#ffd21f') => { x.strokeStyle = col; x.lineWidth = 4; x.lineCap = 'round'; for (let k = 1; k <= 2; k++) { x.beginPath(); x.arc(cx, cy, 8 * k, -0.9, 0.9); x.stroke(); } };
   function silhouette(id) {
     const c = blank(), x = c.getContext('2d');
+    if (id === 'manager') { // hood up, high collar, drones idling round him like fireflies
+      bg(x, '#26304f', '#0d1222');
+      x.fillStyle = '#05070d';
+      x.beginPath(); x.moveTo(64, 20); x.bezierCurveTo(92, 20, 98, 50, 94, 78); x.lineTo(34, 78); x.bezierCurveTo(30, 50, 36, 20, 64, 20); x.fill();   // the hood
+      x.beginPath(); x.moveTo(8, 132); x.lineTo(20, 92); x.quadraticCurveTo(40, 72, 64, 74); x.quadraticCurveTo(88, 72, 108, 92); x.lineTo(120, 132); x.fill(); // the coat
+      x.fillStyle = '#0b1020'; x.beginPath(); x.ellipse(64, 56, 19, 24, 0, 0, PI2); x.fill();                  // the dark under the hood
+      for (const [dx, dy, r] of [[20, 30, 2.4], [104, 22, 2], [112, 60, 2.6], [14, 70, 1.8]]) {
+        x.fillStyle = 'rgba(191,230,255,.35)'; x.beginPath(); x.arc(dx, dy, r * 2.6, 0, PI2); x.fill();
+        x.fillStyle = '#eaf6ff'; x.beginPath(); x.arc(dx, dy, r, 0, PI2); x.fill();
+      }
+      return c;
+    }
+    if (id === 'figure' || id === 'voice') { // a trench coat out of the smoke; a blue chip light behind the right ear
+      bg(x, '#4a536c', '#1f2638');
+      x.fillStyle = 'rgba(210,214,224,.1)'; for (let i = 0; i < 9; i++) { x.beginPath(); x.ellipse(-6 + i * 17, 112 - (i % 3) * 9 - (i & 1) * 26, 34, 11, 0.2 * (i % 3), 0, PI2); x.fill(); }   // smoke
+      x.fillStyle = '#121620';
+      x.beginPath(); x.arc(64, 52, 23, 0, PI2); x.fill();
+      x.beginPath(); x.moveTo(4, 132); x.lineTo(18, 96); x.lineTo(46, 80); x.lineTo(64, 104); x.lineTo(82, 80); x.lineTo(110, 96); x.lineTo(124, 132); x.fill();   // collar up
+      x.fillStyle = 'rgba(143,208,255,.45)'; x.beginPath(); x.arc(41, 58, 7, 0, PI2); x.fill();
+      x.fillStyle = '#bfe6ff'; x.beginPath(); x.arc(41, 58, 2.4, 0, PI2); x.fill();
+      if (id === 'voice') arcs(x, 96, 40, '#8fd0ff');
+      return c;
+    }
     bg(x);
     x.fillStyle = '#5d6a99';
-    x.beginPath(); x.arc(64, 54, 25, 0, Math.PI * 2); x.fill();
+    x.beginPath(); x.arc(64, 54, 25, 0, PI2); x.fill();
     x.beginPath(); x.ellipse(64, 132, 48, 44, 0, Math.PI, 0); x.fill();
-    if (id === 'operator' || id === 'voice') { // a phone line: little sound arcs
-      x.strokeStyle = '#ffd21f'; x.lineWidth = 4; x.lineCap = 'round';
-      for (let k = 1; k <= 2; k++) { x.beginPath(); x.arc(92, 40, 8 * k, -0.9, 0.9); x.stroke(); }
-    }
+    if (id === 'operator' || id === 'voice') arcs(x, 92, 40); // a phone line: little sound arcs
     return c;
+  }
+  function painted(kind, id) {
+    const c = blank(), x = c.getContext('2d');
+    if (kind === 'kettle') { // Des: a chrome kettle, its little screen glowing DES
+      bg(x, '#3a4870', '#18203c');
+      const g = x.createLinearGradient(30, 0, 100, 0); g.addColorStop(0, '#7d8896'); g.addColorStop(0.45, '#eef2f6'); g.addColorStop(1, '#6b7684');
+      x.fillStyle = g; x.beginPath(); x.moveTo(36, 112); x.lineTo(42, 44); x.quadraticCurveTo(64, 30, 86, 44); x.lineTo(92, 112); x.closePath(); x.fill();
+      x.fillStyle = '#2b313b'; x.fillRect(30, 108, 68, 10); x.fillRect(56, 30, 16, 7);
+      x.strokeStyle = '#59626e'; x.lineWidth = 7; x.beginPath(); x.moveTo(90, 54); x.quadraticCurveTo(112, 62, 92, 96); x.stroke();      // handle
+      x.fillStyle = '#9aa4b0'; x.beginPath(); x.moveTo(40, 60); x.lineTo(20, 48); x.lineTo(22, 56); x.lineTo(40, 72); x.fill();          // spout
+      x.fillStyle = '#0d1a2c'; x.fillRect(48, 70, 32, 16);
+      x.shadowColor = '#8fd0ff'; x.shadowBlur = 8; x.fillStyle = '#bfe6ff'; x.font = 'bold 11px "Courier New", monospace'; x.textAlign = 'center'; x.fillText('DES', 64, 82); x.shadowBlur = 0;
+      return c;
+    }
+    if (kind === 'safesense') { // a glass pill with a soft blue glow
+      bg(x, '#dfeefa', '#9cc4ea');
+      x.shadowColor = 'rgba(80,160,255,.9)'; x.shadowBlur = 18;
+      x.fillStyle = 'rgba(255,255,255,.88)'; x.beginPath(); x.roundRect(22, 42, 84, 44, 22); x.fill(); x.shadowBlur = 0;
+      const g = x.createRadialGradient(46, 60, 2, 50, 64, 16); g.addColorStop(0, '#fff'); g.addColorStop(0.5, '#8fd0ff'); g.addColorStop(1, '#2f86e0');
+      x.fillStyle = g; x.beginPath(); x.arc(50, 64, 12, 0, PI2); x.fill();
+      x.fillStyle = '#2f86e0'; x.font = 'bold 15px system-ui, sans-serif'; x.textAlign = 'left'; x.fillText('?', 72, 70);
+      return c;
+    }
+    if (kind === 'drone' || kind === 'lifeguard') { // a Courtesy Drone: a white pod with a soft blue light
+      bg(x, kind === 'lifeguard' ? '#5aa6d6' : '#2c3a66', kind === 'lifeguard' ? '#1d5a86' : '#141b36');
+      const g = x.createLinearGradient(0, 36, 0, 96); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#c5ccd8');
+      x.fillStyle = g; x.beginPath(); x.ellipse(64, 66, 40, 28, 0, 0, PI2); x.fill();
+      x.fillStyle = '#d7dde6'; x.fillRect(16, 46, 22, 5); x.fillRect(90, 46, 22, 5);
+      x.fillStyle = 'rgba(143,208,255,.5)'; x.beginPath(); x.arc(64, 70, 15, 0, PI2); x.fill();
+      x.fillStyle = '#3a9cff'; x.beginPath(); x.arc(64, 70, 8, 0, PI2); x.fill();
+      x.fillStyle = '#eaf6ff'; x.beginPath(); x.arc(61, 67, 3, 0, PI2); x.fill();
+      if (kind === 'lifeguard') { x.fillStyle = '#e8473c'; x.fillRect(58, 40, 12, 4); x.fillRect(62, 36, 4, 12); }
+      return c;
+    }
+    if (kind === 'pa') { // an announcement speaker
+      bg(x, '#3b4a7c', '#1a2346');
+      x.fillStyle = '#c9ced8'; x.beginPath(); x.moveTo(30, 52); x.lineTo(54, 52); x.lineTo(84, 30); x.lineTo(84, 98); x.lineTo(54, 76); x.lineTo(30, 76); x.closePath(); x.fill();
+      arcs(x, 92, 64);
+      return c;
+    }
+    if (kind === 'car') { // a hover-car, a foot off the road
+      bg(x, '#6ab8f6', '#2f6aa8');
+      x.fillStyle = '#eef2f6'; x.beginPath(); x.roundRect(18, 52, 92, 30, 14); x.fill();
+      x.fillStyle = '#26324a'; x.beginPath(); x.roundRect(36, 40, 52, 22, 10); x.fill();
+      x.fillStyle = 'rgba(143,208,255,.7)'; x.fillRect(26, 92, 76, 4);
+      return c;
+    }
+    const s = silhouette(id); arcs(s.getContext('2d'), 92, 40);   // 'line': someone down a phone line
+    return s;
   }
   function fromFace(fc) {
     const c = blank(), x = c.getContext('2d');
@@ -607,18 +961,21 @@ const portraitURL = (() => {
     x.drawImage(fc, (S - fc.width * k) / 2, (S - fc.height * k) / 2, fc.width * k, fc.height * k);
     return c;
   }
+  const pnt = {};
   function canvasFor(id) {
+    const ch = CHARACTERS[id], pk = (ch && ch.portrait) || (PAINT[id] && !(ch && ch.actor) ? PAINT[id] : null);
+    if (pk) return pnt[id] || (pnt[id] = painted(pk, id));   // no body: Des is a kettle even if an old look of that name was baked
     if (cvs[id]) return cvs[id];
-    const ch = CHARACTERS[id];
-    if (ch && ch.voice && ch.voice.also) { // two speakers at once: split portrait
-      const [a, b] = id.split('_'), c = blank(), x = c.getContext('2d');
+    const duo = speakerParts(id);
+    if (duo) { // two speakers at once: split portrait
+      const [a, b] = duo, c = blank(), x = c.getContext('2d');
       x.drawImage(canvasFor(a), S / 4, 0, S / 2, S, 0, 0, S / 2, S);
       x.drawImage(canvasFor(b), S / 4, 0, S / 2, S, S / 2, 0, S / 2, S);
       x.fillStyle = '#ffd21f'; x.fillRect(S / 2 - 1, 0, 2, S);
       return (cvs[id] = c);
     }
-    const look = id in alias ? alias[id] : id;
-    if (look && look !== id && cvs[look]) return (cvs[id] = cvs[look]);
+    const look = id in alias ? alias[id] : (ch && ch.actor) || id;   // a speaker with an actor alias wears that actor's face
+    if (look && look !== id) { const lc = cvs[look] || (CHARACTERS[look] || (typeof LOOKS !== 'undefined' && LOOKS[look]) ? canvasFor(look) : null); if (lc) return (cvs[id] = lc); }
     let fc = null;
     try {
       const a = look && typeof world !== 'undefined' && world.actor && world.actor(look);
@@ -627,33 +984,67 @@ const portraitURL = (() => {
     } catch (e) { fc = null; }
     return (cvs[id] = fc ? fromFace(fc) : silhouette(id));
   }
-  function portraitURL(id) { return urls[id] || (urls[id] = canvasFor(id).toDataURL()); }
+  const silOf = (id) => !!(CHARACTERS[id] && CHARACTERS[id].silhouette);
+  function portraitURL(id) {
+    if (silOf(id)) { const k = '~' + id; return urls[k] || (urls[k] = (sil[id] || (sil[id] = silhouette(id))).toDataURL()); }
+    return urls[id] || (urls[id] = canvasFor(id).toDataURL());
+  }
   portraitURL.bake = (id, canvas) => { cvs[id] = canvas; delete urls[id]; };
+  portraitURL.canvas = (id) => (silOf(id) ? sil[id] || (sil[id] = silhouette(id)) : canvasFor(id));   // for cards (People)
   return portraitURL;
 })();
 
-// ------------------------------------------------------------ menus: title, main, options, controls, scene select, extras, pause
+// ------------------------------------------------------------ menus: title, main, options, controls, chapter select, extras, pause
 const menus = (() => {
   const titleEl = document.getElementById('title'), root = document.getElementById('menu'), uiEl = document.getElementById('ui'); // uiEl.menuon hides the touch controls
   const head = root.querySelector('.head'), body = root.querySelector('.body'), list = root.querySelector('.list'), foot = root.querySelector('.foot');
   const btns = [];
-  let items = [], sel = 0, back = null, onTitle = false, typed = '', song = null, orbitT = 0;
+  let items = [], sel = 0, back = null, onTitle = false, typed = '', orbitT = 0, mainSel = 0, exSel = 0, jSel = 0, pIdx = 0;
+  let song = null, playing = null; // the Jukebox: an AUDIO.song handle, and 'pudding' | 'two' | null
   const M = { mode: null, paused: false };
 
   const CONTROLS = [
     ['Move', 'WASD or arrows', 'Left stick', 'Left virtual stick'],
     ['YES (confirm, examine, advance)', 'Enter, Space, left click', 'A', 'YES button'],
-    ['NO (cancel, duck, fast-forward)', 'Escape, Backspace, right click', 'B', 'NO button'],
+    ['NO (cancel, fast-forward)', 'Escape, Backspace, right click', 'B', 'NO button'],
     ['Run', 'Shift', 'RB', 'Push the stick further'],
-    ['Swap', 'Tab', 'Y', 'SWAP button'],
+    ['SWAP', 'Tab', 'Y', 'SWAP button'],
+    ['CHIP (Chip View, Chase (2040) only)', 'Q', 'LB', 'CHIP button'],
     ['Inventory', 'I', 'X', 'BAG button'],
     ['Pause', 'P', 'Start', 'Pause icon'],
   ];
-  const VOL = { get: (k) => '■'.repeat(Math.round(options[k] * 10)) + '□'.repeat(10 - Math.round(options[k] * 10)),
-    adj: (k, d) => { options[k] = Math.max(0, Math.min(1, Math.round(options[k] * 10 + d) / 10)); } };
-  const cyc = (key, vals, names) => ({
-    label: null, val: () => '‹ ' + names[Math.max(0, vals.indexOf(options[key]))] + ' ›',
-    adj: (d) => { options[key] = vals[(vals.indexOf(options[key]) + d + vals.length) % vals.length]; applyOptions(); },
+  // Extras: People. One card per named character except Rue, who is only ever his brick phone (no caption).
+  const PEOPLE = [
+    { id: 'luka', name: 'Luka', text: 'The 2IC. The one who could.' },
+    { id: 'chase', name: 'Chase', text: 'Pudding. Finished two songs now.' },
+    { id: 'chase40', name: 'Chase (2040)', text: 'Senior casual. They made it up for him.' },
+    { id: 'luka40', name: 'Luka (2040)', text: 'Head of Network Safety since 2031. He chose NO.' },
+    { id: 'jordan', name: 'Jordan', text: 'Jordan ran the store for two days on his own at Christmas, and nobody thanked him. Thank you, Jordan.' },
+    { id: 'luke40', name: 'Luke', text: "Luke still does sausages. Sausages still don't hang up on him." },
+    { id: 'teddy', name: 'Teddy', text: 'Teddy has said yes to everyone since Monday.' },
+    { id: 'mia', name: 'Mia', text: 'Mia played a gig at the Starlight. Forty people came. It was loud.' },
+    { id: 'nadia', name: 'Nadia', text: 'Nadia let her team do something dangerous. It went fine.' },
+    { id: 'jayden', name: 'Jayden', text: 'Jayden poured his slab on time. His dad is still filthy.' },
+    { id: 'des', name: 'Des (a kettle)', text: "Des (a kettle) asks everyone if they'd like tea. Everyone says yes." },
+    { id: 'margaret', name: 'Margaret', text: 'Has been coming here since it was a video shop. Can wait.' },
+    { brick: true },
+  ];
+  // The Bug List, 2040 Edition: BUGS_2040 (config) if it exists: strings or { text, seen? }. This is the fallback.
+  const BUGS40 = ['Are you sure? Are you sure you\'re sure?', 'Buttons that run away', 'Progress bar goes backwards', 'Password rules change while you type',
+    'Error 4044 — identity conflict', 'Sends MFA codes to dead phones'];
+
+  // audio, guarded: names the AUDIO build doesn't have fall back to the next one (AUDIO.buffers lists what was baked)
+  const AU = () => (typeof AUDIO !== 'undefined' ? AUDIO : null);
+  const baked = (store, n) => { const a = AU(), b = a && a.buffers && a.buffers[store]; return !b || n in b; };
+  const cue = (...ns) => { for (const n of ns) if (baked('M', n)) return n; return ns[0]; };
+  const titleMusic = () => cue('title', 'pads', 'store40');
+  const mus = (c, o) => { if (typeof music === 'function') music(c, o); };
+
+  const VOL = { get: (k) => { const n = Math.round((options[k] ?? 1) * 10); return '■'.repeat(n) + '□'.repeat(10 - n); },
+    adj: (k, d) => { options[k] = Math.max(0, Math.min(1, Math.round((options[k] ?? 1) * 10 + d) / 10)); } };
+  const cyc = (key, vals, names, label) => ({
+    label, val: () => '‹ ' + names[Math.max(0, vals.indexOf(options[key]))] + ' ›',
+    adj: (d) => { const i = Math.max(0, vals.indexOf(options[key])); options[key] = vals[(i + d + vals.length) % vals.length]; applyOptions(); },
   });
 
   function applyOptions() {
@@ -672,7 +1063,7 @@ const menus = (() => {
   }
   function show(h, its, bk, o = {}) {
     head.textContent = h || ''; items = its; back = bk || null;
-    sel = Math.min(o.sel || 0, its.length - 1);
+    sel = Math.max(0, Math.min(o.sel || 0, its.length - 1));
     body.textContent = '';
     if (o.body) body.append(o.body); else if (o.html) body.innerHTML = o.html;
     foot.textContent = o.foot ?? (bk ? 'YES — Select · NO — Back' : 'YES — Select');
@@ -704,24 +1095,26 @@ const menus = (() => {
 
   // ---------------------------------------------------------- screens
   function mainMenu() {
-    const its = [];
+    const go = (fn) => () => { mainSel = sel; fn(); }, its = [];   // (coming back, the selection is where you left it)
     if (hasSave()) its.push({ label: 'Continue', act: cont });
     its.push({ label: 'New Game', act: () => (hasSave() ? confirm('Start a new game? Your saved game will be replaced.', newGame, mainMenu) : newGame()) });
-    its.push({ label: 'Options', act: () => optionsMenu(mainMenu) });
+    its.push({ label: 'Options', act: go(() => optionsMenu(mainMenu)) });
     if (profile.completed) {
-      its.push({ label: 'Chapter Select', act: () => sceneSelect(mainMenu, 'CHAPTER SELECT') });
-      its.push({ label: 'Extras', act: extras });
+      its.push({ label: 'Chapter Select', act: go(() => sceneSelect(mainMenu, 'CHAPTER SELECT')) });
+      its.push({ label: 'Extras', act: go(() => { exSel = 0; extras(); }) });
     }
-    show('', its, null, { low: true });
+    show('', its, null, { low: true, sel: mainSel });
   }
   function optionsMenu(to) {
     const its = [
-      Object.assign(cyc('controls', ['modern', 'tank'], ['Modern', 'Tank']), { label: 'Controls' }),
-      Object.assign(cyc('textSpeed', ['slow', 'normal', 'fast'], ['Slow', 'Normal', 'Fast']), { label: 'Text speed' }),
-      Object.assign(cyc('textSize', ['normal', 'large'], ['Normal', 'Large']), { label: 'Text size' }),
+      cyc('controls', ['modern', 'tank'], ['Modern', 'Tank'], 'Controls'),
+      cyc('textSpeed', ['slow', 'normal', 'fast'], ['Slow', 'Normal', 'Fast'], 'Text speed'),
+      cyc('textSize', ['normal', 'large'], ['Normal', 'Large'], 'Text size'),
       ...[['music', 'Music volume'], ['sfx', 'SFX volume'], ['voice', 'Voice volume']].map(([k, l]) => ({ label: l, val: () => VOL.get(k), adj: (d) => { VOL.adj(k, d); applyOptions(); } })),
-      Object.assign(cyc('reduceFlashing', [false, true], ['Off', 'On']), { label: 'Reduce flashing' }),
-      Object.assign(cyc('objective', [true, false], ['On', 'Off']), { label: 'Objective text' }),
+      cyc('reduceFlashing', [false, true], ['Off', 'On'], 'Reduce Flashing'),
+      cyc('objective', [true, false], ['On', 'Off'], 'Objective text'),
+      cyc('storyMode', [false, true], ['Off', 'On'], 'Story Mode'),
+      cyc('holdToPress', [false, true], ['Hold', 'Press'], 'Hold to confirm'),
       { label: 'Back', act: to },
     ];
     show('OPTIONS', its, to, { foot: '‹ › Change · NO — Back' });
@@ -730,48 +1123,104 @@ const menus = (() => {
     const rows = CONTROLS.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('');
     show('CONTROLS', [{ label: 'Back', act: to }], to, { html: `<table><tr><th>ACTION</th><th>KEYBOARD AND MOUSE</th><th>GAMEPAD</th><th>TOUCH</th></tr>${rows}</table>` });
   }
-  function sceneSelect(to, h = 'SCENE SELECT') {
-    const its = SCENE_ORDER.map((id) => ({ label: id, sub: (SCENES[id] && SCENES[id].title) || '', act: () => start(id, { select: true }) }));
+  // every scene in story order with its title; each starts with what a player would have by then (flow's grants)
+  function sceneSelect(to, h = 'CHAPTER SELECT') {
+    const its = SCENE_ORDER.map((id) => ({ label: id, sub: (SCENES[id] && SCENES[id].title) || '', dis: !SCENES[id], act: () => playScene(id, (/^([AB])\d/.exec(id) || [])[1] || null) }));
     its.push({ label: 'Back', act: to });
     show(h, its, to);
   }
   function saved() { return loadGame() || state; }
+  const seenEnding = (k) => { const e = profile.endingsSeen; return !!e && (Array.isArray(e) ? e.includes(k) : !!e[k]); };
   function extras() {
+    const go = (fn) => () => { exSel = sel; fn(); };
     show('EXTRAS', [
-      { label: song ? "Stop Pudding's song" : "Pudding's song", act: toggleSong },
-      { label: "Luka's notebook", act: () => cardScreen('NAMES', 'list', { title: 'Names', paper: 'printout', items: NAMES.map((n) => ({ text: saved().names.includes(n) ? n : '— — —', done: saved().names.includes(n) })) }) },
-      { label: 'The Bug List', act: () => cardScreen('THE ORIGINAL SPEC', 'list', { frame: true, skull: true, ticks: true,
-        items: BUGS.filter((b) => saved().bugs.includes(b.id) || saved().bugs.includes(b.text)).map((b) => ({ text: b.text, done: true })).concat([{ text: DOOR_BUG, done: true }]) }) },
-      { label: 'Credits', act: credits },
+      { label: 'Endings', act: go(endings) },
+      { label: 'Jukebox', act: go(() => { jSel = 0; jukebox(); }) },
+      { label: 'The Bug List, 2040 Edition', act: go(bugList) },
+      { label: 'People', act: go(() => people(0)) },
+      { label: 'Pudding Discography', act: go(discography) },
+      { label: 'Credits', act: go(credits) },
       { label: 'Back', act: mainMenu },
-    ], mainMenu, { sel: head.textContent === 'EXTRAS' ? sel : 0 });
+    ], mainMenu, { sel: exSel });
   }
-  function toggleSong() {
-    if (typeof AUDIO === 'undefined') return;
-    if (song) { song.stop(); song = null; if (typeof music === 'function') music('title'); return extras(); }
-    const s = saved();
-    const lane = (on) => Array.from({ length: 16 }, (_, i) => on.includes(i));
-    const pattern = s.pattern || [lane([0, 4, 8, 12]), lane([4, 12]), lane([0, 2, 4, 6, 8, 10, 12, 14]), lane([0, 2, 5, 7, 10, 13])];
-    if (typeof music === 'function') music(null, { fade: 0.5 });
-    song = AUDIO.song(pattern, { samples: s.samples, onEnd: () => { song = null; if (M.mode === 'menu' && head.textContent === 'EXTRAS') extras(); } });
-    extras();
+  function endings() { // which have been seen; replay either (from the start of its first scene, on that branch)
+    const its = [['A', 'A1', 'Keep'], ['B', 'B1', 'Again']].map(([k, id, t]) => ({
+      label: `Ending ${k} — ${(SCENES[id] && SCENES[id].title) || t}`, sub: seenEnding(k) ? 'Seen · Replay' : 'Not seen yet', dis: !SCENES[id], act: () => playScene(id, k) }));
+    its.push({ label: 'Back', act: extras });
+    show('ENDINGS', its, extras);
   }
+  function jukebox() {
+    const s = saved(), got = (k) => !!(s.samples && s.samples.includes(k));
+    const its = [
+      { label: (playing === 'pudding' ? '■  ' : '▶  ') + 'Opt Us In (Dublin ’87)', sub: 'Pudding · 1987', act: () => toggle('pudding') },
+      { label: (playing === 'two' ? '■  ' : '▶  ') + 'two', sub: s.pattern ? 'Pudding · your mix' : 'Pudding', act: () => toggle('two') },
+    ];
+    if (typeof SAMPLES !== 'undefined') for (const k in SAMPLES) {
+      const smp = SAMPLES[k];
+      its.push({ label: '♪  ' + (smp.label || k), sub: got(k) ? smp.where || 'Recorded' : '— — —', act: () => { jSel = sel; ui.sfx(smp.sfx || k); } });
+    }
+    its.push({ label: 'Back', act: () => { stopJuke(true); extras(); } });
+    show('JUKEBOX', its, () => { stopJuke(true); extras(); }, { sel: jSel });
+  }
+  function stopJuke(restore) {
+    const was = playing;
+    if (song) { try { song.stop(); } catch (e) { /* already ended */ } song = null; }
+    playing = null;
+    if (was && restore && onTitle) mus(titleMusic(), { fade: 0.6 });
+  }
+  function toggle(which) {
+    jSel = sel;
+    const was = playing;
+    stopJuke(was === which);
+    if (was !== which) {
+      const A = AU();
+      if (which === 'pudding') { mus('pudding', { fade: 0.4 }); playing = 'pudding'; }
+      else if (A && A.song) {
+        const s = saved();
+        mus(null, { fade: 0.4 });
+        try {
+          const h = A.song({ pattern: s.pattern || null, samples: s.samples || [], onEnd: () => { if (song !== h) return; song = null; playing = null; if (onTitle) mus(titleMusic()); if (M.mode === 'menu' && head.textContent === 'JUKEBOX') jukebox(); } });
+          song = h; playing = 'two';
+        } catch (e) { console.warn('TWO: jukebox', e); }
+      }
+    }
+    jukebox();
+  }
+  function bugList() {
+    const src = typeof BUGS_2040 !== 'undefined' && Array.isArray(BUGS_2040) && BUGS_2040.length ? BUGS_2040 : BUGS40, fl = saved().flags || {};
+    const items = src.map((b) => (typeof b === 'string' ? { text: b } : { text: b.text, y: b.y, done: b.seen ? !!fl[b.seen] : b.done !== false }));
+    cardScreen('THE BUG LIST, 2040 EDITION', 'buglist40', { items });
+  }
+  function people(i) {
+    pIdx = (i + PEOPLE.length) % PEOPLE.length;
+    const p = PEOPLE[pIdx], c = document.createElement('canvas');
+    if (p.brick) ui.paintCard(c, 'brick', { lit: true }); else ui.paintCard(c, 'person', p);
+    show('PEOPLE', [
+      { label: '‹  ' + (p.brick ? '' : p.name) + '  ›', val: () => pIdx + 1 + ' / ' + PEOPLE.length, adj: (d) => people(pIdx + d) },
+      { label: 'Back', act: extras },
+    ], extras, { body: c, foot: '‹ › Browse · NO — Back' });
+  }
+  function discography() { cardScreen('PUDDING DISCOGRAPHY', 'discography', { a: seenEnding('A'), b: seenEnding('B') }); }
   function cardScreen(h, kind, data) {
     const c = document.createElement('canvas');
     ui.paintCard(c, kind, data);
     show(h, [{ label: 'Back', act: extras }], extras, { body: c });
   }
   function credits() {
-    show('CREDITS', [{ label: 'Back', act: extras }], extras, { html: `<div class="cr"><p><b>RUE</b>A comedy adventure. Systems crash. People pick up.</p>
-      <p><b>STARRING</b>Luka, 2IC, Optus Redcliffe<br>Chase, casual, eight months in<br>Rue, Business Studies, Trinity College Dublin</p>
-      <p><b>WITH</b>Des · Bernie · Declan · Prof. Hartigan · Margaret · Dazza · Luke · Jordan<br>Siobhán · Ronan · Fiachra · Mick · Nuala</p>
-      <p><b>MUSIC</b>“Opt Us In (Dublin ’87)” by Pudding</p>
-      <p>A work of affectionate parody. Not affiliated with or endorsed by Optus. Rue is a fictional portrayal. This is not how Optus got its name. JARVIS was not, as far as we know, built from a bug list. We can't prove it.</p></div>` });
+    show('CREDITS', [{ label: 'Back', act: extras }], extras, { html: `<div class="cr"><p class="two">two</p><p>A comedy adventure. The sequel to Rue.</p>
+      <p><b>STARRING</b>Luka · Chase · Luka (2040) · Chase (2040)</p>
+      <p><b>WITH</b>Jordan · Luke · Teddy · Mia · Nadia · Jayden · Des (a kettle) · and Rue</p>
+      <p><b>MUSIC</b>“two” by Pudding<br>“Opt Us In (Dublin ’87)” by Pudding, the national hold music</p>
+      <p><i>No drones were harmed in the making of this game. Several were tethered.</i><br><i>Optus Cloud+ is not a real product. Please remember things yourself.</i><br><i>Nobody can fix JARVIS.</i></p>
+      <p>A work of affectionate parody. Not affiliated with or endorsed by Optus. SafeSense, the Courtesy Drones, Neural Chips, the Opt-Out and Optus Cloud+ are made up. Luka and Chase are real coworkers, written with affection.</p></div>` });
   }
   function pauseMenu() {
+    const F = typeof flow !== 'undefined' ? flow : null;
     const its = [{ label: 'Resume', act: M.resume }];
-    if (typeof inventory !== 'undefined') its.push({ label: 'Inventory', act: () => { M.resume(); inventory.open(); } });
-    if (typeof flow !== 'undefined' && flow.cutscene) its.push({ label: 'Skip Scene', act: () => confirm('Skip?', () => { M.resume(); if (flow.skip) flow.skip(); else flow.skipping = true; }, pauseMenu) });
+    if (F && F.roaming && typeof inventory !== 'undefined') its.push({ label: 'Inventory', act: () => { M.resume(); inventory.open(); } });
+    // offered by the mini-game host after two failures (never for the Choice): flow.skipOffer
+    if (F && F.skipOffer) its.push({ label: 'Skip this mini-game', act: () => confirm('Skip this mini-game?', () => { M.resume(); if (typeof F.skipOffer === 'function') F.skipOffer(); else if (typeof F.skipMinigame === 'function') F.skipMinigame(); }, pauseMenu) });
+    if (F && F.cutscene) its.push({ label: 'Skip Scene', act: () => confirm('Skip?', () => { M.resume(); if (F.skip) F.skip(); else F.skipping = true; }, pauseMenu) });
     its.push({ label: 'Options', act: () => optionsMenu(pauseMenu) });
     its.push({ label: 'Controls', act: () => controlsMenu(pauseMenu) });
     its.push({ label: 'Quit to Title', act: () => confirm('Quit to the title screen? This scene will restart from its beginning.', quit, pauseMenu) });
@@ -780,30 +1229,54 @@ const menus = (() => {
 
   // ---------------------------------------------------------- leaving the title
   function leave() {
-    if (song) { song.stop(); song = null; }
+    stopJuke(false);
     onTitle = false; M.mode = null; uiEl.classList.remove('menuon');
     titleEl.classList.add('off'); root.classList.add('off');
-    if (typeof music === 'function') music(null, { fade: 0.8 });
+    mus(null, { fade: 0.8 });
   }
-  function start(id, o) { leave(); state = newState(); flow.start(id, o); }
-  function newGame() { start('1.1'); }
+  // a fresh state; with select, flow adds every earlier scene's grants. An ending's scenes carry their branch in state.choice.
+  function playScene(id, choice) {
+    leave(); state = newState();
+    if (choice) state.choice = choice;
+    flow.start(id, choice ? { select: true, choice } : { select: true });
+    if (choice) state.choice = choice;   // (flow's select rebuilds state synchronously, before its first await)
+  }
+  function newGame() { leave(); state = newState(); flow.start('1.1'); }
   function cont() { const s = loadGame(); if (!s) return; leave(); state = s; flow.start(s.scene); }
   function quit() {
     M.resume();
     if (typeof flow !== 'undefined' && flow.stop) flow.stop();
     M.title();
   }
+  // the title: Redcliffe, 2040, at dusk, a ring of drones outside, the camera slowly circling (fallback: whatever set exists)
+  const TITLE_SETS = ['reddy40', 'reddy26', 'reddy'];
+  async function titleSet() {
+    const id = TITLE_SETS.find((k) => SETS[k]) || Object.keys(SETS)[0];
+    if (!id || typeof world === 'undefined') return;
+    const def = SETS[id], env = def.env && def.env.dusk ? 'dusk' : undefined;
+    if (world.setId !== id) await world.load(id, { env }); else if (env) world.env(env);
+    if (typeof def.dress === 'function') { try { def.dress('title'); } catch (e) { console.warn('TWO: title dress', e); } }
+    else { const ring = world.prop && world.prop('drone_ring'); if (ring) ring.visible = true; }
+    const amb = (world.set && world.set.ambience) || {};
+    if (typeof AUDIO !== 'undefined') { AUDIO.ambience(amb); AUDIO.setRoom(amb.room || 'none'); }
+    for (const a of (world.actors instanceof Map ? [...world.actors.keys()] : Object.keys(world.actors || {}))) world.despawn(a);
+    if (typeof player !== 'undefined') player.enabled = false;
+    orbit(); orbitT = 0;
+  }
   function orbit() {
-    try { cam.shot({ shot: 'MID', on: 'brick_phone', angle: 'high', move: 'orbit', from: 0, to: 360, dur: 240 }); }
-    catch (e) { try { cam.override('set', { name: 'title_orbit' }); } catch (e2) { /* no camera yet */ } }
+    try {
+      if (world.anchor && world.anchor('title_center')) cam.shot({ shot: 'INSERT', at: 'title_center', move: 'orbit', from: 0, to: 360, dur: 240 });
+      else cam.shot({ shot: 'WIDE', on: [1, 2, -7], dist: 30, height: 9, facing: true, move: 'orbit', from: 0, to: 360, dur: 240 });   // round the store
+    } catch (e) { try { cam.override('set', { name: 'title_orbit' }); } catch (e2) { /* no camera yet */ } }
   }
 
   M.init = () => {
-    on('key', (code) => { // J-A-R-V-I-S on the title opens the scene select
+    on('key', (code) => { // J-A-R-V-I-S on the title opens the chapter select
       if (!onTitle || M.mode === 'wait' || !code.startsWith('Key')) return;
       typed = (typed + code[3]).slice(-6);
       if (typed === 'JARVIS') { typed = ''; titleEl.classList.add('withmenu'); sceneSelect(mainMenu); }
     });
+    on('reddy40:lightning', () => { if (onTitle) ui.sfx('thunder', { vol: 0.45 }); });   // the storm over the bay, on the title
   };
   M.title = async () => {
     M.paused = false; clock.paused = false; clock.scale = 1;
@@ -814,17 +1287,11 @@ const menus = (() => {
       else TWO_TEST.done = true;
       return;
     }
-    M.mode = 'wait'; onTitle = true; typed = ''; uiEl.classList.add('menuon');
+    M.mode = 'wait'; onTitle = true; typed = ''; mainSel = 0; uiEl.classList.add('menuon');
     root.classList.add('off');
     await ui.fade(1, 0.4);
-    try {
-      if (world.setId !== 'office') await world.load('office', { env: 'dark' }); else world.env('dark');
-      if (typeof AUDIO !== 'undefined') { AUDIO.ambience(world.set.ambience); AUDIO.setRoom(world.set.ambience.room); }   // (no Dublin rain left over on the title)
-      for (const id of (world.actors instanceof Map ? [...world.actors.keys()] : Object.keys(world.actors || {}))) world.despawn(id);
-      if (typeof player !== 'undefined') player.enabled = false;
-      orbit(); orbitT = 0;
-    } catch (e) { console.warn('TWO: title scene', e); }
-    if (typeof music === 'function') music('title');
+    try { await titleSet(); } catch (e) { console.warn('TWO: title scene', e); }
+    mus(titleMusic());
     titleEl.classList.remove('off', 'withmenu');
     M.mode = 'press';
     ui.fade(0, 1.2);
@@ -851,7 +1318,7 @@ const menus = (() => {
     else if ((input.pressed('no') || (M.paused && input.pressed('pause'))) && back) back();
     for (let i = 0; i < M.keys.length; i++) input.consume(M.keys[i]);
   };
-  M.keys = ['yes', 'no', 'up', 'down', 'left', 'right', 'pause', 'inventory', 'swap'];
+  M.keys = ['yes', 'no', 'up', 'down', 'left', 'right', 'pause', 'inventory', 'swap', 'chip'];
   return M;
 })();
 
@@ -1573,5 +2040,104 @@ Object.assign(CARDS, (() => {
   }
   wheel.size = [960, 500];
 
-  return { postit, clock, phone, brick, screen, newspaper, poster, badge, calendar, watch, label, list, polaroid, plaque, nameplate, tv, battery, filofax, wheel };
+  // ---------------------------------------------------------- TWO's built-in kinds
+  function person(cx, w, h, d) { // Extras · People: a Polaroid of someone you met (their portrait, pixel-crisp), name in felt tip, one line in biro
+    seedOf('person' + (d.id || d.name));
+    const fw = w * 0.82, fh = h * 0.92, x = (w - fw) / 2, y = (h - fh) / 2;
+    tilt(cx, w, h, (rnd() - 0.5) * 0.07);
+    shadow(cx, 26, 10);
+    cx.fillStyle = '#fbfbf6'; cx.fillRect(x, y, fw, fh); noShadow(cx);
+    const m = fw * 0.07, iw = fw - 2 * m;
+    cx.fillStyle = '#1b2448'; cx.fillRect(x + m, y + m, iw, iw);
+    const pc = d.id && typeof portraitURL !== 'undefined' && portraitURL.canvas ? portraitURL.canvas(d.id) : null;
+    if (pc) { cx.save(); cx.imageSmoothingEnabled = false; cx.drawImage(pc, x + m, y + m, iw, iw); cx.restore(); }
+    cx.fillStyle = 'rgba(245,238,220,.12)'; cx.fillRect(x + m, y + m, iw, iw);   // a little faded
+    const ny = y + m + iw + fh * 0.085;
+    hand(cx, d.name || '', x + fw / 2, ny, fh * 0.058, '#1a1a1a', { felt: true, align: 'center' });
+    if (d.text) {
+      const f = fit(cx, d.text, (sz) => `${sz}px ${HAND}`, iw, y + fh - ny - fh * 0.06, fh * 0.034, 1.2);
+      let ly = ny + f.size * 1.55;
+      for (const l of f.lines) { hand(cx, l, x + fw / 2, ly, f.size, BIRO, { pen: true, align: 'center' }); ly += f.size * 1.2; }
+    }
+  }
+  person.size = [560, 720];
+
+  function take(cx, w, h, d) { // a recorded sample: Chase's 2026 phone recorder, the take's waveform (the same one as the take card)
+    const smp = (typeof SAMPLES !== 'undefined' && SAMPLES[d.id]) || {};
+    shadow(cx, 24, 10);
+    cx.fillStyle = '#14161c'; rr(cx, w * 0.04, h * 0.06, w * 0.92, h * 0.88, 34); cx.fill(); noShadow(cx);
+    cx.fillStyle = '#ff4a3d'; cx.beginPath(); cx.arc(w * 0.11, h * 0.2, 10, 0, PI2); cx.fill();
+    cx.font = `bold 22px ${SYS}`; cx.textBaseline = 'middle'; cx.textAlign = 'left'; cx.fillStyle = '#ff8a7a';
+    cx.fillText('REC  ·  TAKE ' + (d.take || 1), w * 0.15, h * 0.2);
+    uiWave(cx, w * 0.09, h * 0.3, w * 0.82, h * 0.36, d.id || 'take', '#ffd9d4', 64);
+    cx.fillStyle = '#fff'; cx.font = `bold 34px ${SANS}`; cx.fillText(d.label || smp.label || String(d.id || ''), w * 0.09, h * 0.76, w * 0.82);
+    if (smp.where || d.where) { cx.fillStyle = '#8f9abb'; cx.font = `18px ${SYS}`; cx.fillText(d.where || smp.where, w * 0.09, h * 0.86, w * 0.82); }
+  }
+  take.size = [720, 360];
+
+  function discography(cx, w, h, d) { // Extras · Pudding Discography: a cassette J-card; "two" is listed once you've heard how it ends
+    seedOf('pudding discography');
+    tilt(cx, w, h, -0.02);
+    const x = w * 0.06, y = h * 0.08, cw = w * 0.88, ch = h * 0.84;
+    shadow(cx, 24, 10); cx.fillStyle = '#f3ecd8'; cx.fillRect(x, y, cw, ch); noShadow(cx);
+    cx.fillStyle = '#ffd21f'; cx.fillRect(x, y, cw * 0.11, ch);   // the spine
+    cx.save(); cx.translate(x + cw * 0.055, y + ch / 2); cx.rotate(-Math.PI / 2); hand(cx, 'PUDDING', 0, 12, 34, '#141d3a', { felt: true, align: 'center' }); cx.restore();
+    const lx = x + cw * 0.18;
+    hand(cx, 'Pudding', lx, y + ch * 0.2, 64, '#141d3a', { felt: true });
+    hand(cx, 'discography', lx + 4, y + ch * 0.31, 30, BIRO, { pen: true });
+    cx.fillStyle = 'rgba(29,47,143,.35)'; cx.fillRect(lx, y + ch * 0.36, cw * 0.74, 2);
+    const rows = [['Opt Us In (Dublin ’87)', '1987', true], ['two (2026)', '', !!d.a], ['two (2026–2040)', '', !!d.b]];
+    rows.forEach(([t, yr, on], i) => {
+      const ry = y + ch * (0.52 + i * 0.15);
+      hand(cx, (i + 1) + '.', lx, ry, 32, BIRO, { pen: true });
+      hand(cx, on ? t : '— — —', lx + 46, ry, 34, on ? BIRO : 'rgba(29,47,143,.45)', { pen: true });
+      if (on && yr) hand(cx, yr, x + cw * 0.93, ry, 28, BIRO, { pen: true, align: 'right' });
+    });
+  }
+  discography.size = [760, 560];
+
+  function buglist40(cx, w, h, d) { // Extras · The Bug List, 2040 Edition: framed, two columns (still there since 2026 | new in 2040)
+    const its = (d.items || []).map((b) => (typeof b === 'string' ? { text: b } : b));
+    seedOf('buglist40 ' + its.length);
+    shadow(cx, 26, 10);
+    const g = cx.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#6b4424'); g.addColorStop(1, '#3a2312');
+    cx.fillStyle = g; cx.fillRect(w * 0.015, h * 0.02, w * 0.97, h * 0.96); noShadow(cx);
+    const x = w * 0.055, y = h * 0.07, pw = w * 0.89, ph = h * 0.86;
+    cx.fillStyle = '#efeadf'; cx.fillRect(x, y, pw, ph);
+    const tw = hand(cx, 'The Bug List', x + pw * 0.05, y + ph * 0.12, ph * 0.075, BIRO, { pen: true, bold: true });
+    cx.strokeStyle = BIRO; cx.lineWidth = 2.5; cx.beginPath(); cx.moveTo(x + pw * 0.05, y + ph * 0.14);
+    for (let k = 1; k <= 8; k++) cx.lineTo(x + pw * 0.05 + tw * k / 8, y + ph * 0.14 + (rnd() - 0.5) * 4); cx.stroke();
+    hand(cx, d.sub || '2040 Edition', x + pw * 0.05 + tw + pw * 0.04, y + ph * 0.115, ph * 0.06, '#c8342b', { felt: true, slant: -0.04 });
+    const hasY = its.some((i) => i.y), half = Math.ceil(its.length / 2);
+    const cols = hasY ? [its.filter((i) => !(i.y >= 2040)), its.filter((i) => i.y >= 2040)] : [its.slice(0, half), its.slice(half)];
+    const heads = hasY ? ['Still there (since 2026)', 'New in 2040'] : ['', ''];
+    const top = y + ph * 0.25, colW = pw * 0.43, colH = ph * 0.7;
+    // the biggest size at which both columns (long entries wrapped onto a second line) fit
+    let z = ph * 0.05, lines;
+    for (;;) {
+      cx.font = `${z}px ${HAND}`;
+      lines = cols.map((col) => col.map((it) => wrap(cx, it.text, colW - z * 1.4)));
+      const rows = Math.max(...lines.map((col) => col.reduce((a, l) => a + l.length, 0) + (heads[0] ? 1.2 : 0)));
+      if (rows * z * 1.3 <= colH || z < 9) break;
+      z *= 0.93;
+    }
+    cols.forEach((col, ci) => {
+      const lx = x + pw * (0.05 + ci * 0.48);
+      let yy = top;
+      if (heads[ci]) { hand(cx, heads[ci], lx, yy, z * 0.95, '#6b6f7a', { pen: true }); yy += z * 1.55; }
+      col.forEach((it, k) => {
+        cx.strokeStyle = BIRO; cx.lineWidth = 2; cx.strokeRect(lx, yy - z * 0.7, z * 0.7, z * 0.7);
+        if (it.done !== false) { cx.lineWidth = 3; cx.lineCap = 'round'; cx.beginPath(); cx.moveTo(lx + z * 0.12, yy - z * 0.38); cx.lineTo(lx + z * 0.3, yy - z * 0.1); cx.lineTo(lx + z * 0.82, yy - z * 0.95); cx.stroke(); }
+        for (const l of lines[ci][k]) { hand(cx, l, lx + z * 1.15, yy, z, BIRO, { pen: true }); yy += z * 1.18; }
+        yy += z * 0.14;
+      });
+    });
+    const sh = cx.createLinearGradient(0, 0, w, h); sh.addColorStop(0, 'rgba(255,255,255,.14)'); sh.addColorStop(0.4, 'rgba(255,255,255,0)');
+    cx.fillStyle = sh; cx.fillRect(x, y, pw, ph);   // the glass
+  }
+  buglist40.size = [1000, 720];
+
+  // the painters' kit, for content cards that want to match (not enumerable: never a card kind)
+  Object.defineProperty(CARDS, '_kit', { configurable: true, value: { HAND, SANS, SYS, MONO, SERIF, BIRO, rnd, seedOf, rr, shadow, noShadow, tilt, wrap, fit, hand, hands, skull, brass, engrave, screw, wave: uiWave } });
+  return { postit, clock, phone, brick, screen, newspaper, poster, badge, calendar, watch, label, list, polaroid, plaque, nameplate, tv, battery, filofax, wheel, person, take, discography, buglist40 };
 })());
