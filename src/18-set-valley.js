@@ -73,6 +73,8 @@
 //   'saved'), slide(u), scr (the raw screen)} · headphones_desk {show(b)} · amp_seat · mirror_ball {sparkle(k)} ·
 //   truss_pars {on(b)} · crowd_gig {on(b)} · exit_signs {on(b)} · bulkheads {on(b)} · wall_clock_sl {set(h, m)} · posters
 //   · green_room {kettle_steam()} · kettle_sl · region_m / m_ann / m_mall / m_ct / region_s / region_f (dress only).
+// PATHS (V.paths, [x, z] or [x, y, z] lists): d28_swoop d28_high_a/_b walk_mall shush_loop gust traffic_east/_west
+//   walk_starlight sneak29 to_desk to_posters to_stage. Inside, moveTo has no pathfinding: route via these.
 // AMBIENCE (03-audio names): street crowd_whisper + thunder + hum + hover_traffic · inside hum/thunder (muffled) with the
 //   rain kind 'roof' · night29 thunder (+ rain_street while the stage door is open) · lit city + rain 'street'.
 SETS.valley = (() => {
@@ -1496,6 +1498,7 @@ SETS.valley = (() => {
       atlasS: matTex(T.atlasS, { emissive: 0xffffff, emissiveIntensity: 0.16 }),
       glass: basic('vl_glass', { color: 0x2a3444, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false, forceSinglePass: true }),
       glow: basic('vl_glow', { color: 0xfff0d8 }),
+      chrome: mat(0xffffff, { emissive: 0x2e333c, key: 'vl_chrome' }), paper: mat(0xffffff, { emissive: 0x34312c, key: 'vl_paper' }), urnHi: basic('vl_urn_hi', { color: 0xb8c2d0 }),
       skylight: basic('vl_skylight', { color: 0x7a6a58 }),
       neonM: nb('vl_neon_m', T.neon, 0xff3fa4), neonT: nb('vl_neon_t', T.neon, 0x2fe8d6), neonR: nb('vl_neon_r', T.neon, 0xff3a2a),
       nap: nb('vl_nap', T.napclub, 0xff3fa4), napP: nb('vl_nap_p', T.napclub, 0xff3fa4), blade: nb('vl_blade', T.blade, 0x4a4650),
@@ -1888,8 +1891,17 @@ SETS.valley = (() => {
     }), mMall);
     // the tea urn on QUIET CUP's takeaway ledge (the street's kettle)
     R.urn = P(part('urn', () => {
-      cyl(0.15, 0.16, 0.42, 12, 0xc8ccd2, 0, 0.21, 0); cyl(0.16, 0.16, 0.03, 12, 0x8a9098, 0, 0.43, 0); cyl(0.05, 0.05, 0.05, 8, 0x3a3a3e, 0, 0.47, 0);
-      bb(-0.18, 0.08, -0.02, -0.14, 0.12, 0.02, 0x3a3a3e); for (const s of [-1, 1]) bb(-0.02, 0.32, s * 0.15, 0.02, 0.36, s * 0.19, 0x3a3a3e);
+      cyl(0.17, 0.17, 0.03, 12, 0x2a2c30, 0, 0.015, 0); cyl(0.15, 0.155, 0.4, 12, 0xeef2f6, 0, 0.23, 0, 0, 0, M.chrome);   // foot, brushed body
+      for (const y of [0.1, 0.38]) cyl(0.154, 0.154, 0.018, 12, 0x7a8088, 0, y, 0, 0, 0, M.chrome);                       // pressed bands
+      cyl(0.16, 0.16, 0.03, 12, 0xb8bec6, 0, 0.445, 0, 0, 0, M.chrome); cyl(0.05, 0.14, 0.05, 12, 0xdce0e6, 0, 0.485, 0, 0, 0, M.chrome); cyl(0.028, 0.028, 0.045, 8, 0x1a1a1e, 0, 0.53, 0);
+      bb(-0.143, 0.12, 0.034, -0.137, 0.37, 0.046, 0xffffff, M.urnHi); bb(-0.135, 0.12, -0.082, -0.129, 0.37, -0.074, 0xffffff, M.urnHi);   // the chrome's two highlights
+      for (const s of [-1, 1]) bb(-0.02, 0.3, s * 0.15, 0.02, 0.34, s * 0.2, 0x1a1a1e);                    // handles
+      bb(-0.2, 0.07, -0.028, -0.145, 0.125, 0.028, 0x1a1a1e); bb(-0.205, 0.035, -0.012, -0.185, 0.075, 0.012, 0x9aa0a8); bb(-0.215, 0.125, -0.01, -0.195, 0.17, 0.01, 0xb02a2a);   // tap, spout, red lever
+      bb(-0.158, 0.15, -0.009, -0.149, 0.34, 0.009, 0x6a8ab0); bb(-0.159, 0.15, -0.004, -0.148, 0.27, 0.004, 0xb8c8d8);   // sight glass (2/3 full)
+      bb(-0.158, 0.3, 0.05, -0.149, 0.316, 0.066, 0xffffff, M.ledG);                                      // READY
+      bb(-0.27, 0, -0.07, -0.16, 0.012, 0.07, 0x3a3e44);                                                   // drip tray
+      for (const [z, n] of [[0.3, 7], [0.42, 5]]) for (let i = 0; i < n; i++) cyl(0.042, 0.032, 0.09, 8, i === n - 1 ? 0xf4efe6 : 0xe8e0d0, -0.06, 0.045 + i * 0.03, z, 0, 0, M.paper);   // paper-cup stacks
+      cyl(0.043, 0.043, 0.025, 8, 0xc83030, -0.06, 0.23, 0.3);
     }, [7.75, 1.0, 30.0], 0, { floor: false }), mMall);
     // the takeaway bag that tumbles across the Chinatown pocket under the still lanterns
     R.gust = P(part('gust', () => { bb(-0.11, 0, -0.07, 0.11, 0.26, 0.07, 0xd8c8a0); bb(-0.11, 0.26, -0.07, 0.11, 0.3, -0.03, 0xc8b890); bb(-0.06, 0.14, 0.07, 0.06, 0.2, 0.075, 0xb02a2a); }, [-26.0, 0, 18.6], 0, { floor: false }), mAnn);
@@ -2051,7 +2063,7 @@ SETS.valley = (() => {
     // ======================================================== whisperers: six rigs built once (Rue's CUST), re-parented each build
     WH ||= ['whisper_a', 'whisper_b', 'whisper_c', 'whisper_d', 'whisper_e', 'whisper_f'].map((id, i) => {
       const rig = buildCharacter(id); rig.root.add(blobShadow());
-      return { rig, i, a: 'idle', at: 0, x: 0, z: 0, yaw: 0, tx: 0, tz: 0, t: 2 + i, talk: 0, col: [1e4, 1e4, 1e4, 1e4], dir: 1, pause: 0, mode: '' };
+      return { rig, i, a: 'idle', at: 0, x: 0, z: 0, yaw: 0, tx: 0, tz: 0, t: 2 + i, talk: 0, col: [1e4, 1e4, 1e4, 1e4], dir: 1, pause: 0, block: 0, ox: 0, mode: '' };
     });
     for (const w of WH) { mMall.add(w.rig.root); COL.push(w.col); }
     // dress-dependent colliders (parked at 1e4 when unused)
@@ -2253,6 +2265,7 @@ SETS.valley = (() => {
     lit: [[2.4, 30.0, PI, 'laugh'], [-1.6, 26.0, 2.8, 'look_up'], [3.0, 42.0, -2.9, 'laugh'], [-4.2, 35.0, 2.6, 'look_up'], [-4.8, 47.0, 2.9, 'laugh'], [4.6, 23.5, -2.7, 'look_up']],
   };
   const WALK = [[13.0, 21.0], [38.0, 55.0]];
+  const NEAR = [];   // actorsIn() scratch (no per-frame allocation)
   function update(dt, ctx) {
     if (!R.root) return;
     const t = ctx.t;
@@ -2423,15 +2436,24 @@ SETS.valley = (() => {
       const w = WH[i], r = w.rig.root;
       if (!on) { if (r.visible) { r.visible = false; w.col[0] = w.col[1] = w.col[2] = w.col[3] = 1e4; w.rig.talk(false); } continue; }
       const p = P[i];
-      if (R.whDirty || w.mode !== mode) { w.mode = mode; w.x = p[0]; w.z = p[1]; w.yaw = p[2]; w.tz = p[1]; w.a = p[3]; w.at = 0; w.t = 1 + i; w.dir = 1; w.pause = 0; r.visible = true; w.rig.talk(false); }
+      if (R.whDirty || w.mode !== mode) { w.mode = mode; w.x = p[0]; w.ox = 0; w.z = p[1]; w.yaw = p[2]; w.tz = p[1]; w.a = p[3]; w.at = 0; w.t = 1 + i; w.dir = 1; w.pause = 0; r.visible = true; w.rig.talk(false); }
       let anim = p[3], pp = EMPTYP;
       if (mode === 'quiet') {
         if (i < 2) { anim = 'sit'; pp = SITP; if ((w.t -= dt) <= 0) { w.t = 1.2 + Math.random() * 1.4; const me = Math.random() < 0.5; WH[0].rig.talk(me); WH[1].rig.talk(!me); } }
         else if (i < 4) { if ((w.t -= dt) <= 0) { w.t = 6 + Math.random() * 4; w.tz = p[1] + (Math.random() - 0.5) * 0.3; if (i === 2) { const tk = Math.random() < 0.6; WH[2].rig.talk(tk); WH[3].rig.talk(!tk && Math.random() < 0.5); } } if (Math.abs(w.tz - w.z) > 0.02) { w.z += Math.sign(w.tz - w.z) * Math.min(Math.abs(w.tz - w.z), 0.4 * dt); anim = 'walk'; } else anim = 'idle'; }
         else {
           const [z0, z1] = WALK[i - 4];
-          if (w.pause > 0) { w.pause -= dt; anim = 'idle'; }
-          else { w.z += w.dir * 0.55 * dt; anim = 'walk'; if (w.z > z1) { w.z = z1; w.dir = -1; w.pause = 2 + Math.random() * 3; } else if (w.z < z0) { w.z = z0; w.dir = 1; w.pause = 2 + Math.random() * 3; } }
+          // give way to anyone (player or cast) within 1.7 m, coming or overtaking: sidestep off the lane while they pass
+          // (east by default, west if they are east of it), stop only when someone is right in front; a long stand-off
+          // turns the walker round
+          const WA = typeof world !== 'undefined' && world.actorsIn;
+          let side = 0, front = false;
+          if (WA && world.actorsIn(p[0], w.z, 1.7, NEAR).length) side = w.ox > 0.05 ? 1.0 : w.ox < -0.05 ? -0.75 : NEAR[0].pos.x > p[0] + 0.3 ? -0.75 : 1.0;
+          if (WA && world.actorsIn(w.x, w.z + w.dir * 0.55, 0.5, NEAR).length) front = true;
+          w.ox += clamp(side - w.ox, -1.4 * dt, 1.4 * dt); w.x = p[0] + w.ox;
+          if (front && w.pause <= 0) { anim = 'idle'; if ((w.block += dt) > 2.5) { w.block = 0; w.dir = -w.dir; } }
+          else if (w.pause > 0) { w.pause -= dt; anim = 'idle'; }
+          else { w.block = 0; w.z += w.dir * (side ? 0.4 : 0.55) * dt; anim = 'walk'; if (w.z > z1) { w.z = z1; w.dir = -1; w.pause = 2 + Math.random() * 3; } else if (w.z < z0) { w.z = z0; w.dir = 1; w.pause = 2 + Math.random() * 3; } }
           const want = w.dir > 0 ? 0 : PI; w.yaw += ((((want - w.yaw + PI) % TAU) + TAU) % TAU - PI) * Math.min(1, dt * 5);
         }
       } else {   // lit: alternate laughing and looking up
@@ -2443,7 +2465,7 @@ SETS.valley = (() => {
       r.position.set(w.x, 0, w.z); r.rotation.y = w.yaw;
       w.rig.pose(anim, w.at, anim === 'walk' ? WALKP : pp); w.rig.update(dt);
       if (mode === 'quiet' && i < 2) { const side = i ? -1 : 1; w.rig.parts.head.rotation.y = side * 0.45; w.rig.parts.torso.rotation.z = -side * 0.08; }
-      w.col[0] = w.x - 0.28; w.col[1] = w.z - 0.28; w.col[2] = w.x + 0.28; w.col[3] = w.z + 0.28;
+      w.col[0] = w.x - 0.22; w.col[1] = w.z - 0.22; w.col[2] = w.x + 0.22; w.col[3] = w.z + 0.22;
     }
     R.whDirty = false;
   }
@@ -2577,7 +2599,7 @@ SETS.valley = (() => {
     napclub: { at: [-8.0, 4.8, 41.0], from: [-2.0, 2.0, 36.0], fov: 40 },
     lanterns: { at: [-30.0, 5.0, 22.0], from: [-29.0, 1.6, 9.0], fov: 40 },
     tower_countdown: { at: [0.0, 112.0, -10.7], from: [-2.0, 1.7, 30.0], fov: 18 },
-    tower_from_mall: { at: [0.0, 50.0, -11.0], from: [1.0, 1.6, 48.0], fov: 50 },
+    tower_from_mall: { at: [0.0, 50.0, -11.0], from: [4.0, 1.6, 47.0], fov: 50 },   // spec from [1, 1.6, 48] sat under the z 46 crown
     s28_gate_track_a: { at: [-26.0, 1.4, 9.0], from: [-21.5, 1.6, 5.8], fov: 44 },
     s28_gate_track_b: { at: [-34.0, 1.4, 9.0], from: [-31.5, 1.6, 5.8], fov: 44 },
     s28_stage_door_ext: { at: [-28.4, 1.3, -11.0], from: [-27.0, 1.6, -5.5], fov: 42 },
@@ -2640,6 +2662,11 @@ SETS.valley = (() => {
     traffic_east: [[-70, -3.5], [70, -3.5]], traffic_west: [[70, 3.5], [-70, 3.5]],
     walk_starlight: [[0, 9.0], [-27.0, 9.0], [-30.0, 6.0], [-30.0, -6.0], [-28.4, -8.6]],
     sneak29: [[-36.6, -22.4], [-37.0, -26.0], [-37.0, -29.9], [-35.0, -22.4], [-33.0, -19.2], [-28.5, -16.0], [-28.4, -12.1]],
+    // inside, round the furniture (moveTo has no pathfinding): the FOH desk from the floor (east of the amp, behind the
+    // desk), the poster wall (north of the column), up onto the stage (wing doorway, the wing step)
+    to_desk: [[-32.0, -22.0], [-32.0, -27.6], [-34.7, -27.25]],
+    to_posters: [[-38.0, -22.6], [-42.3, -23.5]],
+    to_stage: [[-30.0, -19.0], [-28.5, -17.0], [-28.5, -14.8], [-29.6, -12.9], [-31.5, -12.9], [-35.5, -14.0]],
   };
   const AR = [
     { id: 'ar_quiet_head', at: [0.0, 3.6, 11.4], text: 'QUIET HOURS 24/7', kind: 'sign', w: 3.2 },
