@@ -25,7 +25,7 @@ for (let i = 0; i < md.length; i++) {
   const segs = [...l.matchAll(/“([^”]+)”/g)].map((m) => m[1]);
   for (const s of segs) {
     if (/^\d\.\d+\\?_/.test(s) || /^[0-9.]+_[a-z]/.test(s.replace(/\\_/g, '_'))) continue; // cutscene ids like 1.1_open
-    const n = norm(s).replace(/,$/, '');
+    const n = norm(s).replace(/,$/, '').replace(/(\s*\[(?:YES|NO)\])+$/, '');   // engine yes/no asks show their buttons as buttons
     if (n.length < 2 || IGNORE.has(n)) continue;
     want.push({ scene, sec, line: i + 1, text: n });
   }
