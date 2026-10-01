@@ -23,7 +23,7 @@
 //     landing (x 13..17.6, z -24..-16: shutter STAIRWELL SEALED · for your safety at z -21.2, the down-flight).
 //   L30 "The Hangar": walkable x 33..60.4, z -37..-13 · docking racks R1 x 40.4..41.3, R2 47..47.9 (bay z -35.2..-34 for
 //     the rail), R3 53..53.9 (+ crossings), R0 along the south glass (z -12.6, glass z -11), R5 along the north wall
-//     (z -37) · ~750 docked pods · M1 on its rail z -34.6 (parked centre x 46.2, pushed 50.45) · floor hatch (36.2, -16.6)
+//     (z -37) · 768 docked pods (+24 on M1) · M1 on its rail z -34.6 (parked centre x 46.2, pushed 50.45) · floor hatch (36.2, -16.6)
 //     · speaker S1 (40.3, 1.5, -31), phones P1 (45.4, -15.6) / P2 (55, -22) · private lift: doors x 60.4 z -21.5..-19.9,
 //     MANAGER ONLY, reader (60.38, 1.2, -19.35), side panel ROOF ACCESS — SANTA PHOTO 11:30 — AUTHORISED: SANTA
 //     (60.38, 1.45, -22.4), car x 60.6..62.8 · the storm strip beyond the glass.
@@ -53,18 +53,40 @@
 //   · ctrl_w / ctrl_e held(on) progress(k) · lane_bots · bins_l12 (guitars, skateboards, knives IMs) · chase_guitar ·
 //   headphones_wall take() put() taken · tramp_bin push(u) reset() done · stair_door12 open(u) · landing21 door(u)
 //   shutter.pulse() · tea_point steam() kettle_cord (child; .visible) · jack state('bare'|'adapter'|'phone')
-//   screen('green'|'white'|'off') · valves turn(i, u) held(i, on) reset() open (emits 'valves:open' when both reach 1
-//   within 1.5 s) · fog21 roll(k) · hatch21 lock('red'|'green') open(u) ladder(u) · racks21 (LED scroll) · docked
+//   screen('green'|'white'|'off') · valves turn(i, u) held(i, on) reset() open (emits 'valves:open' when both wheels
+//   are at 1 together; one let go still counts for 1.5 s) · fog21 roll(k) · hatch21 lock('red'|'green') open(u) ladder(u) (the dropped ladder collides) · racks21 (LED scroll) · docked
 //   wake(i, on) tint(name, k) · m1 push(u) reset() done x · hatch30 open(u) · s1 / p1 / p2 play(on) · lift30 doors(u)
 //   reader('red'|'green') beep() panel('booking'|'recognised') car.light(on) car.button(on) · sky30 flash(k) · cleaners.
 // DATA: paths (clean_*, d21_*, d30*, old_trail, lane_bots), checkpoints, lures, ar { l12, l21, l30 }, drones { l21, l30 }.
 // Draw calls: one Builder per floor (vc + atlas + labels + glow + a few textured), the bank's 12 units (2 each), every
-// repeat instanced (docked 2, M1 2, cleaners 2, headphones 1, ...); the live mirror re-renders the visible floor once.
+// repeat instanced (docked 2, M1 2, cleaners 2, headphones 1, ...); the live mirror re-renders the visible floor once
+// (max 94 calls from any camera or anchor (l12_gap); L30 ≈ 530k tris live with the reflected fleet, ≈ 330k baked).
+// DEVIATIONS from the spec (all for the picture or for robustness):
+//   · env: hemi/dir raised (three's physically-based lights made the spec's L12 mid-grey and L21/L30 near-black; L12 now
+//     reads sterile white); no preset carries a `spot` (the lamps own the spot, so an env change never turns it on as a
+//     hand torch); lamp intensities × LAMP_GAIN.
+//   · mirror: 512² on desktop (128² touch), linear filtering, fog on the floor's own colour only; its render target is an
+//     sRGB target flagged isXRRenderTarget so three renders the reflection with the screen's programs (no second program
+//     per material: rigs, drones and cones that walk into a reflection never compile mid-game).
+//   · cams: l12_gap sits on the gap's axis; l21_east_s / l21_east_n moved off the CRAC corner / the east wall.
+//   · anchors framed to read their text or to clear the actors: l12_lift_inside (the spec lens was inside Luka's head at
+//     l12_car_luka), l12_panel, headphones_sign, ladders, stair_door12, shutter, tea_point, jack, fog_wide, side_panel,
+//     hangar_reveal (now along band A: the spec lens sat at rack-top height and looked into R1's top), ladder21 (the
+//     spec lens was inside the CRAC block).
+//   · L12: the robot lane / deep archive run behind block A too; flavour bins (KAZOOS, STILTS, ...) along the hall walls;
+//     the stair stub is closed by colliders (walls + steps). L21: the cooling pipes rise and run along the wall at the
+//     ceiling (not across the aisle lenses); the wheels sit on stems at x -13.5 / 12.5; the ceiling deck is unlit
+//     slate (a down-facing deck gets no light from the rig and read pure black). L30: no cable trays on the rack tops
+//     (they blocked the 3.6 m lenses); the baked (phone) mirror copies the fleet's lights, not its shells; the private
+//     car's black walls carry faint warm streaks of the strip light (part of car.light). The dropped L21 ladder adds a
+//     dynamic collider (rails at z -17.0) so nobody walks through it.
+//   · ambience: positional only where fixed (shelf_servo); cleaner_swish is a plain bed (AUDIO.ambience keeps one handle
+//     per loop name, so per-drone handles would outlive the set).
 SETS.hq_floors = (() => {
   const PI = Math.PI, H = PI / 2, TAU = PI * 2, DS = THREE.DoubleSide;
   // ---------------------------------------------------------- palette (spec §3.1)
   const W12 = 0xf2f4f6, W12S = 0xd4d8de, BIN = 0x9aa2aa, PLATE = 0xf8f8f8, INK = 0x1a1a1a,
-    RACK21 = 0x1e2a3a, WALL21 = 0x2c3a4e, CEIL21 = 0x1e2836, LED = 0x6fd0ff, BRICK = 0xd8c8a0, BEIGE = 0xcdbb94,
+    RACK21 = 0x1e2a3a, WALL21 = 0x2c3a4e, CEIL21 = 0x1a2738, LED = 0x6fd0ff, BRICK = 0xd8c8a0, BEIGE = 0xcdbb94,
     PIPE = 0x2a6aa8, STEEL = 0xb8bec6, STEELD = 0x7a8088, HUB = 0xbfe6ff, RACK30 = 0x4a525c, BEAM = 0x2a3038, WALL30 = 0x3a4450,
     SHELL = 0xe8ecf0, UNDER = 0x9fe8ff, GLOWB = 0xbfe6ff, DEEP = 0x4a8ab8, CONC = 0x3a3f46, RUBBER = 0x2a2c30, BLACK = 0x0a0c10;
   const T12 = [1, 1, 1], T21 = [0.86, 0.93, 1.06], T30 = [0.9, 0.95, 1.05], ONE = [1, 1, 1];
@@ -361,8 +383,8 @@ SETS.hq_floors = (() => {
       const x = 14 + rnd() * 36, y = 22 + rnd() * 26, r = 8 + rnd() * 14, g = c.createRadialGradient(x, y, 0, x, y, r);
       g.addColorStop(0, 'rgba(200,220,235,0.22)'); g.addColorStop(1, 'rgba(200,220,235,0)'); c.fillStyle = g; c.fillRect(0, 0, 64, 64);
     }
-    const e = c.createLinearGradient(0, 0, 0, 64); e.addColorStop(0, 'rgba(0,0,0,1)'); e.addColorStop(0.3, 'rgba(0,0,0,0)'); e.addColorStop(0.9, 'rgba(0,0,0,0)'); e.addColorStop(1, 'rgba(0,0,0,1)');
-    c.fillStyle = e; c.fillRect(0, 0, 64, 64);
+    const e = c.createRadialGradient(32, 34, 4, 32, 34, 29); e.addColorStop(0, 'rgba(0,0,0,0)'); e.addColorStop(0.5, 'rgba(0,0,0,0.4)'); e.addColorStop(1, 'rgba(0,0,0,1)');
+    c.fillStyle = e; c.fillRect(0, 0, 64, 64);   // every edge fades to black (= clear, additive)
   }
   function paintPA(c) {   // 64 × 64: round ceiling speaker grille
     c.fillStyle = '#d8dde2'; c.fillRect(0, 0, 64, 64);
@@ -465,14 +487,11 @@ SETS.hq_floors = (() => {
       #include <common>
       #include <fog_pars_fragment>
       void main() {
-        vec3 refl = texture2DProj(tDiffuse, vUv).rgb;
+        vec3 rOut = texture2DProj(tDiffuse, vUv).rgb;            // already in output (sRGB) space: see the render target
         vec3 base = tint * texture2D(tFloor, vTex).rgb;
         gl_FragColor = vec4(base, 1.0);
         #include <colorspace_fragment>
         vec3 bOut = gl_FragColor.rgb;
-        gl_FragColor = vec4(refl, 1.0);
-        #include <colorspace_fragment>
-        vec3 rOut = gl_FragColor.rgb;
         #ifdef USE_FOG
           #ifdef FOG_EXP2
             float fogF = 1.0 - exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);
@@ -488,10 +507,13 @@ SETS.hq_floors = (() => {
     const plane = new THREE.Plane(), normal = new THREE.Vector3(), rwp = new THREE.Vector3(), cwp = new THREE.Vector3(), rot = new THREE.Matrix4(),
       lookAt = new THREE.Vector3(), clip = new THREE.Vector4(), view = new THREE.Vector3(), target = new THREE.Vector3(), q = new THREE.Vector4();
     const cams = new WeakMap(), HID = [];
-    const touch = () => { try { return matchMedia('(pointer: coarse)').matches; } catch (e) { return false; } };
+    const TOUCH = (() => { try { return matchMedia('(pointer: coarse)').matches; } catch (e) { return false; } })(), touch = () => TOUCH;
     function sharedFor(key, res) {
       let s = shared.get(key); if (s) return s;
-      const rt = new THREE.WebGLRenderTarget(res, res, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, type: THREE.HalfFloatType, generateMipmaps: false, depthBuffer: true });
+      // sRGB 8-bit target flagged like an XR target: three then renders the reflection with the SCREEN's programs (sRGB
+      // output), so nothing that appears in a reflection (rigs, drones, cones) ever needs a second, mid-game program
+      const rt = new THREE.WebGLRenderTarget(res, res, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, type: THREE.UnsignedByteType, colorSpace: THREE.SRGBColorSpace, generateMipmaps: false, depthBuffer: true });
+      rt.isXRRenderTarget = true;
       const mat = new THREE.ShaderMaterial({
         name: 'hqMirror', fog: true, vertexShader: VS, fragmentShader: FS,
         uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
@@ -955,10 +977,10 @@ SETS.hq_floors = (() => {
     bb(-14.0, 2.4, -36.97, 13.0, 2.46, -36.94, 0x3a4c62); bb(-14.0, 2.4, -15.46, 13.0, 2.46, -15.43, 0x3a4c62); bb(-13.97, 2.4, -37.0, -13.94, 2.46, -24.45, 0x3a4c62); bb(-13.97, 2.4, -22.35, -13.94, 2.46, -15.4, 0x3a4c62);
     bb(12.94, 2.4, -37.0, 12.97, 2.46, -20.75, 0x3a4c62); bb(12.94, 2.4, -19.25, 12.97, 2.46, -15.4, 0x3a4c62);
     // ---- ceiling (y 3.2) with the hatch opening (x -12.25..-11.35, z -17.05..-16.15), cold LED strips over the aisles
-    const C = (x0, z0, x1, z1) => quad(x1 - x0, z1 - z0, M.vc, (x0 + x1) / 2, 3.2, (z0 + z1) / 2, 0, H, CEIL21);
+    const C = (x0, z0, x1, z1) => quad(x1 - x0, z1 - z0, M.glow, (x0 + x1) / 2, 3.2, (z0 + z1) / 2, 0, H, CEIL21);   // unlit: a down-facing deck gets no light from the rig
     C(-14.0, -37.0, 13.0, -17.05); C(-14.0, -16.15, 13.0, -15.4); C(-14.0, -17.05, -12.25, -16.15); C(-11.35, -17.05, 13.0, -16.15);
     for (const z of [-35.6, -31.6, -27.6, -23.6]) { tray(-10.0, 8.0, z); ledStrip(-9.6, z - 0.6, 7.6, z - 0.6, 3.2, LED, 0.08); ledStrip(-9.6, z + 0.6, 7.6, z + 0.6, 3.2, LED, 0.08); }
-    for (const x of [-12.0, 10.5]) ledStrip(x, -36.6, x, -16.0, 3.2, 0x9cd8ff, 0.1);
+    ledStrip(-12.0, -36.6, -12.0, -17.6, 3.2, 0x9cd8ff, 0.1); ledStrip(10.5, -36.6, 10.5, -16.0, 3.2, 0x9cd8ff, 0.1);   // the west strip stops short of the hatch
     // ---- the rack rows R1..R4 (glass doors with LED dots on both faces) and the CRAC block
     for (const [z0, z1, gaps, led] of RACK_ROWS) {
       let x = -10.0;
@@ -988,7 +1010,7 @@ SETS.hq_floors = (() => {
     for (const [px, sx] of [[-13.85, 1], [12.85, -1]]) {
       cyl(0.15, 0.15, 3.2, 10, PIPE, px, 1.6, -32.4);
       cyl(0.17, 0.17, 0.1, 10, 0x1a4a7a, px, 0.15, -32.4); cyl(0.17, 0.17, 0.1, 10, 0x1a4a7a, px, 2.3, -32.4);
-      cyl(0.15, 0.15, 3.0, 10, PIPE, px + sx * 1.5, 3.0, -32.4, 0, H);
+      cyl(0.15, 0.15, 4.4, 10, PIPE, px, 3.0, -34.6, H, 0); cyl(0.17, 0.17, 0.1, 10, 0x1a4a7a, px, 3.0, -33.0, H, 0);
       cyl(0.09, 0.09, 0.32, 8, 0x3a4048, px + sx * 0.2, 1.15, -32.4, 0, H); bb(px + sx * 0.08 - 0.12, 1.0, -32.55, px + sx * 0.08 + 0.12, 1.3, -32.25, 0x1a4a7a);
       sign2(px + sx * 0.16, 1.62, -32.4, sx);
     }
@@ -1009,7 +1031,7 @@ SETS.hq_floors = (() => {
     bb(-12.35, 3.2, -17.15, -12.25, 6.8, -16.05, 0x0a0c10); bb(-11.35, 3.2, -17.15, -11.25, 6.8, -16.05, 0x0a0c10); bb(-12.35, 6.8, -17.15, -11.25, 6.9, -16.05, 0x050608);
     for (let y = 3.5; y < 6.6; y += 0.3) bb(-12.0, y, -17.05, -11.6, y + 0.03, -16.99, 0x3a4048);
     tint = T21;
-    bb(-12.3, 3.15, -17.1, -11.3, 3.2, -16.1, 0x3a4656);   // the hatch frame
+    bb(-12.33, 3.14, -17.13, -11.27, 3.2, -17.05, 0x8a9aae); bb(-12.33, 3.14, -16.15, -11.27, 3.2, -16.07, 0x8a9aae); bb(-12.33, 3.14, -17.05, -12.25, 3.2, -16.15, 0x8a9aae); bb(-11.35, 3.14, -17.05, -11.27, 3.2, -16.15, 0x8a9aae);   // the hatch frame
     // ---- the stair landing (core x 13.0..17.6, z -24..-16): concrete, sealed up-flight behind a padded shutter, down-flight
     tint = [0.72, 0.74, 0.78];
     const F = (x0, z0, x1, z1) => bb(x0, -0.02, z0, x1, 0.0, z1, CONC);
@@ -1101,7 +1123,7 @@ SETS.hq_floors = (() => {
       R.valves.add(ring); R.vRings.push(ring);
     }
     R.valves.userData = {
-      turn(i, u) { i = i ? 1 : 0; R.vTo[i] = clamp01(+u || 0); if (skipping()) R.vU[i] = R.vTo[i]; if (R.vTo[i] >= 1 && R.vAt[i] < 0) R.vAt[i] = R.t; valvesCheck(); },
+      turn(i, u) { i = i ? 1 : 0; const was = R.vTo[i]; R.vTo[i] = clamp01(+u || 0); if (skipping()) R.vU[i] = R.vTo[i]; if (R.vTo[i] < 1 && was >= 1) R.vAt[i] = R.t; valvesCheck(); },
       held(i, on = true) { R.vRings[i ? 1 : 0].visible = !!on; },
       reset() { R.vTo[0] = R.vTo[1] = R.vU[0] = R.vU[1] = 0; R.vAt[0] = R.vAt[1] = -1; R.vOpen = false; },
       get open() { return !!R.vOpen; }, get u() { return R.vU; },
@@ -1117,13 +1139,14 @@ SETS.hq_floors = (() => {
     g.add(R.fog);
     // ---- the maintenance hatch: lid (hinged on its south edge, opens down), the lock lamp, the telescoping ladder
     R.hatch21 = P(new THREE.Group()); R.hatch21.name = 'hatch21';
-    R.lid21 = part('hatch21_lid', () => { bb(-0.45, -0.04, -0.9, 0.45, 0.0, 0.0, 0x4a5666); bb(-0.38, -0.05, -0.8, 0.38, -0.04, -0.1, 0x3a4656); bb(-0.05, -0.08, -0.75, 0.05, -0.05, -0.6, STEEL); }, [-11.8, 3.2, -16.15], 0, { floor: false });
+    R.lid21 = part('hatch21_lid', () => { bb(-0.45, -0.04, -0.9, 0.45, 0.0, 0.0, 0x8a98aa); bb(-0.38, -0.05, -0.8, 0.38, -0.04, -0.1, 0x6a7a90); for (let k = 0; k < 3; k++) bb(-0.36, -0.052, -0.75 + k * 0.25, 0.36, -0.05, -0.68 + k * 0.25, 0xe8eef4); bb(-0.05, -0.08, -0.75, 0.05, -0.05, -0.6, STEEL); }, [-11.8, 3.2, -16.15], 0, { floor: false });
     R.hatch21.add(R.lid21);
     R.lock21 = new THREE.Mesh(LOCKGEO, droneLightMat('escort')); R.lock21.position.set(-11.8, 3.185, -17.2); R.lock21.rotation.x = H; R.lock21.name = 'hatch21_lock';
     R.hatch21.add(R.lock21);
     bb3(R.hatch21, 'hatch21_ladder_top', () => ladderModel(3.4), [-11.8, 3.2, -17.0]);
     R.ladder21 = part('hatch21_ladder', () => ladderModel(3.3), [-11.8, 3.2, -16.97], 0, { floor: false });
     R.hatch21.add(R.ladder21);
+    R.ldrCol = [1e4, -17.05, 1e4, -16.98]; COL.push(R.ldrCol);
     R.hatch21.userData = {
       lock(c = 'red') { R.lock21c = c === 'green' ? 'green' : 'red'; R.lock21.material = droneLightMat(R.lock21c === 'green' ? 'green' : 'escort'); if (!skipping()) snd(R.lock21c === 'green' ? 'chime_ready' : 'sad_beep', 0.4, 1, HATCH_AT); },
       open(u = 1) { R.h21To = clamp01(+u); if (skipping()) R.h21U = R.h21To; else snd('clunk', 0.35, 0.8, HATCH_AT); },
@@ -1200,15 +1223,14 @@ SETS.hq_floors = (() => {
     wall(60.4, -37.2, 60.6, -21.5, 3.9, WALL30); wall(60.4, -19.9, 60.6, -12.8, 3.9, WALL30); bb(60.4, 2.45, -21.5, 60.6, 3.9, -19.9, WALL30);
     bb(60.4, 0, -12.8, 60.6, 3.9, -11.0, WALL30);
     // the lift wall: black glass surround, chrome frame, MANAGER ONLY
-    bb(60.36, 0, -23.0, 60.4, 3.1, -18.4, 0x0c0e12);
+    bb(60.36, 0, -23.0, 60.4, 3.1, -18.4, 0x4a5260); bb(60.355, 2.95, -23.0, 60.36, 3.0, -18.4, 0xbfd8f0, M.glow);
     bb(60.33, 0, -21.62, 60.37, 2.52, -21.5, 0xc8ccd2); bb(60.33, 0, -19.9, 60.37, 2.52, -19.78, 0xc8ccd2); bb(60.33, 2.45, -21.62, 60.37, 2.52, -19.78, 0xc8ccd2);
     sign(SIG.manager, 1.2, 0.15, 60.355, 2.75, -20.7, -H, true);
     // ---- ceiling (3.9): dark deck, E–W steel beams, N–S girders over the racks, tiny blue status lights, dim strips
-    quad(27.6, 26.9, M.vc, 46.8, 3.9, -24.45, 0, H, 0x161b22);
+    quad(27.6, 26.9, M.vc, 46.8, 3.9, -24.45, 0, H, 0x2a323e);
     for (let z = -36.0; z <= -12.0; z += 3.0) { bb(33.0, 3.74, z - 0.08, 60.4, 3.9, z + 0.08, BEAM); bb(33.0, 3.72, z - 0.15, 60.4, 3.745, z + 0.15, 0x2a3038); for (let x = 34.5; x < 60; x += 2.0) bb(x - 0.02, 3.70, z - 0.02, x + 0.02, 3.72, z + 0.02, 0x6fc8ff, M.glow); }
-    for (const x of [40.85, 47.45, 53.45]) bb(x - 0.12, 3.62, -37.6, x + 0.12, 3.9, -11.8, BEAM);
+    for (const x of [40.85, 47.45, 53.45]) bb(x - 0.1, 3.76, -37.6, x + 0.1, 3.9, -11.8, BEAM);
     for (const x of [36.7, 44.15, 50.45, 57.15]) ledStrip(x, -36.5, x, -13.5, 3.72, 0x8fb8e8, 0.08);
-    for (const x of [40.85, 47.45, 53.45]) { bb(x - 0.2, 2.95, -37.0, x + 0.2, 3.0, -13.0, 0x4a5868); bb(x - 0.18, 3.0, -37.0, x + 0.18, 3.05, -13.0, 0x1a2a3a); }
     // ---- floor: dashed lane lines down L1 / L2, the M1 rail, the hatch rim + its shaft below
     for (const x of [44.15, 50.45]) for (let z = -36.6; z < -13.4; z += 1.8) bb(x - 0.04, 0, z, x + 0.04, 0.005, Math.min(z + 1.0, -13.4), 0xd8e0e8);
     for (const z of [-34.85, -34.35]) bb(44.7, 0, z - 0.03, 51.95, 0.025, z + 0.03, 0x8a929c);
@@ -1237,10 +1259,10 @@ SETS.hq_floors = (() => {
     bb(33.0, 0, -11.1, 60.4, 0.15, -10.9, 0x1a1e24); bb(33.0, 3.75, -11.1, 60.4, 3.9, -10.9, 0x1a1e24); bb(33.0, 2.1, -11.04, 60.4, 2.16, -10.96, 0x1a1e24);
     quad(27.4, 3.9, GLASSM, 46.7, 1.95, -11.0, PI);
     // ---- the private lift car (x 60.6..62.8, z -21.8..-19.6): black mirror walls, warm strip (prop), ROOF button (prop)
-    bb(60.6, -0.02, -21.8, 62.8, 0.0, -19.6, 0x141618);
-    wall(60.6, -22.0, 62.8, -21.8, 3.9, 0x0a0c10); wall(62.8, -22.0, 63.0, -19.4, 3.9, 0x0a0c10); wall(60.6, -19.6, 62.8, -19.4, 3.9, 0x0a0c10);
+    bb(60.6, -0.02, -21.8, 62.8, 0.0, -19.6, 0x1a1816); bb(60.95, 0.0, -21.55, 62.55, 0.002, -19.85, 0x2a2622);
+    wall(60.6, -22.0, 62.8, -21.8, 3.9, 0x1a1d24); wall(62.8, -22.0, 63.0, -19.4, 3.9, 0x1a1d24); wall(60.6, -19.6, 62.8, -19.4, 3.9, 0x1a1d24);
     bb(60.6, 2.6, -21.8, 62.8, 2.7, -19.6, 0x1a1c20);
-    for (const [x0, z0, x1, z1] of [[60.8, -21.79, 62.6, -21.78], [62.79, -21.6, 62.8, -19.8], [60.8, -19.62, 62.6, -19.61]]) bb(x0, 0.15, z0, x1, 2.45, z1, 0x2a2e36);
+    for (const [x0, z0, x1, z1] of [[60.8, -21.79, 62.6, -21.78], [62.79, -21.6, 62.8, -19.8], [60.8, -19.62, 62.6, -19.61]]) bb(x0, 0.15, z0, x1, 2.45, z1, 0x3a3f4a);
     bb(61.0, 0.9, -21.78, 62.6, 0.94, -21.74, 0xc8ccd2); bb(62.76, 0.9, -21.6, 62.8, 0.94, -19.8, 0xc8ccd2); bb(61.0, 0.9, -19.66, 62.6, 0.94, -19.62, 0xc8ccd2);
     bb(62.1, 0.95, -21.795, 62.34, 1.45, -21.77, 0x8a929c);
     lab(LAB.roof, 0.2, 0.025, 62.22, 1.36, -21.765, 0);
@@ -1248,7 +1270,7 @@ SETS.hq_floors = (() => {
   function propsL30(g) {
     const P = (o) => (g.add(o), o);
     R.pa30 = P(paGrille('pa30', 37.0, 3.9, -18.4));
-    // ---- the docked fleet: ~750 pods (2 IM: shell + light), 12 awake ones that stir
+    // ---- the docked fleet: 768 pods (2 IM: shell + light), 12 awake ones that stir
     const slots = dockSlots(); R.slots = slots;
     R.docked = DRONE_INSTANCED.make(800, { state: 'patrol' });
     R.docked.group.name = 'docked'; R.docked.body.name = 'docked_shells'; R.docked.light.name = 'docked_lights';
@@ -1326,8 +1348,8 @@ SETS.hq_floors = (() => {
     }
     // ---- the private lift: doors (two black leaves), reader (red / green), the SafeSense side panel, the car
     R.lift30 = P(new THREE.Group()); R.lift30.name = 'lift30';
-    R.liftN = part('lift30_door_n', () => { bb(60.43, 0, -21.5, 60.53, 2.45, -20.71, 0x121418); bb(60.42, 0, -20.75, 60.43, 2.45, -20.71, 0xc8ccd2); }, null, 0);
-    R.liftS = part('lift30_door_s', () => { bb(60.43, 0, -20.69, 60.53, 2.45, -19.9, 0x121418); bb(60.42, 0, -20.69, 60.43, 2.45, -20.65, 0xc8ccd2); }, null, 0);
+    R.liftN = part('lift30_door_n', () => { bb(60.43, 0, -21.5, 60.53, 2.45, -20.71, 0x2a2e36); bb(60.425, 0.1, -21.42, 60.43, 2.35, -21.4, 0x4a5260); bb(60.42, 0, -20.75, 60.43, 2.45, -20.71, 0xc8ccd2); }, null, 0);
+    R.liftS = part('lift30_door_s', () => { bb(60.43, 0, -20.69, 60.53, 2.45, -19.9, 0x2a2e36); bb(60.425, 0.1, -20.0, 60.43, 2.35, -19.98, 0x4a5260); bb(60.42, 0, -20.69, 60.43, 2.45, -20.65, 0xc8ccd2); }, null, 0);
     R.lift30.add(R.liftN, R.liftS);
     R.lift30.add(part('lift30_screens', () => {
       bb(60.33, 1.11, -19.42, 60.36, 1.29, -19.28, 0x2a2e34); quad(0.08, 0.12, M.reader, 60.325, 1.2, -19.35, -H);
@@ -1335,7 +1357,14 @@ SETS.hq_floors = (() => {
     }, null, 0, { floor: false }));
     R.carLight = part('lift30_car_light', () => {
       for (const [x0, z0, x1, z1] of [[60.7, -21.75, 62.7, -21.68], [62.68, -21.7, 62.75, -19.7], [60.7, -19.72, 62.7, -19.65]]) bb(x0, 2.52, z0, x1, 2.58, z1, 0xffe8c8, M.glow);
-      quad(1.6, 1.4, M.glow, 61.7, 2.598, -20.7, 0, H, 0x5a4a38);
+      quad(1.6, 1.4, M.glow, 61.7, 2.598, -20.7, 0, H, 0x9a8a70);
+      // the black mirror walls catch the strip: a warm band under the ceiling and soft vertical streaks per panel
+      bb(62.78, 2.24, -21.6, 62.785, 2.34, -19.8, 0x4a3a28, M.glow); for (const z of [-21.15, -20.25]) bb(62.78, 0.3, z - 0.02, 62.785, 2.15, z + 0.02, 0x241c14, M.glow);
+      for (const [z, d] of [[-21.775, 1], [-19.625, -1]]) {
+        bb(60.8, 2.24, z, 62.6, 2.34, z + d * 0.005, 0x4a3a28, M.glow);
+        for (const x of [61.25, 62.15]) bb(x - 0.02, 0.3, z, x + 0.02, 2.15, z + d * 0.005, 0x241c14, M.glow);
+      }
+      bb(61.25, 0.002, -21.25, 62.25, 0.006, -20.15, 0x2e261c, M.glow);   // the warm pool on the floor mat
     }, null, 0, { floor: false });
     R.lift30.add(R.carLight);
     R.carBtn = new THREE.Mesh(BTNGEO, droneLightMat('white')); R.carBtn.position.set(62.22, 1.2, -21.765); R.carBtn.name = 'lift30_roof_button'; R.lift30.add(R.carBtn);
@@ -1471,9 +1500,11 @@ SETS.hq_floors = (() => {
     const s = R.jackState;
     R.adapter.visible = s !== 'bare'; R.brick.visible = R.brickCord.visible = s === 'phone';
   }
+  // open when both wheels are at full turn together (a wheel let go still counts for 1.5 s: "both within 1.5 s")
+  const vFull = (i) => R.vTo[i] >= 1 || (R.vAt[i] >= 0 && R.t - R.vAt[i] <= 1.5);
   function valvesCheck() {
     if (R.vOpen) return;
-    if (R.vAt[0] >= 0 && R.vAt[1] >= 0 && Math.abs(R.vAt[0] - R.vAt[1]) <= 1.5) { R.vOpen = true; if (typeof emit === 'function') emit('valves:open'); }
+    if (vFull(0) && vFull(1)) { R.vOpen = true; if (typeof emit === 'function') emit('valves:open'); }
   }
 
   // ---------------------------------------------------------- the spot as a lamp (lamp(name)), per spec §3.4
@@ -1488,15 +1519,19 @@ SETS.hq_floors = (() => {
   };
   const LAMP_GAIN = 3.0;   // the engine's spot (decay 1.5) needs more than the spec's nominal values to read on these surfaces
   const FLOOR_LAMP = { l12: 'gap', l21: 'off', l30: 'lift30' };
-  function lamp(name) {
-    R.lamp = LAMPS[name] ? name : 'off';
+  // ?setview: the lamp each shot would have in its scene (the car's in car30, the lift's in lift, the jack's on L21)
+  const svLamp = (st) => (R.env === 'car30' && st === 'l30' ? 'car30' : R.env === 'lift' && st === 'l12' ? 'lift12' : st === 'l21' ? 'jack' : FLOOR_LAMP[st]);
+  function lamp(name) { setLamp(name); R.lampUser = true; }
+  function setLamp(name) {
+    R.lamp = LAMPS[name] ? name : 'off'; R.lampUser = false; R.lampOff = false;
     if (isCur() && R.lamp === 'off' && typeof world !== 'undefined') world.torchAuto = true;
     holdLamp();
   }
   function holdLamp() {
     if (!isCur() || typeof world === 'undefined') return;
     const s = world.torch; if (!s) return;
-    if (R.lamp === 'off') { if (s.intensity !== 0) s.intensity = 0; return; }
+    if (R.lamp === 'off') { if (!R.lampOff) { R.lampOff = true; s.intensity = 0; } return; }
+    R.lampOff = false;
     const L = LAMPS[R.lamp];
     world.torchAuto = false;
     s.position.set(L.p[0], L.p[1], L.p[2]); s.target.position.set(L.t[0], L.t[1], L.t[2]);
@@ -1557,7 +1592,7 @@ SETS.hq_floors = (() => {
     if (!R.root) return;
     R.f12.visible = st === 'l12'; R.f21.visible = st === 'l21'; R.f30.visible = st === 'l30';
     applyMode(); hideCleaners(); mirrorTint(0);
-    if (!o.keepLamp) lamp(SETVIEW() && st === 'l21' ? 'jack' : FLOOR_LAMP[st]);
+    if (!o.keepLamp) setLamp(SETVIEW() ? svLamp(st) : FLOOR_LAMP[st]);
     if (isCur()) applyAmbience(true);
   }
 
@@ -1581,7 +1616,7 @@ SETS.hq_floors = (() => {
     // the bank: 3 s ease, beacons blink while moving
     const moving = R.bankK !== R.bankTo || R.jigT >= 0;
     if (moving || dt === 0) placeBank(dt);
-    BEACM.emissiveIntensity = moving ? (Math.sin(t * 14) > 0 ? 2.2 : 0.2) : 0.4;
+    BEACM.emissiveIntensity = moving ? (Math.sin(t * 14) > 0 ? 1.4 : 0.15) : 0.35;
     // control panels: repaint only on change (ring quantised)
     const qk = Math.round(R.ctrlK * 24) / 24;
     for (let i = 0; i < 2; i++) if (R.ctrlKD[i] !== qk || R.ctrlHD[i] !== R.ctrlHeld[i]) {
@@ -1607,7 +1642,7 @@ SETS.hq_floors = (() => {
     T.ledA.offset.y = Math.floor(t * 3) / 64; T.ledB.offset.y = -Math.floor(t * 5) / 64;
     // fog rolls out of the vents: cards rise, spread and drift along the aisles
     R.fogK = approach(R.fogK, R.fogTo, dt / 3);
-    const k = R.fogK; R.fog.visible = k > 0.005; FOGM.opacity = 0.6 * k;
+    const k = R.fogK; R.fog.visible = k > 0.005; FOGM.opacity = 0.3 * k;
     if (R.fog.visible) {
       for (let i = 0; i < VENTS.length; i++) {
         const v = VENTS[i], sp = 1 + 2 * k, dx = Math.sin(t * 0.21 + i * 1.7) * 1.4 * k, rise = 0.9 * k * (0.7 + 0.3 * Math.sin(t * 0.5 + i));
@@ -1621,6 +1656,7 @@ SETS.hq_floors = (() => {
     // hatch: lid hangs down from its south edge, the ladder telescopes to the floor; lock pad pulse on the landing
     R.h21U = approach(R.h21U, R.h21To, dt / 0.8); R.lid21.rotation.x = -H * smooth(R.h21U);
     R.ldrU = approach(R.ldrU, R.ldrTo, dt / 1.6); R.ladder21.position.y = 3.2 - 3.2 * smooth(R.ldrU);
+    if (R.ldrU > 0.5) { R.ldrCol[0] = -12.08; R.ldrCol[2] = -11.52; } else R.ldrCol[0] = R.ldrCol[2] = 1e4;   // the dropped ladder blocks (rails at z -17.0)
     if (R.padT > 0) { R.padT -= dt; R.lockPad.material = R.padT <= 0 ? droneLightMat('patrol') : droneLightMat((R.padT * 6 | 0) % 2 ? 'escort' : 'off'); }
     R.ldU = approach(R.ldU, R.ldTo, dt / 0.8); R.landDoor.rotation.y = H * smooth(R.ldU);
     if (R.ldU >= 0.8) R.landCol[0] = R.landCol[2] = 1e4; else { R.landCol[0] = 13.0; R.landCol[2] = 13.1; }
@@ -1689,10 +1725,11 @@ SETS.hq_floors = (() => {
     GLOWM ||= new THREE.MeshBasicMaterial({ vertexColors: true });
     GLASSM ||= new THREE.MeshBasicMaterial({ color: 0x9ab4c4, transparent: true, opacity: 0.16, depthWrite: false, side: DS });
     SKYM ||= new THREE.MeshBasicMaterial({ map: T.storm, fog: false, color: 0xffffff });
-    FOGM ||= new THREE.MeshBasicMaterial({ map: T.fog, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: DS, color: 0xc8dcf0 });
-    BEACM ||= mat(0x40301a, { emissive: 0xffb040, emissiveIntensity: 0.4, key: 'hqf_beacon' });
+    FOGM ||= new THREE.MeshBasicMaterial({ map: T.fog, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, side: DS, color: 0xa8c4e0, fog: false });   // additive + fog = lit rectangles
+    BEACM ||= mat(0x40281a, { emissive: 0xff8a20, emissiveIntensity: 0.4, key: 'hqf_beacon' });
     RINGM ||= mat(0x10202a, { emissive: 0x6fd0ff, emissiveIntensity: 0.15, key: 'hqf_pa_ring' });
     PHONEM ||= matTex(T.phone, { emissive: 0xffffff, key: 'hqf_phone' });
+    GLOWM.name = 'hqf_glow'; GLASSM.name = 'hqf_glass'; SKYM.name = 'hqf_sky'; FOGM.name = 'hqf_fog'; BEACM.name = 'hqf_beacon'; RINGM.name = 'hqf_ring'; PHONEM.name = 'hqf_phone';
     M = {
       vc: mat(0xffffff), glow: GLOWM, ring: RINGM,
       atlas: matTex(T.signs), lit: matTex(T.signs, { emissive: 0xffffff, emissiveIntensity: 0.85 }), labels: matTex(T.labels),
@@ -1729,7 +1766,7 @@ SETS.hq_floors = (() => {
     buildL30(R.f30); const st30 = finish(R.f30); propsL30(R.f30);
     R.pa30.userData = paApi('l30');
     R.m30 = mir(27.4, 26.0, 46.7, -24.0, 'l30', T.f30, 2.0, [[35.75 - 46.7, -17.05 + 24.0, 36.65 - 46.7, -16.15 + 24.0]]); R.f30.add(R.m30);
-    R.bk30 = bakedCopy('baked_l30', [...staticMeshes(st30), R.docked.body, R.docked.light]); R.f30.add(R.bk30);
+    R.bk30 = bakedCopy('baked_l30', [...staticMeshes(st30), R.docked.light]); R.f30.add(R.bk30);   // the fleet's lights only (the shells would double ~150k tris on a phone)
     buildCleaners(root);
     b = null; GL = null;
     // put every prop where its (persisting) state says, then dress
@@ -1747,10 +1784,10 @@ SETS.hq_floors = (() => {
       const x = world.camera.position.x, f = x < -24 ? 'l12' : x > 24 ? 'l30' : 'l21';
       if (f !== R.state) dress(f);
     } else if (typeof state !== 'undefined' && state && state.scene !== R.scene) {
-      R.scene = state.scene; dress(AUTO[R.scene] || R.state);
+      R.scene = state.scene; dress(AUTO[R.scene] || R.state, { keepLamp: R.lampUser });
     }
     const reshown = R.lastT >= 0 && t - R.lastT > 0.5; R.lastT = t;
-    if (ctx.env !== R.env) R.env = ctx.env;
+    if (ctx.env !== R.env) { R.env = ctx.env; if (SETVIEW()) setLamp(svLamp(R.state)); }
     if (cur) {
       applyAmbience(reshown);
       holdLamp();
@@ -1766,12 +1803,12 @@ SETS.hq_floors = (() => {
   // ---------------------------------------------------------- data
   return {
     env: {
-      l12:     { bg: 0xdfe4ea, fog: [0xe8ecf0, 0.028], hemi: [0xf4f8ff, 0xc8ccd4, 2.0], dir: [0xe8f0ff, 1.1, [6, 14, 8]], spot: [0xf0f6ff, 1.2], rain: 0 },
-      lift:    { bg: 0x101214, fog: [0x202428, 0.020], hemi: [0xd8e2ea, 0x404448, 1.30], dir: [0xffffff, 0.35, [0, 10, 0]], spot: [0xfff6e8, 1.4], rain: 0 },
-      l21:     { bg: 0x0a1420, fog: [0x10223a, 0.035], hemi: [0x8fb8e8, 0x1a2430, 1.7], dir: [0x9cc4ff, 0.8, [-6, 10, 4]], spot: [0xbfe6ff, 1.4], rain: 0 },
-      l21_fog: { bg: 0x40586e, fog: [0x6a8aa8, 0.075], hemi: [0xa8c8e8, 0x2a3440, 1.9], dir: [0x9cc4ff, 0.6, [-6, 10, 4]], spot: [0xbfe6ff, 1.2], rain: 0 },
-      l30:     { bg: 0x0b0f16, fog: [0x141c28, 0.030], hemi: [0x7f9cc8, 0x1a2028, 1.7], dir: [0xa8b8c8, 1.0, [0, 12, 20]], spot: [0xbfe6ff, 1.2], rain: 0 },
-      car30:   { bg: 0x08080a, fog: [0x101012, 0.030], hemi: [0x8a8070, 0x202020, 1.2], dir: [0xffe8c8, 0.45, [0, 10, 0]], spot: [0xffe8c8, 1.3], rain: 0 },
+      l12:     { bg: 0xdfe4ea, fog: [0xe8ecf0, 0.028], hemi: [0xf4f8ff, 0xc8ccd4, 2.0], dir: [0xe8f0ff, 1.1, [6, 14, 8]], rain: 0 },
+      lift:    { bg: 0x101214, fog: [0x202428, 0.020], hemi: [0xd8e2ea, 0x404448, 1.30], dir: [0xffffff, 0.35, [0, 10, 0]], rain: 0 },
+      l21:     { bg: 0x0a1420, fog: [0x10223a, 0.035], hemi: [0x8fb8e8, 0x1a2430, 1.7], dir: [0x9cc4ff, 0.8, [-6, 10, 4]], rain: 0 },
+      l21_fog: { bg: 0x40586e, fog: [0x6a8aa8, 0.075], hemi: [0xa8c8e8, 0x2a3440, 1.9], dir: [0x9cc4ff, 0.6, [-6, 10, 4]], rain: 0 },
+      l30:     { bg: 0x0b0f16, fog: [0x141c28, 0.030], hemi: [0x7f9cc8, 0x1a2028, 1.7], dir: [0xa8b8c8, 1.0, [0, 12, 20]], rain: 0 },
+      car30:   { bg: 0x08080a, fog: [0x101012, 0.030], hemi: [0x8a8070, 0x202020, 1.2], dir: [0xffe8c8, 0.45, [0, 10, 0]], rain: 0 },
     },
     build, dress, lamp, reflect, makeMirror: MIRROR,
     marks: {
@@ -1803,7 +1840,7 @@ SETS.hq_floors = (() => {
     },
     anchors: {
       // L12
-      l12_lift_inside:      { at: [-53.0, 0.8, -37.0], from: [-53.0, 1.6, -42.6], fov: 60 },
+      l12_lift_inside:      { at: [-52.7, 0.9, -37.0], from: [-53.75, 2.25, -42.85], fov: 60 },
       s32_doors_open:       { at: [-53.0, 1.0, -41.6], from: [-51.4, 0.35, -36.6], fov: 50 },
       l12_panel:            { at: [-51.92, 1.25, -41.15], from: [-52.85, 1.3, -41.15], fov: 30 },
       pa12:                 { at: [-53.0, 3.58, -38.4], from: [-52.0, 1.7, -37.0], fov: 40 },
@@ -1820,26 +1857,26 @@ SETS.hq_floors = (() => {
       headphones_sign:      { at: [-54.0, 2.9, -15.42], from: [-54.0, 2.3, -21.4], fov: 34 },
       s32_headphones_close: { at: [-54.0, 1.5, -16.25], from: [-53.0, 1.6, -17.4], fov: 38 },
       tramp_bin:            { at: [-35.5, 0.9, -20.0], from: [-38.6, 1.6, -18.6], fov: 44 },
-      stair_door12:         { at: [-35.0, 1.45, -20.0], from: [-38.0, 1.6, -21.6], fov: 42 },
+      stair_door12:         { at: [-35.0, 1.45, -20.0], from: [-38.05, 1.62, -21.65], fov: 42 },
       // L21
       l21_landing_wide:     { at: [13.4, 1.0, -21.0], from: [17.1, 2.9, -16.6], fov: 64 },
-      shutter:              { at: [16.0, 1.4, -21.2], from: [15.6, 1.6, -19.4], fov: 40 },
+      shutter:              { at: [16.0, 1.75, -21.2], from: [15.4, 1.65, -18.9], fov: 44 },
       pa21:                 { at: [11.0, 3.15, -21.0], from: [11.6, 1.6, -19.6], fov: 40 },
       l21_reveal:           { at: [-2.0, 1.0, -27.6], from: [12.4, 2.6, -27.6], fov: 44 },
-      tea_point:            { at: [12.7, 1.1, -17.4], from: [11.0, 1.5, -17.4], fov: 40 },
+      tea_point:            { at: [12.7, 1.3, -17.4], from: [11.0, 1.6, -17.4], fov: 44 },
       kettle:               { at: [12.7, 1.05, -17.2], from: [12.0, 1.35, -17.2], fov: 32 },
       kettle_cord:          { at: [12.7, 0.95, -18.2], from: [12.1, 1.3, -18.0], fov: 30 },
       jack_wide:            { at: [-13.9, 0.8, -23.4], from: [-11.4, 1.5, -25.4], fov: 46 },
-      jack:                 { at: [-13.96, 0.52, -23.4], from: [-13.45, 0.65, -23.4], fov: 26 },
+      jack:                 { at: [-13.96, 0.54, -23.4], from: [-13.3, 0.6, -23.4], fov: 28 },
       brick_phone_floor:    { at: [-13.6, 0.08, -23.2], from: [-13.0, 0.6, -23.0], fov: 32 },
       valve_w:              { at: [-13.8, 1.15, -32.4], from: [-12.0, 1.5, -31.2], fov: 40 },
       valve_e:              { at: [12.8, 1.15, -32.4], from: [11.0, 1.5, -31.2], fov: 40 },
-      fog_wide:             { at: [-2.0, 0.5, -31.6], from: [-13.4, 2.9, -31.6], fov: 44 },
+      fog_wide:             { at: [-2.0, 0.5, -31.6], from: [-13.2, 2.6, -31.4], fov: 44 },
       hatch21:              { at: [-11.8, 3.2, -16.6], from: [-11.0, 1.0, -18.2], fov: 48 },
-      ladder21:             { at: [-11.8, 2.0, -16.8], from: [-9.8, 1.6, -19.0], fov: 46 },
+      ladder21:             { at: [-11.8, 2.1, -16.9], from: [-10.25, 1.3, -19.7], fov: 50 },
       // L30
       l30_hatch_up:         { at: [36.2, 0.6, -16.6], from: [38.6, 1.4, -19.6], fov: 46 },
-      hangar_reveal:        { at: [52.0, 1.0, -32.0], from: [36.6, 3.7, -14.2], fov: 60 },
+      hangar_reveal:        { at: [44.0, 0.8, -33.0], from: [37.5, 3.5, -13.6], fov: 60 },
       pa30:                 { at: [37.0, 3.85, -18.4], from: [36.4, 1.6, -20.6], fov: 40 },
       sentinel:             { at: [50.45, 1.8, -36.2], from: [50.0, 1.6, -29.6], fov: 40 },
       m1:                   { at: [47.5, 1.4, -34.6], from: [43.2, 2.0, -31.0], fov: 48 },
@@ -1855,7 +1892,7 @@ SETS.hq_floors = (() => {
       l12_lift_in: { type: 'fixed', pos: [-52.05, 2.25, -40.95], look: [-53.4, 1.1, -42.6], fov: 72 },
       l12_aisle_w: { type: 'fixed', pos: [-44.0, 3.3, -34.4], look: [-60.6, 0.5, -35.6], fov: 42 },
       l12_aisle_e: { type: 'fixed', pos: [-56.0, 3.3, -34.4], look: [-39.4, 0.5, -35.6], fov: 42 },
-      l12_gap:     { type: 'fixed', pos: [-48.7, 3.2, -25.8], look: [-50.0, 0.6, -32.6], fov: 54 },
+      l12_gap:     { type: 'fixed', pos: [-50.0, 3.45, -23.2], look: [-50.0, 0.5, -33.4], fov: 50 },
       l12_hall_w:  { type: 'fixed', pos: [-47.6, 3.3, -26.6], look: [-56.0, 0.5, -17.4], fov: 56 },
       l12_hall_e:  { type: 'fixed', pos: [-42.4, 3.3, -26.4], look: [-35.8, 0.5, -19.4], fov: 58 },
       // L21
