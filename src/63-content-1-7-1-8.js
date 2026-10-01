@@ -47,30 +47,28 @@
       to: { pos: [V1.x + sx * (d - pu), y, V1.z + sz * (d - pu)], look: [V1.x, ly, V1.z], fov: o.fovTo || f }, dur: o.dur || 7, ease: 'linear' });
   }
   const CLOSE = (id, o) => ({ do: (c) => closeOn(c, id, o) });
-  // a close on `id` from the side of his face away from `from` (so `from` stays out of the frame)
+  // a close on `id` from whichever side of his face (±mag off his facing) keeps `from` furthest out of the frame
   function closeAway(c, id, from, o = {}) {
     const a = act(c, id), b = act(c, from);
     if (!a || !b) return;
-    let d = Math.atan2(b.pos.x - a.pos.x, b.pos.z - a.pos.z) - a.rotY; d = Math.atan2(Math.sin(d), Math.cos(d));
-    closeOn(c, id, Object.assign({ yaw: d > 0 ? -0.7 : 0.7 }, o));
+    const m = o.mag || 0.7, d = o.dist || 0.95;
+    let best = m, bestA = -1;
+    for (const y of [m, -m]) {
+      const ry = a.rotY + y, cx = a.pos.x + Math.sin(ry) * d, cz = a.pos.z + Math.cos(ry) * d;
+      const ux = a.pos.x - cx, uz = a.pos.z - cz, vx = b.pos.x - cx, vz = b.pos.z - cz;
+      let ang = Math.acos(Math.max(-1, Math.min(1, (ux * vx + uz * vz) / (Math.hypot(ux, uz) * Math.hypot(vx, vz) || 1))));
+      if (c.world.lineClear && !c.world.lineClear(a.pos.x, a.pos.z, cx, cz, 0.05)) ang -= 10;   // never a lens inside the furniture
+      if (ang > bestA) { bestA = ang; best = y; }
+    }
+    closeOn(c, id, Object.assign({}, o, { yaw: best }));
   }
-  // `id` steps up beside the active character (on his right, about a metre off) and turns to him
-  function beside(c, id) {
+  // `id` steps up beside the active character (side 1: on his right, -1: his left; about a metre off) and turns to him
+  function beside(c, id, side = 1) {
     const a = act(c, c.state.active), b = act(c, id);
     if (!a || !b) return;
-    const ry = a.rotY, x = a.pos.x - Math.cos(ry) * 1.0 - Math.sin(ry) * 0.25, z = a.pos.z + Math.sin(ry) * 1.0 - Math.cos(ry) * 0.25;
-    return b.moveTo([x, 0, z], { collide: true }).then(() => { b.face(c.state.active, sk(c) ? 0 : 0.3); });
+    const ry = a.rotY, x = a.pos.x - side * Math.cos(ry) * 1.0 - Math.sin(ry) * 0.25, z = a.pos.z + side * Math.sin(ry) * 1.0 - Math.cos(ry) * 0.25;
+    return b.moveTo([x, 0, z], { collide: true }).then(() => b.face(c.state.active, sk(c) ? 0 : 0.3));
   }
-  // side-on: the active character and the thing he's looking at, the lens off to one side of the line between them
-  const side = (t, o = {}) => ({ do: (c) => {
-    if (sk(c)) return;
-    const a = act(c, c.state.active);
-    if (!a) return;
-    const mx = (a.pos.x + t[0]) / 2, mz = (a.pos.z + t[2]) / 2, dx = t[0] - a.pos.x, dz = t[2] - a.pos.z, L = Math.hypot(dx, dz) || 1;
-    const k = (o.side || 1) * (o.d || 1.8) / L, ly = o.ly ?? 0.9;
-    c.cam.shot({ shot: 'CAM', pos: [mx + dz * k, o.h || 1.3, mz - dx * k], look: [mx, ly, mz], fov: o.fov || 44,
-      to: { pos: [mx + dz * k * 0.92, o.h || 1.3, mz - dx * k * 0.92], look: [mx, ly, mz], fov: o.fov || 44 }, dur: 5, ease: 'linear' });
-  } });
   // walk the active character through waypoints (autoplay: the roams are solved on foot, through the real hotspots)
   async function walk(c, pts, run = true) {
     const sid = c.flow.sceneId;
@@ -330,15 +328,15 @@
     hotspots: [
       // examine lines (the active character; the blank sign gets an answer from Chase (2040), who knows it by heart)
       { id: 'h17_sign', at: 'sign_look', r: 1.5, flag: 's17_sign',
-        steps: [meFace('blank_sign'), { wait: 0.3 }, ots('blank_sign', { fov: 44, dist: 1.4 }), { wait: 0.5 }, me("That sign's blank."),
-          { do: (c) => beside(c, 'chase40') },
+        steps: [meFace('blank_sign'), { wait: 0.35 }, { do: (c) => { beside(c, 'chase40', -1); } },   // he comes up on his other side
+          ots('blank_sign', { fov: 44, dist: 1.4 }), { wait: 0.6 }, me("That sign's blank."), { wait: 0.2 },
           { do: (c) => closeAway(c, 'chase40', c.state.active, { dist: 1.15, fov: 38, push: 0.1, dur: 6 }) },
           { wait: 0.3 },
           say('chase40', "It says 'Welcome to Redcliffe'. And an ad for teeth.")] },
       { id: 'h17_tree', at: 'tree_look', r: 1.7, flag: 's17_tree',
         steps: [meFace([8.4, 0, 13.2]), { wait: 0.3 }, ots([8.4, 2.0, 13.2], { fov: 54, dist: 1.6 }), { wait: 0.6 }, me("They've bubble-wrapped Christmas.")] },
       { id: 'h17_bollard', at: 'bollard_look', r: 1.1, flag: 's17_bollard',
-        steps: [meFace([-10.4, 0, 5.15]), { wait: 0.3 }, side([-10.4, 0, 5.15], { d: 2.6, h: 1.25, ly: 0.85, fov: 40, side: -1 }), { wait: 0.4 },
+        steps: [meFace([-10.4, 0, 5.15]), { wait: 0.3 }, { shot: 'CAM', pos: [-8.9, 2.3, 7.9], look: [-10.35, 0.7, 5.4], fov: 46, to: { pos: [-9.05, 2.2, 7.7], look: [-10.35, 0.7, 5.4], fov: 45 }, dur: 5, ease: 'linear' }, { wait: 0.4 },
           { do: (c) => { const a = act(c, c.state.active); if (a && !sk(c)) a.play('give', { dur: 1.2, loop: false }); } }, { wait: 0.9 },
           me("It's soft. The bollard's soft.")] },
       // the four human moments
@@ -740,8 +738,9 @@
     { act: [['chase', 'look_down']] },
     { wait: 0.5 },
     // [CLOSE · Chase] His face.
+    { place: 'chase', at: [3.05, 0, -2.2, -2.6] }, { act: [['chase', 'look_down']] },
     { expr: [['chase', 'stunned']] },
-    { do: (c) => closeAway(c, 'chase', 'luka', { dist: 0.95, fov: 34, push: 0.06, dur: 5, ly: -0.04 }) },
+    CLOSE('chase', { yaw: 1.0, dist: 1.0, fov: 36, push: 0.06, dur: 5, ly: 0.06, dy: 0.04 }),   // from the room side: Luka out of frame
     { wait: 2.4 },
     { expr: [['chase', 'sad']] },
     { wait: 1.2 },
@@ -794,8 +793,8 @@
     { wait: 0.8 },
     // [WIDE · locked] The three of them in the tiny kitchen. The parcel of chips going cold on the bench. The
     // Christmas lights blink on the balcony.
-    put('chase40', 3.2, -1.9, -1.64), { do: (c) => parcel(c, 'bench') },
-    put('chase', 2.75, -0.9, -2.4), put('luka', 1.75, -2.0, 0.3),
+    put('chase40', 2.95, -1.55, -1.96), { do: (c) => parcel(c, 'bench') },
+    put('chase', 2.45, -0.8, -2.56), put('luka', 1.6, -2.1, 0.3),
     { act: [['chase40', 'idle'], ['chase', 'idle'], ['luka', 'reading_bare']] },
     { expr: [['chase40', 'sad'], ['chase', 'sad'], ['luka', 'still']] },
     KITCHEN_LOCKED,
