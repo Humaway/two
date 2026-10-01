@@ -92,6 +92,7 @@ button { font: inherit; color: inherit; cursor: pointer; pointer-events: auto; b
 #signal i { display: block; height: 100%; transform-origin: 0 50%; transform: scaleX(0); background: linear-gradient(90deg, #8fd0ff, #3a9cff); }
 #signal.warn { color: #ffcf7a; } #signal.warn i { background: linear-gradient(90deg, #ffd27a, #ff9a3c); }
 #signal.full { color: #ff8a7a; animation: pulse .5s ease-in-out infinite; } #signal.full i { background: #ff5a4a; }
+body.calm #signal.full, body.calm #ar .arl { animation: none; }   /* Reduce Flashing: no blinking red, no AR flicker */
 
 /* strength / strain meter (roller door, brass plate, two-person holds) */
 #meter { left: 50%; bottom: calc(7vh + 52px); z-index: 3; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 7px 14px;

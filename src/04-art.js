@@ -1490,7 +1490,7 @@ const buildCharacter = (() => {
         return rig;
       },
     };
-    root.addEventListener('added', () => { if (typeof state !== 'undefined' && state) rig.dress(state); });
+    root.addEventListener('added', () => { if (!root.userData.noDress && typeof state !== 'undefined' && state) rig.dress(state); });   // noDress: a visit (the Safe Room), not a spawn
     // warm-up: hidden attachments (and, on the very first rig, every drone / prop / instanced family in ART_WARM_KIT)
     // ride along as scale-0 proxies sharing their geometry + material, so the boot render compiles and uploads them
     // without drawing a pixel (the portrait stays clean); each proxy removes itself after that first render.

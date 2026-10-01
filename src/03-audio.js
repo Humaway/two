@@ -1454,8 +1454,21 @@ const { AUDIO, sfx, music } = (() => {
   function startWarm() {
     if (warming || !baked) return;
     warming = true;
-    setTimeout(() => { const T = performance.now(); Promise.all(Object.keys(LATE).map(ensureLate)).then(() => { stats.ms.late = Math.round(performance.now() - T); }); }, 60);
+    setTimeout(warmLate, 60);
     setTimeout(warmCues, 150);
+  }
+  // one LATE bed at a time, a breath between: each bake builds its whole node graph on the main thread, and nineteen at
+  // once (crowds, babble) would be one long hitch at the start of play (spec §16: none over 50 ms). A scene that asks for
+  // a bed first just bakes it now (ensureLate is shared, so nothing bakes twice).
+  function warmLate() {
+    const names = Object.keys(LATE), T = performance.now();
+    let i = 0;
+    const next = () => {
+      while (i < names.length && L[names[i]]) i++;
+      if (i >= names.length) { stats.ms.late = Math.round(performance.now() - T); return; }
+      ensureLate(names[i++]).then(() => setTimeout(next, 40));
+    };
+    next();
   }
   function warmCues() {
     let i = 0;

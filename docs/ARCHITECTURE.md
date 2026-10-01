@@ -221,9 +221,10 @@ changed here.
 chirp), `msg`, `title`, `icon: 'warn' | 'error' | 'info' | 'none'`, `buttons = ['OK']`, `at: 'center' | [x, y]` (0..1)
 `| { actor } | { pos: [x, y, z] }` (pinned to a world point, hidden behind the camera), `w`, `dur`, `spinner`,
 `progress: { from, to, dur }`, `dodge`, `cls`, `shake`, `ding: false`, `z`, `emptySlot` (the dashed empty space where
-NO should be), `note` (small text under the message), `moon` (the Do Not Disturb moon). `popup.clear()`,
-`popup.count()`, `popup.prewarm(n)`. Step `{ popup: spec, wait: true }` → `flow.result` = the index. Autoplay presses
-the first button after 0.3 s.
+NO should be), `note` (small text under the message), `moon` (the Do Not Disturb moon). `popup.clear()` (resolves -1;
+while a cutscene is being skipped a pop-up with buttons answers as autoplay would), `popup.count()`,
+`popup.prewarm(n)`. Step `{ popup: spec, wait: true }` → `flow.result` = the index (when skipped: the index autoplay
+would press, so skipped and played runs branch alike). Autoplay presses the first button that doesn't `dodge` after 0.3 s.
 
 ### 5.3 HUD, time cards, UI bits
 
@@ -248,12 +249,13 @@ the first button after 0.3 s.
   (state) => id`, `branch: 'A' | 'B'`; `grants` also takes `hack`, `choice`, `quiet`, `noService`, `removeItems` and
   `state: {…}`.
 - Scene steps add `['playable', ids]` (who SWAP cycles mid-scene) and `['follow', true | id | [ids] | null]`.
+  `['control', id]` changes the leader the way SWAP does: if `id` was following, the one who led takes his place.
 - Cutscene steps add `{ bark }`, `{ nameGlitch }`, `{ timeCard }`, `{ quiet }` and `{ slowmo: 0.3, dur: 1.5 }` (slow
   motion for `dur` on-screen seconds, not awaited; `wait`s inside it are game time, so `{ wait: 0.5 }` lasts 1.7 s at
-  0.3; it ends with the cutscene; nothing while skipping). `flow.slowmo` is the factor.
+  0.3; it ends with the cutscene; nothing while skipping). `flow.slowmo` is the factor (autoplay's `speed` multiplies it).
 - SWAP: `playable` may list three ids; SWAP (Tab / Y / the SWAP button) cycles them in order, skipping anyone not on
   this set, and `emit('swap', id)`. `flow.follow` is null, an id or a list: the non-active playables follow (the one you
-  leave takes the new one's place). `flow.swapNext()` (code, autoplay) → the new id or null; `flow.setFollow(x)`;
+  leave takes the new one's place if the new one was following; someone holding his spot keeps holding it). `flow.swapNext()` (code, autoplay) → the new id or null; `flow.setFollow(x)`;
   `flow.holdPos(id, on = true)` (leaves the follow list); `player.wait(id, on = true)` (stays in the party but holds
   its spot: "Hold this"); `player.waiting(id)`; `player.follower(id | [ids] | null)`; `player.followers`.
 - Samples: a hotspot `{ sample: 'kettle' }` records when `state.active === 'chase'`: hold YES `CONFIG.record` (1 s; a
@@ -270,7 +272,10 @@ the first button after 0.3 s.
   `chip:view`, `saferoom`.
 - Input: CHIP is an action (Q / LB / the CHIP touch button, shown only while Chase (2040) can use it):
   `input.pressed('chip')`, `input.held('chip')`. Every hold-to-confirm reads `input.holding(a)` (with
-  `options.holdToPress` a press latches until `input.unlatch(a)`, NO, or 5 s).
+  `options.holdToPress` a press latches until `input.unlatch(a)`, NO, or 5 s; a second CHIP press turns Chip View off).
+- Hotspot actions stop at the first await after the scene changed (no door, `do`, flag or save into the next scene or
+  the title); a timelapse cut short by a scene change fires no more keys. Quit to Title clears every sound a scene left
+  (`AUDIO.stopAll()`: songs, muffle, ringing, beds).
 
 ### 5.5 World and camera
 
@@ -296,7 +301,8 @@ the first button after 0.3 s.
   `{ spawn: id, at, set: rightSetId }`.
 - Sets: `world.liveMax = 3` (the default); a set not on screen for more than two scenes is disposed when a scene
   starts; `world.prebuild(id) → Promise` builds over three frames (in a cutscene's last shot or under a fade);
-  `world.prop / anchor / mark(name, setId?)`. `world.envName` = the current set's env preset name. `world.torchAuto` is
+  `world.prop / anchor / mark(name, setId?)`. `world.envName` = the current set's env preset name; `world.raining` =
+  its env rains now (a set's `ambience.rain` bed starts only then, and follows every wet/dry env change). `world.torchAuto` is
   reset to `true` whenever a set is shown, even again within a scene (a set that parks the spot as a lamp should
   re-assert `world.torchAuto = false` in its `update` while the lamp is lit, not only in `dress` / `lamp()`).
 - Colliders are live: a set may push, splice or move boxes in its `colliders` array (or write a box's numbers in place)
@@ -335,7 +341,8 @@ the first button after 0.3 s.
   needs `stealth.active`) → the hug → capture. Cones are floor fans clipped by the set's live colliders and by
   `DRONES.cover(id, box | null)` boxes (`DRONES.walls = false`: cover boxes only).
 - `DRONES.get(id)`, `remove(id)`, `clear()`, `all`, `reset()`, `pause(on)`, `calm()`, `alert(who)`, `turn(who)`,
-  `goTo(id, at, { speed, then }) → Promise`, `face(id, where)`, `release(id)`, `light(id, state)`, `state(id)`,
+  `goTo(id, at, { speed, then }) → Promise` (also resolves when something else takes the drone over: face, release,
+  turn, a reset; a goTo sent from a cutscene that is skipped lands at once), `face(id, where)`, `release(id)`, `light(id, state)`, `state(id)`,
   `inCone(id, who) → bool`, `claw(id, k = 1, dur = 0.4)` (the noise drone's claw, 0 closed … 1 open; the model is
   `DRONES.get(id).obj` for a prop to follow), `zap(droneId, actorId, { line }) → Promise` (1.6's static),
   `lines = { escort, laugh }`.

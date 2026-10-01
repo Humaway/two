@@ -389,6 +389,8 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     if (lockT > 0) lockT -= dt;
     if (peekT > 0) peekT -= dt;
     if (live && !can && chip.forced && input.pressed('chip')) { input.consume('chip'); ui.toast(chip.forcedMsg); ui.sfx('clunk'); }
+    // options.holdToPress: a press latches Chip View on (input.holding); pressing CHIP again while it's on lets go
+    if (options.holdToPress && can && chip.on && !chipShow && !(peekT > 0) && input.pressed('chip')) { input.consume('chip'); input.unlatch('chip'); }
     const fill = !chip.forced && lockT <= 0 && !SR.on && ((can && input.holding('chip')) || peekT > 0);
     const want = fill || (chipShow && !SR.on);
     if (want !== chip.on) setView(want);
@@ -550,7 +552,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
       len: 3.2, half: 0.42, len0: 3.2, half0: 0.42, hasCone: true, ai: true, sweep: 0, sweepP: 5, showPath: true,
       coneK: 0, disc: 0.6, discY: NaN, yOff: 0, lureY: NaN, clawK: 0.3, clawTo: 0.3, clawV: 2.5,
       st: 'patrol', stT: 0, tgt: null, sus: 0, lost: 0, lx: 0, lz: 0, light: '',
-      gx: 0, gz: 0, gs: 1.4, gRes: null, after: 'idle', faceX: 0, faceZ: 0, faceOn: false, lureTok: 0, lureT: 0, lureDur: 0, arrived: false };
+      gx: 0, gz: 0, gs: 1.4, gRes: null, gCut: false, after: 'idle', faceX: 0, faceZ: 0, faceOn: false, lureTok: 0, lureT: 0, lureDur: 0, arrived: false };
   }
   function lightD(d, l) {
     if (d.light === l) return;
@@ -561,6 +563,8 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
   function setSt(d, st, tgt) {
     const prev = d.st;
     d.st = st; d.stT = 0; d.tgt = tgt || null;
+    // a goTo cut short (DRONES.face / release / turn / calm, the soft fail) still resolves: nobody awaits it forever
+    if (prev === 'goto' && st !== 'goto' && d.gRes) { const r = d.gRes; d.gRes = null; r(); }
     if (st === 'curious') { d.sus = 0; d.lost = 0; snd('drone_q', d.obj.position, 0.8); }
     else if (st === 'escort') snd('drone_red', d.obj.position, 0.8);
     else if (st === 'patrol' && prev === 'return') snd('drone_ok', d.obj.position, 0.4);
@@ -626,6 +630,9 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
   }
   function droneTick(d, dt, watch, escalate) {
     d.px = d.x; d.pz = d.z; d.py = d.y; d.pyaw = d.yaw; d.t += dt; d.stT += dt;
+    // a skipped cutscene: a scripted flight lands at once, so an awaited goTo never holds the skip up (lured drones keep
+    // investigating on their own clock, a roam after the cutscene may count on that; lureTick settles lure.done instead)
+    if (d.st === 'goto' && d.gCut && skipping()) { d.x = d.px = d.gx; d.z = d.pz = d.gz; const r = d.gRes; d.gRes = null; setSt(d, d.after); if (r) r(); }
     const look = watch && d.hasCone && d.ai;
     if (!paused) switch (d.st) {
       case 'patrol': {
@@ -736,7 +743,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
   }
 
   // ---- lures (13.6): one live lure; the sample replays at the spot while drones are on it
-  const LURE = { on: false, tok: 0, at: V(), sfx: '', t: 0, rep: 0, line: null, said: false, res: [] };
+  const LURE = { on: false, tok: 0, at: V(), sfx: '', t: 0, rep: 0, line: null, said: false, res: [], cut: false };
   function lureArrive(d) {
     snd('drone_scan', d.obj.position, 0.5);
     if (LURE.on && d.lureTok === LURE.tok && LURE.line && !LURE.said) { LURE.said = true; barkD(LURE.line); }
@@ -744,6 +751,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
   function lureEnd() { LURE.on = false; while (LURE.res.length) LURE.res.shift()(); }
   function lureTick(dt) {
     if (!LURE.on) return;
+    if (LURE.cut && LURE.res.length && skipping()) while (LURE.res.length) LURE.res.shift()();   // an awaited lure in a skipped cutscene: done now (the drones stay on it)
     LURE.t += dt;
     let n = 0;
     for (let i = 0; i < D.length; i++) if (D[i].st === 'lured' && D[i].lureTok === LURE.tok) n++;
@@ -834,7 +842,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
         setSt(d, 'lured');
         out.n++; out.ids.push(d.id);
       }
-      LURE.on = true; LURE.t = 0; LURE.rep = 0; LURE.sfx = S.sfx || ''; LURE.said = false;
+      LURE.on = true; LURE.t = 0; LURE.rep = 0; LURE.sfx = S.sfx || ''; LURE.said = false; LURE.cut = flow.cutscene;
       LURE.line = o.line !== undefined ? o.line : sampleId === 'laugh' ? DRONES.lines.laugh : null;
       out.done = new Promise((res) => LURE.res.push(res));
       log('lure ' + sampleId + ' ' + out.n);
@@ -858,6 +866,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
       if (d.gRes) { const r = d.gRes; d.gRes = null; r(); }
       leave(d);
       d.gx = t1.x; d.gz = t1.z; d.gs = o.speed ?? 1.4; d.after = o.then === 'patrol' ? 'return' : o.then || 'idle';
+      d.gCut = flow.cutscene;   // sent from a cutscene: a skip of it lands the flight at once
       if (skipping()) { d.x = d.px = d.gx; d.z = d.pz = d.gz; setSt(d, d.after); return Promise.resolve(); }
       setSt(d, 'goto');
       return new Promise((r) => { d.gRes = r; });
@@ -886,7 +895,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     // 1.6's zap: a harmless static discharge off a drone's courtesy field into someone's fingertip
     async zap(did, aid, o = {}) {
       if (skipping()) return;
-      const d = dById.get(did), a = world.actor(aid || state.active);
+      const g = gen, d = dById.get(did), a = world.actor(aid || state.active);
       if (!a) return;
       const hand = a.rig && a.rig.parts && (a.rig.parts.handR || a.rig.parts.handL);
       if (hand) { a.root.updateMatrixWorld(true); hand.getWorldPosition(t2); } else t2.set(a.pos.x, a.pos.y + 1.0, a.pos.z);
@@ -897,8 +906,10 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
       const an = anim(['stumble', 'shake']);
       if (an !== 'idle') a.play(an);
       await wait(0.25);
+      if (g !== gen) return;   // the scene moved on: no smoke or bark in the next one
       if (d && d.obj) lightD(d, LIGHT_OF[d.st] || 'patrol');
       await wait(0.2);
+      if (g !== gen) return;
       world.puff(at, { n: 5, color: 0x8c8c8c, speed: 0.12, life: 1.6, gravity: -0.35 });   // "It's a little bit of smoke."
       if (o.line) barkD(o.line === true ? 'Static discharge! ^ For your safety!' : o.line);
       await wait(0.3);
@@ -1120,7 +1131,9 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     if (a) {
       SR.actor = a; SR.home = a.root.parent;
       const bk = SR.back; bk[0] = a.pos.x; bk[1] = a.pos.y; bk[2] = a.pos.z; bk[3] = a.rotY;   // where he goes back to
+      a.root.userData.noDress = true;   // a visit, not a spawn: 04-art's 'added' re-dress would drop the scene's wardrobe toggles
       SR.scene.add(a.root);
+      a.root.userData.noDress = false;
       a.place([v.bag[0], 0, v.bag[1], Math.atan2(v.from[0] - v.bag[0], v.from[2] - v.bag[1])]);
       a.play(anim(['sit', 'sit_bench']), { h: 0.38 });
     }
@@ -1134,7 +1147,10 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     document.body.classList.remove('saferoom');
     const a = SR.actor;
     SR.actor = null;
-    if (a) { if (SR.home) SR.home.add(a.root); a.play('idle'); a.rig.seated = false; a.place(SR.back); }   // (onRetry may place him again)
+    if (a) {
+      if (SR.home) { a.root.userData.noDress = true; SR.home.add(a.root); a.root.userData.noDress = false; }
+      a.play('idle'); a.rig.seated = false; a.place(SR.back);   // (onRetry may place him again)
+    }
     if (SR.hidden) SR.hidden.visible = true;
     SR.hidden = null; SR.home = null;
   }
@@ -1308,7 +1324,8 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
   // ============================================================ strengthHold
   const holds = [];
   function strengthHold(o = {}) {
-    const r = { o, who: o.who || 'luka', label: o.label ?? 'Lift', dur: Math.max(0.2, o.dur ?? 1.6), k: 0, idle: 0, keep: false, held: false, g: gen, res: null, autoT: 0, anim: 'idle' };
+    const r = { o, who: o.who || 'luka', label: o.label ?? 'Lift', dur: Math.max(0.2, o.dur ?? 1.6), k: 0, idle: 0, keep: false, held: false, g: gen, res: null, autoT: 0, anim: 'idle',
+      cut: flow.cutscene };   // made inside a cutscene (a hotspot's steps): a skip of it completes the hold
     const h = { get k() { return r.k; }, get full() { return r.keep || r.k >= 1; }, get held() { return r.held; }, done: null,
       cancel: () => holdEnd(r, r.keep), then: (a, b) => h.done.then(a, b) };
     h.done = new Promise((res) => { r.res = res; });
@@ -1338,6 +1355,12 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     for (let i = holds.length - 1; i >= 0; i--) {
       const r = holds[i], o = r.o;
       if (r.g !== gen) { holdEnd(r, false); continue; }
+      if (r.cut && skipping()) {   // begun inside a cutscene that is now skipped: it just happened (as one begun while skipping)
+        if (o.onProgress) o.onProgress(1);
+        if (!r.keep && o.onFull) o.onFull();
+        if (o.keep && o.onRelease) o.onRelease(true);
+        holdEnd(r, true); continue;
+      }
       const a = world.actor(r.who), auto = TEST.auto;
       if (auto) r.autoT += dt;
       let held = auto ? !r.keep || r.autoT < (o.autoHold ?? 1.2) : input.holding('yes'), quit = false;
@@ -1415,7 +1438,8 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     if (P.o.onChange) P.o.onChange((P.ends[0].holder ? 1 : 0) + (P.ends[1].holder ? 1 : 0));
   }
   function pairSwitch(o = {}) {
-    const P = { id: o.id || 'pair' + ++pairSeq, o, label: o.label || 'Turn', who: o.who || null, need: o.hold ?? 0.5, both: 0, done: false, g: gen, res: null, autoT: 0, ends: [] };
+    const P = { id: o.id || 'pair' + ++pairSeq, o, label: o.label || 'Turn', who: o.who || null, need: o.hold ?? 0.5, both: 0, done: false, g: gen, res: null, autoT: 0, ends: [],
+      cut: flow.cutscene };   // (a roam's pair is never completed by skipping some other spot's little cutscene)
     const h = { id: P.id, done: null, then: (a, b) => h.done.then(a, b), end: () => pairEnd(P, false), auto: () => pairAuto(P),
       get held() { return (P.ends[0] && P.ends[0].arrived ? 1 : 0) + (P.ends[1] && P.ends[1].arrived ? 1 : 0); } };
     h.done = new Promise((res) => { P.res = res; });
@@ -1484,6 +1508,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     for (let i = pairs.length - 1; i >= 0; i--) {
       const P = pairs[i];
       if (P.g !== gen) { pairEnd(P, false); continue; }
+      if (P.cut && skipping()) { pairDone(P); continue; }   // made inside a cutscene that is now skipped: done (as one made while skipping)
       if (TEST.auto && P.o.auto !== false && (P.autoT += dt) > 0.6) { pairAuto(P); continue; }
       for (let k = 0; k < 2; k++) {
         const E = P.ends[k];
@@ -1548,6 +1573,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
   on('flow:stop', () => {
     gen++;
     srOff(); hugHide();
+    document.body.classList.remove('saferoom');   // (the host set's Quiet Corner sets it without SR.on: a quit mid-corner)
     DRONES.clear(); AR.clear(); arForce = null;
     while (holds.length) holdEnd(holds[holds.length - 1], false);
     pairSwitch.clear();

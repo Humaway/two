@@ -62,6 +62,7 @@
         { say: 'luka40', text: 'I was always sure.' },
         { popup: { style: 'safesense', title: 'SafeSense', msg: 'This message may upset the recipient. Send anyway?', buttons: ['YES'], emptySlot: true, at: 'center', w: 380 }, wait: true },
         { popup: { msg: 'JARVIS has updated your preferences.', buttons: ['OK'], icon: 'info' }, wait: true },
+        { do: (c) => { if (c.flow.result !== 0) console.error('TWO dev: popup result ' + c.flow.result + ' (skipped or played, it must be 0)'); } },
         // HUD: NO SERVICE, QUIET IN, Samples, the bars filling, the HACK bar
         { do: (c) => { c.hud.set({ noService: true, quiet: '46:58:00', samples: true, bars: 0 }); c.hud.hack(12); } },
         { hud: { bars: 4 }, anim: 2 }, { wait: 0.8 },
@@ -83,7 +84,8 @@
         c.state.flags.dev_swapped = true;
       } }],
       // ---- 4. Chip View: AR labels + Signal
-      ['control', 'chase40'],
+      ['control', 'chase40'],   // the party keeps its shape: Luka (who led) takes Chase (2040)'s place in the follow list
+      ['do', () => { const f = player.followers.map((a) => a.id).join(','); log('control followers ' + f); if (player.followers.length !== 2) console.error('TWO dev: control dropped a follower: ' + f); }],
       ['roam', { until: 'dev_chip', auto: async (c) => {
         AR.add({ id: 'dev_sign', kind: 'sign', text: 'OPTUS · 2040', at: [-2.0, 2.4, -14.2], w: 2.4 });   // the sets' ar lists: w in metres
         AR.add({ id: 'dev_red', kind: 'sign', text: 'ALL CROSSINGS REQUIRE HUMAN CONFIRMATION', at: [0.8, 2.5, -1.2], w: 3, color: 0xff3a3a });
@@ -123,6 +125,9 @@
         const nz = DRONES.spawn('dev_noise', { at: [2.5, 0, -11.5], kind: 'noise', cone: { len: 3.4, half: 0.6 } });
         DRONES.claw('dev_noise', 1); await c.wait(0.5); DRONES.claw('dev_noise', 0);
         log('noise claw ' + (nz && nz.obj.userData.setClaw ? 'yes' : 'no'));
+        // a goTo taken over half-way (release) still resolves
+        const gp = DRONES.goTo('dev_noise', [2.5, 0, -9.5], { speed: 0.4 }); await c.wait(0.3); DRONES.release('dev_noise'); await gp;
+        log('goTo released resolves');
         // capture: stealth with autoCapture, Luka walks into dev_b's cone
         stealth.begin({ autoCapture: true });
         W.actor('luka').place([-1.0, 0, -8.6, PI2(1)]);
@@ -179,6 +184,9 @@
         { act: [['luka', 'laugh_big', { dur: 2 }]] }, { wait: 2 },
         { do: (c) => { if (sk(c) || !c.AUDIO) return; const v = c.AUDIO.voicemail("Hi, you've reached Luka. ^ Leave a message."); log('voicemail ' + v.dur.toFixed(1) + ' s'); } },
         { say: 'voicemail', text: "Hi, you've reached Luka. ^ Leave a message." },
+        // a time-lapse (day -> night -> day) with a key; played or skipped, the key fires once
+        { shot: 'WIDE', on: ['luka', 'chase'] },
+        { timelapse: { from: 'day', to: 'night', dur: 1.6, cycles: 1, keys: [{ t: 0.6, steps: [{ do: () => log('timelapse key') }] }] } },
         { fade: 'out', dur: 0.6 },
       ]],
     ],

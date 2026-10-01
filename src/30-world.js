@@ -57,7 +57,9 @@
 //         world.lineClear(x0, z0, x1, z1, pad = 0) -> bool (no collider box on the segment), world.floorAt(x, z),
 //         actor.moveTo(where, { collide: true }) (AI: slides along walls, ends where it stalls for 0.6 s).
 //         Debug: world.liveIds, world.pendingIds, world.splitId, cam.cameraR.
-// MISC    world.envName: the current set's env preset name. world.torchAuto is reset to true whenever a set is shown.
+// MISC    world.envName: the current set's env preset name; world.raining: its env rains now (the flow starts a set's rain
+//         bed only then). world.torchAuto is reset to true whenever a set is shown. A timelapse stops (no more keys) when
+//         the scene changes or another set is shown, and lands at once while skipping.
 //         cam.override(mode, { ..., ease: secs }) blends into (or, with null, out of) an override instead of cutting;
 //         'fixed' takes pos/look arrays a mini-game may mutate in place every tick, damped by lag / lookLag (seconds).
 //         Colliders are live: a set may push, splice or move boxes in def.colliders at runtime (pushed bins, opening
@@ -1590,7 +1592,7 @@ const { world, cam, frame, player } = (() => {
     if (SPL.mode === 'open') return Math.round(w * (1 + (r - 1) * k));
     return Math.round(w * (SPL.keep === 'right' ? r * (1 - k) : r + (1 - r) * k));
   }
-  const TL = { on: false, t: 0, dur: 8, cycles: 3, a: envNew(), b: envNew(), keys: [], ki: 0, res: null, wasLocked: false };
+  const TL = { on: false, e: null, t: 0, dur: 8, cycles: 3, a: envNew(), b: envNew(), keys: [], ki: 0, res: null, wasLocked: false };
   function fireKey(kk) {
     try {
       if (kk.do) kk.do();
@@ -1600,6 +1602,7 @@ const { world, cam, frame, player } = (() => {
   function timelapse(o = {}) {
     const e = cur;
     if (!e) return Promise.resolve();
+    if (TL.on) tlAbort();                // a running one stops first (before its keys and envs are overwritten)
     const pre = (p) => (typeof p === 'string' ? e.def.env && e.def.env[p] : p) || {};
     const fn = typeof o.from === 'string' ? o.from : 'day', tn = typeof o.to === 'string' ? o.to : 'night';
     envFill(envCopy(TL.a, e.env), pre(o.from ?? 'day'), fn, e);
@@ -1607,18 +1610,27 @@ const { world, cam, frame, player } = (() => {
     TL.keys = (o.keys || []).slice().sort((x, y) => x.t - y.t); TL.ki = 0; TL.t = 0;
     TL.dur = o.dur || 8; TL.cycles = o.cycles || 3;
     if (skipping()) { for (const kk of TL.keys) fireKey(kk); envCopy(e.env, TL.a); envApply(e, e.env); return Promise.resolve(); }
-    settle(TL, 'res');
-    TL.wasLocked = locked; locked = true; TL.on = true;
+    TL.wasLocked = locked; locked = true; TL.on = true; TL.e = e;
     return new Promise((r) => { TL.res = r; });
   }
   function tlTick(dt) {
     const e = cur;
-    TL.t += dt;
+    if (e !== TL.e) { tlAbort(); return; }   // the set changed under it
+    TL.t = skipping() ? TL.dur : TL.t + dt;  // a skip lands it at once (keys fired, env where it ends)
     envLerp(e.env, TL.a, TL.b, 0.5 - 0.5 * Math.cos(TAU * TL.cycles * Math.min(1, TL.t / TL.dur)));
     envApply(e, e.env);
     while (TL.ki < TL.keys.length && (TL.keys[TL.ki].t <= TL.t || TL.t >= TL.dur)) fireKey(TL.keys[TL.ki++]);
-    if (TL.t >= TL.dur) { TL.on = false; locked = TL.wasLocked; settle(TL, 'res'); }
+    if (TL.t >= TL.dur) { TL.on = false; TL.e = null; locked = TL.wasLocked; settle(TL, 'res'); }
   }
+  // a time-lapse cut short by a scene change (flow:stop) or another set: no more keys (they are the old scene's), its set
+  // left at the env it would have ended on, the camera unlocked (flow.stop unlocks it too), the promise settled
+  function tlAbort() {
+    const e = TL.e;
+    TL.on = false; TL.e = null; TL.ki = TL.keys.length; locked = false;   // (never TL.wasLocked: a restart would inherit its own lock)
+    if (e && live.get(e.id) === e) { envCopy(e.env, TL.a); envApply(e, e.env); }
+    settle(TL, 'res');
+  }
+  on('flow:stop', () => { if (TL.on) tlAbort(); });
 
   // ------------------------------------------------------------ update + render
   function shown(a) { return a.set === cur || (a.set === splitE && splitE); }
@@ -1736,6 +1748,7 @@ const { world, cam, frame, player } = (() => {
     whipBlur: 1.6,                  // px of canvas blur during a WHIP (0 = none)
     get torch() { return cur ? cur.spot : null; },
     get envName() { return cur ? cur.envName : ''; },   // the current set's env preset name (the last one set by name)
+    get raining() { return !!cur && cur.env.rain > 0; },   // the current env rains (its rain bed and particles are on)
     get scene() { return cur ? cur.scene : null; },
     get splitId() { return splitE ? splitE.id : null; },
     get liveIds() { return [...live.keys()]; },          // debug/tests: live sets, oldest first (+ staged prebuilds)

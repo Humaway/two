@@ -7,6 +7,7 @@
 async function boot() {
   loadPrefs();   // options + profile (02-core); a blocked or broken store just keeps the defaults
   document.body.classList.toggle('large', options.textSize === 'large');
+  document.body.classList.toggle('calm', !!options.reduceFlashing);   // Reduce Flashing: CSS pulses and flickers go still
   ui.init(); menus.init();
   on('scene:end', (e) => {
     const id = e && typeof e === 'object' ? e.id : e;
@@ -31,7 +32,7 @@ async function boot() {
     last = now;
     perf.frame(ms);
     input.poll();
-    acc += Math.min(ms / 1000, CONFIG.maxFrame) * (TEST.auto ? Math.max(clock.scale, TEST.speed) : clock.scale);
+    acc += Math.min(ms / 1000, CONFIG.maxFrame) * (TEST.auto ? TEST.speed : 1) * clock.scale;   // (autoplay's speed scales slow motion too)
     for (let n = 0; acc >= step && n < 12; n++) { tick(); acc -= step; }
     if (acc >= step) acc %= step; // more than 12 ticks behind: drop it rather than spiral
     renderer.info.reset();

@@ -51,7 +51,9 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
   async function loadSet(id, env) {
     await world.load(id, { env });
     const amb = (world.set && world.set.ambience) || NOAMB, A = audio();
-    if (A) { A.ambience(amb); A.setRoom(amb.room || 'none'); }
+    // a rainy set shown in a dry preset (sun, a rain: 0 preset) starts without the rain bed; the world brings it in
+    // (with the set's rain kind) when the env turns wet, as it does on every later change
+    if (A) { A.ambience(amb.rain && world.raining === false ? Object.assign({}, amb, { rain: false }) : amb); A.setRoom(amb.room || 'none'); }
   }
   function spawnMap(m) {
     for (const id in m) {
@@ -107,13 +109,20 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
     if (live && !state.flags.tut_swap && !tutOn) { tutOn = true; ui.prompt(swapTut()); }
     else if (!live && tutOn) { tutOn = false; ui.prompt(null); }
   }
+  // The one we leave takes the new active one's place in flow.follow (a list stays in playable order). Someone who
+  // wasn't following (holding his spot) keeps holding it, and so does the one we leave: with three playables and
+  // follow 'chase40', a SWAP from Luka to Chase keeps Chase (2040) following and leaves Luka where he stands.
+  function handOver(prev, nx) {
+    const f = flow.follow, pl = playables();
+    if (!f || !prev || prev === nx) return;
+    if (Array.isArray(f)) { const i = f.indexOf(nx); if (i >= 0) { f[i] = prev; f.sort((a, b) => pl.indexOf(a) - pl.indexOf(b)); } }
+    else if (f === nx) flow.follow = prev;
+  }
   function doSwap() {
     const prev = state.active, nx = nextPlayable();
     if (!nx) return null;
     state.active = nx; player.control(nx);
-    const f = flow.follow, pl = playables(); // the one we left takes the new active one's place (kept in playable order)
-    if (Array.isArray(f)) { const i = f.indexOf(nx); if (i >= 0) { f[i] = prev; f.sort((a, b) => pl.indexOf(a) - pl.indexOf(b)); } }
-    else if (f) flow.follow = prev;
+    handOver(prev, nx);
     applyFollow();
     if (tutOn) { tutOn = false; ui.prompt(null); }
     state.flags.tut_swap = true;
@@ -201,7 +210,11 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
     if ('ask' in s) return ask(s.ask, s).then((v) => { flow.result = v; if (s.flag) setFlag(s.flag, v); return runSteps(v ? s.yes : s.no); });
     if ('popup' in s) {
       if (s.clear) popup.clear();
-      if (!s.popup || sk) return;
+      if (!s.popup) return;
+      if (sk) { // skipped: the answer autoplay would give (the first button that doesn't run away), so branches agree
+        if (s.wait) { const b = s.popup.buttons || ['OK'], dg = s.popup.dodge || []; let k = 0; while (k < b.length - 1 && dg.includes(k)) k++; flow.result = b.length ? k : -1; }
+        return;
+      }
       const p = popup(s.popup);
       if (s.wait) return p.done.then((i) => { flow.result = i; });
       return;
@@ -286,8 +299,8 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
   }
 
   function timelapse(tl) {
-    const keys = tl.keys || [], fired = keys.map(() => false);
-    const fire = (i) => { if (fired[i]) return; fired[i] = true; return runSteps(keys[i].steps); };
+    const g = G, keys = tl.keys || [], fired = keys.map(() => false);
+    const fire = (i) => { if (fired[i] || g !== G) return; fired[i] = true; return runSteps(keys[i].steps); };   // never into the next scene
     const rest = async () => { for (let i = 0; i < keys.length; i++) await fire(i); }; // keys a skip jumped over still apply
     if (flow.skipping) return rest();
     let done = false;
@@ -402,7 +415,7 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
       recontrol();
     }
     async function door(h) {
-      const d = h.door, kind = d.kind || 'jarvis', to = d.to && typeof d.to === 'object' && !Array.isArray(d.to) ? d.to : { mark: d.to };
+      const g = G, d = h.door, kind = d.kind || 'jarvis', to = d.to && typeof d.to === 'object' && !Array.isArray(d.to) ? d.to : { mark: d.to };
       if (kind === 'jarvis') { // "takes nine seconds": ~2 s of spinner, then a jump cut
         const p = popup({ msg: 'JARVIS is loading this door.', spinner: true, buttons: [], icon: 'info' });
         const key = 'door_seen_' + h.id, first = d.first && !state.flags[key];
@@ -411,12 +424,15 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
         p.close();
       } else if (kind === 'wood') { ui.sfx('creak'); await ui.fade(1, 0.35); }
       else ui.sfx('door_slide');
-      if (to.set && to.set !== world.setId) { if (kind !== 'wood') await ui.fade(1, 0.25); await loadSet(to.set, to.env); }
+      if (g !== G) return;   // quit / scene change mid-door: never load its set over the title or the next scene
+      if (to.set && to.set !== world.setId) { if (kind !== 'wood') await ui.fade(1, 0.25); if (g !== G) return; await loadSet(to.set, to.env); }
       placeParty(to.mark);
       if (kind === 'wood' || to.set) ui.fade(0, 0.35);
     }
+    // Every await is followed by a generation check: a spot's later parts (its door, its `do`, its flag, the save) never
+    // run once the scene has changed under it (Quit to Title mid-dialogue or mid-door, Chapter Select).
     async function fire(h) {
-      const sel = inventory.selected;
+      const g = G, sel = inventory.selected;
       let done = true, boiled = false;
       inventory.selected = null;
       testLog('hotspot ' + h.id + (sel ? ' use ' + sel : ''));
@@ -424,17 +440,19 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
         const u = h.use && h.use[sel];
         if (!u) { await say(state.active, "That won't work."); return; }
         await runAny(u);
+        if (g !== G) return;
       } else {
-        if (h.text != null) await speak(h);
-        if (h.kettle || h.des) { if (!(await kettle(h))) return; boiled = true; }
+        if (h.text != null) { await speak(h); if (g !== G) return; }
+        if (h.kettle || h.des) { if (!(await kettle(h)) || g !== G) return; boiled = true; }
         if (h.ask) {
           const y = await ask(h.ask.q, h.ask), b = y ? h.ask.yes : h.ask.no;
-          if (b) await runAny(b);
+          if (g !== G) return;
+          if (b) { await runAny(b); if (g !== G) return; }
           if (!y) return;
         }
-        if (h.steps) await playCutscene(h.steps, { letterbox: false });
-        if (h.door) await door(h);
-        if (h.do) await h.do(ctx());
+        if (h.steps) { await playCutscene(h.steps, { letterbox: false }); if (g !== G) return; }
+        if (h.door) { await door(h); if (g !== G) return; }
+        if (h.do) { await h.do(ctx()); if (g !== G) return; }
         done = !h.use; // a spot with `use` only completes through the right item
       }
       if (done && h.flag) setFlag(h.flag, true);
@@ -447,7 +465,7 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
       trigger(x) { // run a spot by id (autoplay helpers, content); a recordable spot also records (Chase active)
         const h = typeof x === 'string' ? list.find((e) => e.id === x) : x;
         if (!h) { console.warn('TWO: no hotspot ' + x); return Promise.resolve(); }
-        return busyRun(async () => { const sel = inventory.selected; if (acts(h) || sel) await fire(h); if (!sel && canRecord(h)) record(h); });
+        return busyRun(async () => { const g = G, sel = inventory.selected; if (acts(h) || sel) await fire(h); if (g === G && !sel && canRecord(h)) record(h); });
       },
     };
   })();
@@ -594,7 +612,7 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
       }
       case 'steps': return playCutscene(a, { letterbox: false });
       case 'objective': if (Array.isArray(a)) objective.list(a); else objective(a); return;
-      case 'control': state.active = a; if (actorOf(a)) player.control(a); applyFollow(); showSwap(); return;
+      case 'control': { const prev = state.active; state.active = a; if (actorOf(a)) player.control(a); handOver(prev, a); applyFollow(); showSwap(); return; }   // the party keeps its shape (as SWAP)
       case 'playable': flow.playable = a ? a.slice() : null; showSwap(); return;   // change who SWAP cycles through mid-scene
       case 'roam': return roam(a || {});
       case 'minigame': player.enabled = false; return minigame(a, st[2]);

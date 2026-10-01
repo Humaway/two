@@ -63,6 +63,8 @@ const input = (() => {
   const stick = { id: -1, x: 0, y: 0, far: false, fx: 0, fy: 0 };
   const padAxes = { x: 0, y: 0, fx: 0, fy: 0 };
   let pads = 0, pPrev = {}, pPtr = false, rPtr = false;
+  // a pad that vanishes mid-press (unplugged, asleep) must not leave its buttons held or its stick deflected
+  const padClear = () => { for (let i = 0; i < PADA.length; i++) { const a = PADA[i]; if (pad[a]) rel[a] = true; pad[a] = false; pPrev[a] = false; } padAxes.x = padAxes.y = padAxes.fx = padAxes.fy = 0; };
 
   const I = {
     move: { x: 0, y: 0 }, run: false, scheme: touchDevice ? 'touch' : 'kb', lastKey: '',
@@ -88,7 +90,7 @@ const input = (() => {
       const gp = navigator.getGamepads();
       let g = null;
       for (let i = 0; i < gp.length; i++) if (gp[i] && gp[i].connected) { g = gp[i]; break; }
-      if (!g) return;
+      if (!g) { padClear(); return; }
       let any = false;
       for (let i = 0; i < PADA.length; i++) {
         const a = PADA[i], b = g.buttons[CONFIG.pad[a]], d = !!(b && b.pressed);
@@ -172,14 +174,16 @@ const input = (() => {
   addEventListener('contextmenu', (e) => e.preventDefault());
   addEventListener('focusin', (e) => { if (e.target.tagName === 'BUTTON') e.target.blur(); }); // Enter/Space are YES, never a native click
   addEventListener('gamepadconnected', () => { pads++; });
-  addEventListener('gamepaddisconnected', () => { pads = Math.max(0, pads - 1); });
+  addEventListener('gamepaddisconnected', () => { pads = Math.max(0, pads - 1); padClear(); });
 
   // touch buttons (any [data-a] in #touch: YES NO SWAP BAG pause, and CHIP when the head has #t-chip)
   for (const b of touchEl.querySelectorAll('[data-a]')) {
     const a = b.dataset.a;
     b.addEventListener('pointerdown', (e) => { e.preventDefault(); b.setPointerCapture(e.pointerId); tch[a] = true; push(a); b.classList.add('on'); });
     const up = () => { if (tch[a]) rel[a] = true; tch[a] = false; b.classList.remove('on'); };
-    b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
+    // lostpointercapture too: a button hidden while held (CHIP when Chase (2040) stops being playable, SWAP/BAG under
+    // the dialogue box) may never see its pointerup, and the action would stay held for good
+    b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
   }
   // virtual stick: offset from the base centre / radius; beyond the rim = run
   const R = 60;
@@ -199,7 +203,7 @@ const input = (() => {
   stickEl.addEventListener('pointerdown', (e) => { e.preventDefault(); stickEl.setPointerCapture(e.pointerId); stick.id = e.pointerId; stickMove(e); });
   stickEl.addEventListener('pointermove', (e) => { if (e.pointerId === stick.id) stickMove(e); });
   const stickUp = (e) => { if (e.pointerId !== stick.id) return; stick.id = -1; stick.x = stick.y = stick.fx = stick.fy = 0; stick.far = false; knob.style.transform = ''; };
-  stickEl.addEventListener('pointerup', stickUp); stickEl.addEventListener('pointercancel', stickUp);
+  stickEl.addEventListener('pointerup', stickUp); stickEl.addEventListener('pointercancel', stickUp); stickEl.addEventListener('lostpointercapture', stickUp);
 
   if (touchDevice) { touchEl.classList.remove('off'); touchEl.parentNode.classList.add('touchui'); }
   return I;

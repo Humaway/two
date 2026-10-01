@@ -696,7 +696,10 @@ const popup = (() => {
     };
   }
 
-  popup.clear = () => { while (live.length) close(live[live.length - 1], -1); };
+  const autoK = (p) => { let k = 0; while (k < p.n - 1 && p.spec.dodge && p.spec.dodge.includes(k)) k++; return k; };   // the first button that doesn't run away
+  // clear(): every pop-up closes with -1, except while a cutscene is being skipped (flow.skip): one with buttons then
+  // answers as autoplay would, so a skipped { popup, wait } branches exactly as a played one
+  popup.clear = () => { const sk = ui.skipping(); while (live.length) { const p = live[live.length - 1]; close(p, sk && p.n ? autoK(p) : -1); } };
   popup.count = () => live.length;
   popup.prewarm = (n) => { for (let i = pool.length + live.length; i < n; i++) pool.push(make()); };   // build the DOM behind the loader, not mid-storm
   popup.update = (dt) => {
@@ -708,10 +711,7 @@ const popup = (() => {
       if (p.pr) { p.prT += dt; const k = p.pr.dur > 0 ? Math.min(1, p.prT / p.pr.dur) : 1; if (k < 1 || p.prT - dt < p.pr.dur) setProg(p, p.pr.from + (p.pr.to - p.pr.from) * k); }
       if (p.spec.spinner && (p.tickT += dt) >= 1) { p.tickT -= 1; ui.sfx('tick', { vol: 0.3 }); }
       if (p.life > 0 && p.age >= p.life) { close(p, -1); continue; }
-      if (p.n && (skip || (TEST.auto && p.age >= 0.3))) { // autoplay presses the first button that doesn't run away
-        let k = 0; while (k < p.n - 1 && p.spec.dodge && p.spec.dodge.includes(k)) k++;
-        close(p, k); continue;
-      }
+      if (p.n && (skip || (TEST.auto && p.age >= 0.3))) { close(p, autoK(p)); continue; }   // autoplay presses the first button that doesn't run away
       if (p.n && (!top || p.z > top.z)) top = p;
     }
     if (!top || say.busy()) return;
@@ -1049,6 +1049,7 @@ const menus = (() => {
 
   function applyOptions() {
     document.body.classList.toggle('large', options.textSize === 'large');
+    document.body.classList.toggle('calm', !!options.reduceFlashing);   // Reduce Flashing: the Signal's pulse, the AR flicker
     saveOptions();
     emit('options', options);
   }
@@ -1290,6 +1291,8 @@ const menus = (() => {
     M.mode = 'wait'; onTitle = true; typed = ''; mainSel = 0; uiEl.classList.add('menuon');
     root.classList.add('off');
     await ui.fade(1, 0.4);
+    // a clean slate under the black: a scene quit mid-way may have left a song, a muffle (3.5), the ringing or beds on
+    const A = AU(); if (A && A.stopAll) A.stopAll();
     try { await titleSet(); } catch (e) { console.warn('TWO: title scene', e); }
     mus(titleMusic());
     titleEl.classList.remove('off', 'withmenu');
