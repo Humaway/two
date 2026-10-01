@@ -174,7 +174,7 @@ and houses beyond x −12.
 | Lamps | east barrier x 6.25 at z = 58 + 36k (k 0…19); west barrier x −6.30 at z = 76 + 36k (k 0…18); 9 m pole, 2.2 m arm over the road, LED head | 39 (pole IM + head IM) |
 | Railing posts | east outer railing x 8.48 and west railing x −6.28, every 2.4 m | 602 (1 IM), y from `deckY` |
 | Rails / barriers | merged boxes per 10 m segment on the hump, long boxes elsewhere | static |
-| Channel markers | posts with lit tops at (−26, 380), (+26, 380) green; (−26, 420), (+26, 420) red; and **(26, 650)** (the `ch_channel` camera's perch) | 5 (1 IM + lights) |
+| Channel markers | posts with lit tops at (−26, 380), (+26, 380) green; (−26, 420), (+26, 420) red; and **(26, 650)**, a taller beacon pole to y 3.2 (the `ch_channel` camera sits just above it) | 5 (1 IM + lights) |
 | Old Houghton Highway bridge | x −46…−36, deck top y −1.0, z 36…760, piers every 20 m; low railings; padded barrier at its north end (closed) | merged + 36 piers IM |
 | Moored boats | (60, −5, 300), (90, −5, 520), (−80, −5, 610) | 3 (1 IM) |
 | Water | plane x −700…700, z −600…1400, y −5.0 | 1 quad, ripple scroll |
@@ -418,7 +418,7 @@ Courtesy Drones that move (patrols, the scan drone, the six chasers) are **not**
 | `s25_towers_red` | [11.6, 7.2, 3.0] | [8.6, 1.3, 9.8] | 48 | `2.5_alarm`: tower_E goes red against the storm, drones lifting off over the scooters |
 | `s25_launch` | [3.5, 0.8, 20.0] | [9.6, 1.4, 6.0] | 46 | "Go." — the scooters dropping onto lane L |
 | `s25_crest_wide` | [2.0, 5.0, 420.0] | [−30.0, 12.0, 380.0] | 44 | `2.5_laugh` 9 WIDE: the crest, both scooters and the drone line, the bay and the storm wall (when the lead is at s ≈ 415) |
-| `s25_edge` | [9.6, 2.6, 772.0] | [20.0, −1.4, 777.0] | 42 | the drones stopped at the edge (from the boardwalk); the council sign in frame |
+| `s25_edge` | [9.6, 2.6, 772.0] | [20.0, −0.6, 777.0] | 42 | the drones stopped at the edge (from the boardwalk); the council sign in frame |
 | `s25_bw_hide` | [29.5, −1.8, 800.0] | [36.0, −1.6, 806.0] | 44 | under the mangroves: they look back |
 | `drone_footage` | [30.0, −2.6, 800.0] | [14.0, 24.0, 774.0] | 46 | the drone's-eye view for `2.5_manager` (see §9) |
 | `credits_checkpoint` | [4.0, 1.5, 0.0] | [−2.0, 3.0, −20.0] | 44 | credits: gates up, cars gliding through, the booth lit |
@@ -440,9 +440,9 @@ cams: {
   cp_dock:    { type: 'fixed', pos: [3.2, 4.2, 12.5],   look: [8.3, 0.6, 3.6],   fov: 50 },
   cp_overview:{ type: 'fixed', pos: [-4.0, 9.0, -46.0], look: [4.0, 0.0, -10.0], fov: 50 },  // filmable land outside the walk
   ch_launch:  { type: 'fixed', pos: [11.6, 3.6, 30.0],  look: [4.0, 0.6, 12.0],  fov: 50 },
-  ch_pier:    { type: 'fixed', pos: [-9.6, -1.8, 214.0],look: [1.5, 0.9, 168.0], fov: 38 },  // low, from a pier cap outside the W railing
+  ch_shoulder:{ type: 'fixed', pos: [-5.8, 0.5, 214.0], look: [1.0, 0.9, 168.0], fov: 38 },  // low on the W shoulder, looking back up the road
   ch_lamp:    { type: 'fixed', pos: [6.2, 12.0, 364.0], look: [0.5, 2.2, 336.0], fov: 50 },  // from a lamp head on the hump
-  ch_channel: { type: 'fixed', pos: [26.0, -2.6, 650.0],look: [2.0, 1.2, 598.0], fov: 32 },  // long lens from the channel marker
+  ch_channel: { type: 'fixed', pos: [26.0, 3.5, 650.0], look: [2.0, 1.2, 598.0], fov: 32 },  // long lens from the channel-marker beacon
   ch_end:     { type: 'fixed', pos: [16.5, 5.2, 790.0], look: [4.0, 0.4, 750.0], fov: 46 },
   bw_end:     { type: 'fixed', pos: [36.0, 0.6, 806.0], look: [24.0, -2.0, 786.0], fov: 48 },
 },
@@ -454,13 +454,18 @@ zones: [   // first match wins
   { box: [6.0, -46.5, 13.3, -28.0],  cam: 'cp_north' },
   { box: [8.4, 774.0, 60.0, 840.0],  cam: 'bw_end' },
   { box: [-60, 8.2, 60, 100],        cam: 'ch_launch' },    // deck zones: framing + fallback only (the chase drives the camera)
-  { box: [-60, 100, 60, 260],        cam: 'ch_pier' },
+  { box: [-60, 100, 60, 260],        cam: 'ch_shoulder' },
   { box: [-60, 260, 60, 460],        cam: 'ch_lamp' },
   { box: [-60, 460, 60, 690],        cam: 'ch_channel' },
   { box: [-60, 690, 60, 900],        cam: 'ch_end' },
   { box: [-60, -60, 60, 8.2],        cam: 'cp_overview' },
 ],
 ```
+
+**Sight-line rule (checked):** the deck has a solid 0.85 m barrier and a 1.30 m railing on both edges, so any lens
+outside the deck must cross them above deck + 1.30 (`ch_channel`, `ch_end`, the laugh TRACK and `s25_crest_wide` do; a
+low lens must sit on the road itself, like `ch_shoulder`). Keep a 3 m radius clear of mangrove canopies around the
+`bw_end`, `s25_bw_hide` and `s25_edge` lenses.
 
 The deck zones are deliberately wide (x ±60, over the water) so the framing helper can put a side-on lens off the
 deck edge during `2.5_laugh` without being pulled back inside.
@@ -479,12 +484,12 @@ arrays it mutates each tick (allocation-free); in side segments it calls `cam.ov
 | --- | --- | --- | --- |
 | 10 | 60 | `ch_launch` | the scooters drop onto lane L; drones peel off tower_E behind them |
 | 60 | 150 | FOLLOW | low behind |
-| 150 | 215 | `ch_pier` | low through the railing posts: scooters and drones approach and blast past |
+| 150 | 215 | `ch_shoulder` | low on the west shoulder (x −5.8, 0.5 m up): scooters and drones approach and blast past, railing posts and lamps receding |
 | 215 | 330 | FOLLOW | |
 | 330 | 360 | `ch_lamp` | high on the rising hump: the drone formation reads from above |
 | 360 | (laugh) | `2.5_laugh` cutscene; `chase.cruise(true)` | |
 | resume | 560 | FOLLOW | |
-| 560 | 640 | `ch_channel` | long lens from the water: the bridge in profile, the chase coming toward the lens |
+| 560 | 640 | `ch_channel` | long lens from the channel-marker beacon (3.5 m above the deck, 8.5 m above the water): the bridge in profile, the chase coming toward the lens |
 | 640 | 735 | FOLLOW | |
 | 735 | end | `ch_end` | the swerve; `chase.swerve()`; the drones stop at the edge |
 
@@ -552,7 +557,8 @@ framing helper). Then `chase.mount` the riders and hand over to the mini-game.
 
 **`2.5_laugh`** (content; `chase.cruise(true, { drones: ['d25_c1', …, 'd25_c6'] })` before step 1, `false` after)
 1. TRACK side-on: `{ shot: 'WIDE', on: ['luka', 'chase40'], move: 'track', track: 'alongside', side: 'right' }`
-   (subject's right = −X): lens over the water west of the deck (x ≈ −12), looking east: scooters in lanes L/M, the
+   (subject's right = −X): lens over the water west of the deck (x ≈ −12) **at deck + 2.0** (it must clear the west
+   railing's top rail at deck + 1.30; at deck + 1.4 it grazes it), looking east: scooters in lanes L/M, the
    six drones in a neat line behind at `chase.formation`, the bay and the storm wall behind them, lamps ticking past.
    **Requires** the west railing to be see-through at lens height (railing posts every 2.4 m + two rails — yes) and
    the deck zones wide enough (§7.1).
@@ -663,7 +669,7 @@ SETS.bridge = {
     START: 14, LAUGH: 360, END: 735, SPEED: 6.94,   // metres (z), m/s = 25 km/h
     deckY,                  // (z) → deck top height
     follow: { offset: [-0.8, 1.55, -7.0], look: [0, 0.9, 12.0], fov: 52, damp: 4 },
-    schedule: [ [10, 60, 'ch_launch'], [60, 150, 'FOLLOW'], [150, 215, 'ch_pier'], [215, 330, 'FOLLOW'],
+    schedule: [ [10, 60, 'ch_launch'], [60, 150, 'FOLLOW'], [150, 215, 'ch_shoulder'], [215, 330, 'FOLLOW'],
                 [330, 360, 'ch_lamp'], [360, 560, 'FOLLOW'], [560, 640, 'ch_channel'], [640, 735, 'FOLLOW'], [735, 900, 'ch_end'] ],
     formation: [[1.8, 2.2, -5], [1.8, 2.3, -7], [1.8, 2.2, -9], [1.8, 2.3, -11], [1.8, 2.2, -13], [1.8, 2.3, -15]],
                             // [x (absolute), y above deck, dz behind scooter_1]: "six drones in a neat line behind them"

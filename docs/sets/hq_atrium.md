@@ -290,11 +290,11 @@ Flashing → a dim swell). `tower({ podium: 'none' })` supplies the curtain wall
 | Hover-cars (body / glow / shadow) | 4 | 3 IM |
 | Tower drones | 12 | inside `tower()` |
 
-**Instance positions of the floor staff (`crowd_staff` 0–11, facing in brackets)**: (−4.0, −21.0, ry H) "merry 1"
-partner side → actually the partner faces the player spot: see §7.4; (−3.0, −21.0, −H); (3.2, −19.0, H); (5.0, −24.5,
-2.6); (−6.6, −26.0, 0.9); (1.6, −25.4, −2.2); (6.8, −21.8, −1.4); (−1.8, −17.2, 2.9); (8.2, −37.0, 0); (11.0, −34.4,
-−0.6); (−10.4, −35.8, 1.2); (0.4, −37.8, 0.3). Mezzanine onlookers: W L1 (−13.9, 4.5, −20 / −33), E L1 (13.9, 4.5,
-−18 / −30), E L2 (13.9, 9.0, −24), W L2 (−13.9, 9.0, −26), all leaning on the rails facing the centre.
+**Instance positions of the floor staff (`crowd_staff` 0–11, `[x, z, ry]`)**: 0 (−3.0, −21.0, −H) partner for
+`bi_merry_1`; 1 (3.2, −19.0, H) partner for `bi_merry_2`; 2 (8.2, −37.0, 0) partner for `bi_merry_3`; 3 (5.0, −24.5,
+2.6); 4 (−6.6, −26.0, 0.9); 5 (1.6, −25.4, −2.2); 6 (6.8, −21.8, −1.4); 7 (−3.4, −16.6, 2.9); 8 (11.0, −34.4, −0.6);
+9 (−10.4, −35.8, 1.2); 10 (1.8, −38.6, 0.3); 11 (−7.4, −21.8, 1.2). Mezzanine onlookers: W L1 (−13.9, 4.5, −20 / −33),
+E L1 (13.9, 4.5, −18 / −30), E L2 (13.9, 9.0, −24), W L2 (−13.9, 9.0, −26), all leaning on the rails facing the centre.
 
 Gameplay drones (Fun Monitor, Door Drone, the Quiet Corner drone) are **content-spawned** with `DRONES.spawn` (§7.3).
 
