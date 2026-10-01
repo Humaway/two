@@ -89,6 +89,7 @@ const { chip, AR, DRONES, stealth, safeRoom, strengthHold, pairSwitch } = (() =>
   const log = (m) => testLog(m);
   const snd = (n, at, vol) => { if (!skipping() && typeof sfx === 'function') sfx(n, { at, vol }); };
   const barkD = (text) => (text && !skipping() && typeof bark === 'function' ? bark('drone', text) : null);
+  const barkClear = () => { if (typeof bark === 'function' && bark.clear) bark.clear(); };
   const PARTY = ['luka', 'chase', 'chase40'];
   const t1 = V(), t2 = V(), t3 = V();
   let gen = 0;                                   // bumped on flow:stop: stale async runs stop
@@ -1147,6 +1148,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     if (variant === 'quiet' && world.mark('quiet_beanbag')) return hostCorner(o, who, g);   // 3.1: hq_atrium's own corner
     await ui.fade(1, 0.3, tint);
     if (g !== gen) return;
+    barkClear();   // the escort's "Gotcha!" doesn't talk over the room
     srOn(variant, who);
     if (typeof music === 'function' && music.silence) music.silence(true);
     ui.fade(0, 0.35);
@@ -1170,6 +1172,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     const a = who ? world.actor(who) : null, bk = SR.back, m = world.mark('quiet_drone');
     await ui.fade(1, 0.3, '#1e2733');
     if (g !== gen) return;
+    barkClear();
     if (a) { bk[0] = a.pos.x; bk[1] = a.pos.y; bk[2] = a.pos.z; bk[3] = a.rotY; a.place('quiet_beanbag'); a.play(anim(['sit', 'sit_bench']), { h: 0.3 }); }
     if (m) { DRONES.spawn('_quiet_drone', { at: [m[0], 0, m[2]], hover: m[1] || 2.1, cone: false, ai: false, showPath: false }); DRONES.face('_quiet_drone', 'quiet_beanbag'); }
     cam.shot(world.anchor('quiet_corner') ? { shot: 'INSERT', at: 'quiet_corner' } : { shot: 'MID', on: who || 'quiet_beanbag' });
