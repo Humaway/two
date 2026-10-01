@@ -24,7 +24,10 @@ const { AUDIO, sfx, music } = (() => {
   const rnd = Math.random, mtof = (m) => 440 * Math.pow(2, (m - 69) / 12), R12 = (n) => Math.pow(2, n / 12);
   const B = {}, L = {}, M = {}, V = {}, S = {};  // one-shots, loops, music cues, voices, song stems
   let WHITE, BROWN, DROPS, DRIPS, CRACKLE, DIST;
-  let ctx = null, master, busM, busS, busV, muffleF, sendRoom, sendWet, ducked = false, silenced = false;
+  let ctx = null, master, busM, busS, busV, muffleF, sendRoom, sendWet, sendSlap, ducked = false, silenced = false;
+  // rooms (AUDIO.setRoom): [room send, wet send, slapback send, indoors (the rain bed is muffled)]
+  const ROOMS = { none: [0, 0, 0, 0], room: [0.25, 0, 0, 1], small: [0.2, 0, 0, 1], carriage: [0.22, 0, 0, 1], hall: [0.12, 0.24, 0, 1],
+    atrium: [0.1, 0.3, 0, 1], wet: [0, 0.35, 0, 0], lane: [0.04, 0, 0.3, 0] };
   const stats = { ms: {}, failed: [] };
   function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
@@ -612,6 +615,7 @@ const { AUDIO, sfx, music } = (() => {
     train_chime: [1.7, (c, d, t) => { for (const [s, m] of [[0, 80], [0.32, 76], [0.64, 83]]) { tone(c, d, t + s, mtof(m), 0.5, { v: 0.13, a: 0.003, d: 0.35, r: 0.35 }); tone(c, d, t + s, mtof(m) * 2, 0.2, { v: 0.02, a: 0.003, d: 0.1 }); } }],
     train_doors: [1.5, (c, d, t) => { noise(c, d, t, 0.35, { v: 0.25, a: 0.01, d: 0.15, s: 0.3, r: 0.1, hp: 2000 }); noise(c, d, t + 0.3, 0.8, { v: 0.1, a: 0.1, r: 0.2, bp: 600, q: 0.8 }); tone(c, d, t + 1.15, 110, 0.08, { to: 70, v: 0.3, a: 0.002, d: 0.04 }); }],
     uke_strum: [1.7, (c, d, t) => strum(c, d, t, 'D', 0.32)],
+    phone_ring: [2.4, (c, d, t) => { for (const s of [0, 1.2]) [76, 83, 81, 88].forEach((m, i) => marimba(c, d, t + s + i * 0.13, m, 0.18, 0.12)); }], // a 2040 smartphone (valley lit36)
     lift_ding: [1.4, (c, d, t) => { fm(c, d, t, mtof(84), 1, { ratio: 2, index: 0.5, md: 0.3, isus: 0.05, v: 0.13, a: 0.002, d: 0.5, r: 0.4 }); tone(c, d, t, mtof(96), 0.2, { v: 0.01, a: 0.002, d: 0.1 }); }],
     cracker: [0.8, (c, d, t) => { // Christmas cracker: snap, then paper
       noise(c, d, t, 0.02, { v: 1, a: 0.0003, d: 0.006, hp: 900 }); noise(c, d, t, 0.08, { v: 0.4, a: 0.001, d: 0.03, bp: 2500, q: 0.8 });
@@ -824,6 +828,106 @@ const { AUDIO, sfx, music } = (() => {
     ringing: { len: 4, rms: 0.035, xf: 1, whole: (c, d) => { tone(c, d, 0, 6800, 4.5, { v: 0.3 }); tone(c, d, 0, 6800.25, 4.5, { v: 0.12 }); tone(c, d, 0, 3400, 4.5, { v: 0.015 }); } }, // 3.5: heartbeat-free high ringing
     hum_voice: { len: 2, rms: 0.08, xf: 1, whole: (c, d) => hum(c, d, 0, 52, 2.5, 0.2) }, // Blend In: holding a hummed note (rate/vol from the mini-game)
   };
+
+  // ---------------------------------------------------------- the sets' beds (every loop name docs/sets/*.md uses)
+  // LOOP_ALIAS: a variant of a baked bed, nothing to bake: name -> [bed, vol, rate, lowpass Hz (0 = open)].
+  const LOOP_ALIAS = {
+    surf: ['waves', 1, 1, 0], surf_far: ['waves', 0.6, 0.94, 650], bay_far: ['waves', 0.5, 0.9, 520], water_lap: ['waves', 0.55, 1.18, 950],
+    wind_soft: ['wind', 0.5, 0.9, 900], wind_bay: ['wind', 0.85, 0.92, 0], wind_high: ['wind', 1, 1.25, 0], wind_fast: ['wind', 1.1, 1.6, 0], wind_gust: ['wind', 1, 1.1, 0],
+    thunder_far: ['thunder', 0.7, 1, 180], drone_idle: ['drone_hum', 0.5, 1, 1200], drone_swarm: ['drones', 1, 1, 0], drone_ring: ['drones', 0.7, 0.85, 700],
+    hover_far: ['hover_traffic', 0.7, 1, 900], hover_idle: ['hover', 0.6, 1, 0], server_hum: ['server', 1, 1, 0],
+    hq_hush: ['aircon', 0.7, 1, 800], atrium_air: ['aircon', 0.9, 0.8, 0], room_tone: ['aircon', 0.6, 0.7, 500], hall_hum: ['aircon', 0.8, 0.6, 0], padded_hush: ['aircon', 0.45, 1, 400],
+    rail_clack: ['train_clack', 1, 1, 0], train_hum: ['hum', 0.5, 0.9, 500], train_idle: ['hum', 0.35, 0.8, 400], lift_hum: ['hum', 0.5, 1.2, 700], desk_hum: ['hum', 0.25, 1, 600],
+    neon_hum: ['fluoro', 0.6, 1, 0], clock: ['clock_tick', 1, 1, 0], whisper_crowd: ['crowd_whisper', 1, 1, 0], sizzle_plate: ['hotplate', 1, 1, 0],
+    radio_tinny: ['transistor', 0.7, 1, 0], tinnitus: ['ringing', 0.6, 1, 0], city_far_quiet: ['city', 0.35, 1, 500], birds_dawn: ['birds', 1.2, 1.12, 0],
+  };
+  // LATE loops: baked in the background after boot (from the first YES), or the moment a scene asks for one (it fades
+  // in when ready), so the loader doesn't wait for them. Same recipe shape as LOOPS.
+  const LATE = {
+    gulls: { len: 10, rms: 0.03, tail: 0.8, whole: (c, d) => { // a few gull cries, near and far
+      const R = rng(7), f = band(c, d, 500, 4200);
+      for (const [t0, n, v] of [[0.6, 3, 1], [4.2, 2, 0.5], [6.9, 4, 0.8]]) for (let k = 0; k < n; k++) {
+        const t = t0 + k * (0.32 + R() * 0.1), f0 = 1250 + R() * 250;
+        tone(c, f, t, f0, 0.22, { type: 'sawtooth', to: f0 * 0.62, gl: 0.22, v: 0.09 * v, a: 0.02, d: 0.1, s: 0.5, r: 0.05, bp: 1700, q: 2.5, vib: [22, 40] });
+      }
+    } },
+    crickets: { len: 4, rms: 0.02, tail: 0.2, whole: (c, d) => {
+      const R = rng(11);
+      for (const [f, per, v] of [[4600, 0.62, 0.05], [5200, 0.81, 0.03], [3900, 1.13, 0.02]]) for (let t = R() * per; t < 4; t += per) for (let k = 0; k < 3; k++) tone(c, d, t + k * 0.035, f, 0.02, { v, a: 0.002, d: 0.01, r: 0.008 });
+      noise(c, d, 0, 4.2, { v: 0.01, bp: 4800, q: 4 });
+    } },
+    clink: { len: 8, rms: 0.012, tail: 0.6, whole: (c, d) => { // polite cups and plates, sparse
+      const R = rng(5);
+      for (let t = 0.4; t < 7.8; t += 0.9 + R() * 1.6) {
+        const f = 2400 + R() * 1800;
+        tone(c, d, t, f, 0.25, { v: 0.05, a: 0.001, d: 0.06, r: 0.2 }); tone(c, d, t, f * 2.76, 0.12, { v: 0.02, a: 0.001, d: 0.03, r: 0.1 });
+        if (R() < 0.4) tone(c, d, t + 0.09, f * 1.1, 0.15, { v: 0.03, a: 0.001, d: 0.04, r: 0.1 });
+      }
+    } },
+    crowd_polite: { len: 8, rms: 0.025, xf: 1, whole: (c, d) => { const b = band(c, d, 150, 1800); for (let k = 0; k < 5; k++) babble(c, b, k * 0.2, 8.4, { v: 0.2, f: 110 + k * 25, fast: k % 2 === 0 }); } },
+    crowd_low: { len: 8, rms: 0.03, xf: 1, whole: (c, d) => { const b = band(c, d, 120, 1200); for (let k = 0; k < 4; k++) babble(c, b, k * 0.3, 8.4, { v: 0.25, f: 100 + k * 30 }); } },
+    crowd_laugh: { len: 12, rms: 0.035, xf: 1, whole: (c, d) => { // a murmur and the odd burst of laughter
+      const b = band(c, d, 150, 2600);
+      for (let k = 0; k < 4; k++) babble(c, b, k * 0.3, 12.4, { v: 0.16, f: 120 + k * 30 });
+      laughSynth(c, gn(c, b, 0.25), 2.5, 150); laughSynth(c, gn(c, b, 0.18), 8.1, 190);
+    } },
+    crowd_street: { len: 10, rms: 0.05, xf: 1, whole: (c, d) => { // happy, normal volume
+      const b = band(c, d, 150, 3200);
+      for (let k = 0; k < 7; k++) babble(c, b, k * 0.15, 10.4, { v: 0.22, f: 105 + k * 22, fast: k % 3 === 0 });
+      laughSynth(c, gn(c, b, 0.2), 4, 170);
+    } },
+    platform_murmur: { len: 8, rms: 0.03, xf: 1, whole: (c, d) => {
+      const b = band(c, d, 200, 1500);
+      for (let k = 0; k < 4; k++) babble(c, b, k * 0.25, 8.4, { v: 0.18, f: 115 + k * 28 });
+      noise(c, d, 0, 8.4, { v: 0.12, brown: true, lp: 220 });
+    } },
+    street_arvo: { len: 12, rms: 0.035, xf: 1, whole: (c, d) => { // distant hover hum, a bus pulling in, a bird or two
+      const g = gn(c, d, 0.8); lfo(c, g.gain, 1 / 12, 0.3);
+      noise(c, g, 0, 12.4, { v: 0.35, brown: true, lp: 320 });
+      tone(c, d, 3, 58, 5, { type: 'sawtooth', to: 46, gl: 5, v: 0.06, a: 1.6, r: 2, lp: 260 }); noise(c, d, 7.4, 0.5, { v: 0.05, a: 0.05, r: 0.4, hp: 2500 });   // the bus: in, brakes sigh
+      const R = rng(3); for (const t of [1.2, 9.6]) for (let k = 0; k < 3; k++) { const f = 2900 + R() * 1500; tone(c, d, t + k * 0.1, f, 0.05, { to: f * 0.8, gl: 0.05, v: 0.03, a: 0.005, r: 0.02 }); }
+    } },
+    snore: { len: 6, rms: 0.03, tail: 0.6, whole: (c, d) => { // in (a rattle) ... out (a sigh)
+      noise(c, d, 0.2, 1.6, { v: 0.12, a: 0.8, r: 0.5, bp: 520, q: 1 });
+      tone(c, d, 0.5, 62, 1.2, { type: 'sawtooth', v: 0.12, a: 0.4, r: 0.4, lp: 380, vib: [28, 60] });
+      noise(c, d, 2.6, 1.4, { v: 0.08, a: 0.3, r: 0.9, bp: 900, q: 0.8 });
+    } },
+    mangrove: { len: 8, rms: 0.03, xf: 1, whole: (c, d) => { // crab clicks, insects, drips, the mud
+      noise(c, d, 0, 8.4, { v: 0.3, buf: CRACKLE, bp: 2600, q: 1.2 });
+      const g = gn(c, d, 0.5); lfo(c, g.gain, 13, 0.45); noise(c, g, 0, 8.4, { v: 0.06, bp: 6800, q: 7 });
+      noise(c, d, 0, 8.4, { v: 0.2, buf: DRIPS, lp: 1500 }); noise(c, d, 0, 8.4, { v: 0.15, brown: true, lp: 200 });
+    } },
+    fan: { len: 2, rms: 0.02, xf: 1, whole: (c, d) => { // a ceiling fan: the blade whoosh, its motor, one tick a turn
+      const g = gn(c, d, 0.6); lfo(c, g.gain, 2, 0.35);
+      noise(c, g, 0, 2.3, { v: 0.4, brown: true, lp: 700 }); tone(c, d, 0, 48, 2.3, { v: 0.05 }); clockTick(c, d, 0.7, 1400);
+    } },
+    drip: { len: 7, rms: 0.015, tail: 0.4, whole: (c, d) => { for (const [t, f] of [[0.5, 900], [2.2, 1100], [3.1, 820], [5.4, 1000]]) tone(c, d, t, f, 0.06, { to: f * 1.9, gl: 0.05, v: 0.12, a: 0.001, d: 0.03, r: 0.03 }); } },
+    cleaner_swish: { len: 3, rms: 0.02, xf: 1, whole: (c, d) => { const g = gn(c, d, 0.6); lfo(c, g.gain, 3, 0.4); noise(c, g, 0, 3.3, { v: 0.3, bp: 2500, q: 0.7 }); tone(c, d, 0, 180, 3.3, { type: 'triangle', v: 0.03, lp: 600 }); } },
+    shelf_servo: { len: 6, rms: 0.03, tail: 0.5, whole: (c, d) => { for (const t of [0.5, 3.3]) { tone(c, d, t, 300, 1.2, { type: 'sawtooth', to: 520, gl: 1.2, v: 0.06, a: 0.08, r: 0.2, bp: 1200, q: 2 }); noise(c, d, t, 1.2, { v: 0.03, a: 0.08, r: 0.2, bp: 3000, q: 1 }); } } },
+    hangar_charge: { len: 6, rms: 0.03, xf: 1, whole: (c, d) => { // hundreds of tiny charging whines
+      const R = rng(19);
+      for (let k = 0; k < 14; k++) tone(c, d, 0, 2000 + R() * 3000, 6.3, { v: 0.008 + R() * 0.006, a: 0.2, r: 0.01, vib: [0.3 + R() * 0.8, 15 + R() * 20] });
+      noise(c, d, 0, 6.3, { v: 0.1, brown: true, lp: 300 }); tone(c, d, 0, 100, 6.3, { v: 0.03 });
+    } },
+    alarm_soft: { len: 2, rms: 0.04, tail: 0.3, whole: (c, d) => { for (const [t, f] of [[0, 660], [0.5, 880], [1, 660], [1.5, 880]]) tone(c, d, t, f, 0.42, { v: 0.1, a: 0.03, d: 0.2, s: 0.6, r: 0.06 }); } },
+    valley_music_far: { len: dur(4, 112), rms: 0.05, band: [35, 600], tail: 0.5, bars: [4, (c, d, k) => { // the bars on Brunswick St, through walls
+      const st = 60 / 112 / 4, rt = [33, 33, 29, 31][k];
+      for (const s of [0, 4, 8, 12]) kick(c, d, s * st, 0.6);
+      for (const s of [0, 3, 6, 8, 11, 14]) bassN(c, d, s * st, rt + (s === 14 ? 7 : 0), st * 1.6, 0.35, 500);
+      for (const s of [2, 6, 10, 14]) chord(c, d, s * st, [rt + 24, rt + 28, rt + 31], st, { v: 0.02, a: 0.01, r: 0.05, lp: 700 });
+    }] },
+    parade_far: { len: 8, rms: 0.03, xf: 1, whole: (c, d) => { // muffled surf + a glassy hover-car going past, through the open door
+      const g = gn(c, d, 0.6); lfo(c, g.gain, 0.25, 0.4); noise(c, g, 0, 8.4, { v: 0.5, brown: true, lp: 500 });
+      const h = c.createGain(); h.connect(d); h.gain.setValueAtTime(0, 2); h.gain.linearRampToValueAtTime(1, 3.6); h.gain.linearRampToValueAtTime(0, 5.4);
+      tone(c, h, 2, 64, 3.4, { type: 'sawtooth', to: 57, v: 0.12, a: 0.01, r: 0.02, lp: 420 }); tone(c, h, 2, 1900, 3.4, { v: 0.006, vib: [3, 20] });
+    } },
+  };
+  const BAKING_L = {};
+  function ensureLate(name) { // a LATE loop's buffer, baking it now if it isn't yet
+    if (L[name]) return Promise.resolve(L[name]);
+    if (!LATE[name] || !canBake()) return Promise.resolve(null);
+    return BAKING_L[name] || (BAKING_L[name] = bake(LATE[name]).then((b) => (L[name] = b)).catch((e) => { fail(name, e); return null; }));
+  }
 
   // ---------------------------------------------------------- music cues (32 kHz loops; `boot: 1` bakes behind the loader,
   // the rest bake in the background right after, in story order, or the moment music() asks for them)
@@ -1347,7 +1451,12 @@ const { AUDIO, sfx, music } = (() => {
   // The rest of the score bakes in the background (render threads; the main thread only builds the graphs): from init()
   // (the first YES, or autoplay), or 3 s after the bake if that comes first, so it never competes with the loader.
   let warming = false;
-  function startWarm() { if (warming || !baked) return; warming = true; setTimeout(warmCues, 150); }
+  function startWarm() {
+    if (warming || !baked) return;
+    warming = true;
+    setTimeout(() => { const T = performance.now(); Promise.all(Object.keys(LATE).map(ensureLate)).then(() => { stats.ms.late = Math.round(performance.now() - T); }); }, 60);
+    setTimeout(warmCues, 150);
+  }
   function warmCues() {
     let i = 0;
     const next = () => {
@@ -1435,6 +1544,11 @@ const { AUDIO, sfx, music } = (() => {
     busM = gainTo(muffleF[0], 0); busS = gainTo(muffleF[1], 0); busV = gainTo(master, 0);
     const send = (sec, damp) => { const cv = ctx.createConvolver(), g = gainTo(cv, 0); cv.buffer = impulse(ctx.sampleRate, sec, damp, 2); cv.connect(muffleF[1]); busS.connect(g); return g; };
     sendRoom = send(0.6, 0.3); sendWet = send(2.2, 0.8);
+    { // 'lane': a short slapback off two close walls (a delay with a little feedback)
+      const dl = ctx.createDelay(0.5), fb = ctx.createGain(), lp = ctx.createBiquadFilter();
+      dl.delayTime.value = 0.085; fb.gain.value = 0.32; lp.type = 'lowpass'; lp.frequency.value = 3200;
+      sendSlap = gainTo(dl, 0); dl.connect(lp); lp.connect(fb); fb.connect(dl); lp.connect(muffleF[1]); busS.connect(sendSlap);
+    }
     impulse(ctx.sampleRate, 1.4, 0.6); // the live song player's reverb, ready before it's needed
     applyOptions();
     if (typeof on === 'function') on('options', applyOptions);
@@ -1498,8 +1612,13 @@ const { AUDIO, sfx, music } = (() => {
   // A looped bed: a LOOPS entry, or a music cue heard in the room (DIEG, or any cue name: through its speaker).
   function loop(name, o = {}) {
     if (!ctx) return NOOP;
-    let b = L[name], cue = null, spk = null;
-    if (!b) { const dg = DIEG[name]; cue = dg ? dg[0] : CUES[name] ? name : null; spk = dg ? dg[1] : null; if (!cue) { warnOnce('loop', name); return NOOP; } b = M[cue] || null; }
+    const al = LOOP_ALIAS[name];
+    if (al) { o = Object.assign({}, o, { vol: (o.vol ?? 1) * al[1], rate: (o.rate || 1) * al[2], lp: o.lp || al[3] || 0 }); name = al[0]; }
+    let b = L[name], cue = null, spk = null, late = null;
+    if (!b) {
+      if (LATE[name]) late = name;
+      else { const dg = DIEG[name]; cue = dg ? dg[0] : CUES[name] ? name : null; spk = dg ? dg[1] : null; if (!cue) { warnOnce('loop', name); return NOOP; } b = M[cue] || null; }
+    }
     const g = ctx.createGain(), t = ctx.currentTime;
     const det = name === 'alarm' ? 1 + 0.013 * alarms++ : 1; // each layered alarm slightly detuned
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(o.vol ?? 1, t + (o.fade ?? 0.15));
@@ -1511,7 +1630,7 @@ const { AUDIO, sfx, music } = (() => {
       s = ctx.createBufferSource(); s.buffer = bb; s.loop = true; s.playbackRate.value = (o.rate || 1) * det;
       s.connect(spk ? speaker(spk, into) : into); s.start(ctx.currentTime, o.from ?? rnd() * bb.duration);
     };
-    if (b) start(b); else ensureCue(cue).then(start);
+    if (b) start(b); else (late ? ensureLate(late) : ensureCue(cue)).then(start);
     const h = {
       stop(f = 0.3) {
         if (!on) return;
@@ -1536,7 +1655,7 @@ const { AUDIO, sfx, music } = (() => {
   function ambience(a) {
     if (!ctx) return;
     lastAmb = a;
-    const want = {}, inside = room === 'room', loops = a && Array.isArray(a.loops) ? a.loops : [];
+    const want = {}, inside = !!(ROOMS[room] && ROOMS[room][3]), loops = a && Array.isArray(a.loops) ? a.loops : [];
     if (a && typeof a.rain === 'string') { lastKind = a.rain; if (a.loops) rainKind.set(a.loops, a.rain); }
     else if (a && 'room' in a) lastKind = null; // a set's own ambience without a rain kind
     const kind = a && a.rain ? (typeof a.rain === 'string' ? a.rain : (a.loops && rainKind.get(a.loops)) || lastKind) : null;
@@ -1834,12 +1953,12 @@ const { AUDIO, sfx, music } = (() => {
   const AUDIO = {
     init, prerender, applyOptions, ambience, listener, blip, loop, sfx, music,
     duck(on) { ducked = !!on; applyOptions(); if (!on) hissOff(); },
+    // AUDIO.setRoom(name): the acoustics every sound effect plays in (ROOMS: none room small carriage hall atrium wet lane)
     setRoom(r) {
       if (!ctx) return;
-      const t = ctx.currentTime;
+      const t = ctx.currentTime, k = ROOMS[r] || (r && r !== 'none' && warnOnce('room', r), ROOMS.none);
       if (r !== room) { room = r; if (lastAmb) ambience(lastAmb); } // the rain bed follows indoors/outdoors
-      sendRoom.gain.setTargetAtTime(r === 'room' ? 0.25 : 0, t, 0.2);
-      sendWet.gain.setTargetAtTime(r === 'wet' ? 0.35 : 0, t, 0.2);
+      sendRoom.gain.setTargetAtTime(k[0], t, 0.2); sendWet.gain.setTargetAtTime(k[1], t, 0.2); sendSlap.gain.setTargetAtTime(k[2], t, 0.2);
     },
     now: () => (ctx ? ctx.currentTime : 0),            // the audio clock (sfx(name, { when }) schedules on it)
     get ready() { return baked; },
@@ -1867,6 +1986,9 @@ const { AUDIO, sfx, music } = (() => {
       lastAmb = null; hissOff(); ringing(false, { fade: 0.05 }); muffle(null, 0.05); if (vmH) vmH.stop(0.05);
     },
     buffers: { B, L, M, V, S }, stats, // for tests / the F2 overlay
+    loopNames: () => [...Object.keys(LOOPS), ...Object.keys(LOOP_ALIAS), ...Object.keys(LATE)],   // every bed AUDIO.loop / ambience knows (tests)
+    rooms: Object.keys(ROOMS),
+    loopReady: (n) => { const al = LOOP_ALIAS[n], k = al ? al[0] : n; return !!(L[k] || M[(DIEG[k] && DIEG[k][0]) || k]); },
   };
   if (typeof window !== 'undefined') window.TWO_AUDIO = AUDIO; // test hook (headless probes)
   return { AUDIO, sfx, music };

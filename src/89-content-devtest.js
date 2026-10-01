@@ -137,7 +137,21 @@
         c.state.flags.dev_lifted = true;
       } }],
       ['swap', false], ['follow', null],
-      // ---- 7. audio: "two" muffled (first verse), the laugh, the voicemail
+      // ---- 7. audio: every set bed and room (docs/sets ambience), "two" muffled (first verse), the laugh, the voicemail
+      ['do', async (c) => {
+        const A = c.AUDIO;
+        if (!A || !A.loopNames) return;
+        const names = A.loopNames(), hs = names.map((n) => A.loop(n, { vol: 0.02, fade: 0.05 }));
+        for (const r of A.rooms) A.setRoom(r);
+        A.setRoom('room');
+        const t0 = clock.t;
+        await waitUntil(() => names.every(A.loopReady) || clock.t - t0 > 20 || c.flow.skipping);
+        const notReady = names.filter((n) => !A.loopReady(n));
+        if (notReady.length && !c.flow.skipping) console.error('TWO dev: beds not baked: ' + notReady.join(', '));
+        hs.forEach((h) => h.stop(0.05));
+        log('beds ' + names.length + ' rooms ' + A.rooms.length + ' failed ' + A.stats.failed.length);
+        if (A.stats.failed.length) console.error('TWO dev: audio bakes failed: ' + A.stats.failed.join(', '));
+      }],
       ['cutscene', [
         { shot: 'MID', on: 'chase' },
         { do: (c) => { if (sk(c) || !c.AUDIO) return; const h = c.AUDIO.song({ pattern: null, from: 'VERSE', to: 'VERSE', muffled: true }); log('song ' + h.duration.toFixed(1) + ' s'); c.flow.devSong = h; } },
