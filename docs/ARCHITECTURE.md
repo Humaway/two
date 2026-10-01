@@ -297,8 +297,8 @@ the first button after 0.3 s.
 - Sets: `world.liveMax = 3` (the default); a set not on screen for more than two scenes is disposed when a scene
   starts; `world.prebuild(id) → Promise` builds over three frames (in a cutscene's last shot or under a fade);
   `world.prop / anchor / mark(name, setId?)`. `world.envName` = the current set's env preset name. `world.torchAuto` is
-  reset to `true` whenever a set is shown (a set that parks the spot as a lamp sets it `false` again in its
-  `dress` / `update`).
+  reset to `true` whenever a set is shown, even again within a scene (a set that parks the spot as a lamp should
+  re-assert `world.torchAuto = false` in its `update` while the lamp is lit, not only in `dress` / `lamp()`).
 - Colliders are live: a set may push, splice or move boxes in its `colliders` array (or write a box's numbers in place)
   at runtime (pushed bins and racks, doors that open); collisions, drone cones and `lineClear` read them every tick.
   Splice a box out to remove it.
