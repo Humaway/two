@@ -161,7 +161,7 @@ Lower-case, prefixed by scene: `s11_polished`, `s13_wired`, `s25_laugh` … Stor
 Follow Rue's `SETS.reddy` style (`docs/engine/04-world.md`): one Builder of vertex-coloured merged geometry per
 material, painted canvas textures 128–256 px with nearest filtering, `InstancedMesh` for every repeat, colliders,
 named props for anything content animates, `marks` for actor spots, `anchors` for INSERT/close-up lenses, fixed
-gameplay `cams` + `zones` that tile every walkable area, `env` presets, `ambience`, `update(dt, t)` with **no
+gameplay `cams` + `zones` that tile every walkable area, `env` presets, `ambience`, `update(dt, ctx)` (`ctx = { t, player, running, env, props }`) with **no
 allocation**. Every set's header comment documents its layout (metres, axes) and lists marks/anchors/cams/props. Content
 may also use raw coordinates. Look: low-poly PS1, **clean — no vertex snapping, no wobble, no affine warping**.
 Palettes in spec §14. Under 300 draw calls.
