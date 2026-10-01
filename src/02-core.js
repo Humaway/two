@@ -1,12 +1,13 @@
 // ============================================================ CORE
-// Renderer, event bus, fixed-step clock, input (keyboard, mouse, gamepad, touch), saves, F2 perf overlay.
-// The frame loop itself lives in boot() (90-main.js) and calls clock.step() once per fixed tick.
+// Renderer, event bus, fixed-step clock, input (keyboard, mouse, gamepad, touch; YES NO SWAP CHIP BAG RUN PAUSE),
+// saves (versioned, merged over newState()), F2 perf overlay + adaptive pixel ratio.
+// The frame loop itself lives in boot() (99-main.js) and calls clock.step() once per fixed tick.
 
 const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gl'), antialias: true, powerPreference: 'high-performance' });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setClearColor(0x000000, 1);
 renderer.info.autoReset = false; // reset once per frame in the loop so split-screen counts add up
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, matchMedia('(pointer: coarse)').matches ? 1.5 : 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, matchMedia('(pointer: coarse)').matches ? 1.5 : 2)); // perf picks the start level below
 renderer.setSize(innerWidth, innerHeight, false);
 
 // ------------------------------------------------------------ event bus
@@ -48,9 +49,11 @@ function waitUntil(fn) {
 
 // ------------------------------------------------------------ input
 const input = (() => {
-  const A = ['yes', 'no', 'swap', 'inventory', 'run', 'pause', 'up', 'down', 'left', 'right'];
+  // every action that has a key or a pad button (yes no swap chip inventory run pause up down left right)
+  const A = [...new Set([...Object.keys(CONFIG.keys), ...Object.keys(CONFIG.pad)])];
   const DIRS = { up: 1, down: 1, left: 1, right: 1 }, PADA = Object.keys(CONFIG.pad);
   const kb = {}, pad = {}, tch = {}, ms = {}, hit = {}, rel = {}, prev = {}, pr = {}, re = {}, dn = {};
+  const lat = {}; // options.holdToPress: clock.t of the press that "holds" each action (-1 = none)
   const push = (a) => { hit[a] = (hit[a] || 0) + 1; }; // one queued press
   const codeTo = {}; // KeyboardEvent.code -> action
   for (const a in CONFIG.keys) for (const c of CONFIG.keys[a]) codeTo[c] = a;
@@ -69,6 +72,11 @@ const input = (() => {
     held: (a) => dn[a] === true,
     released: (a) => re[a] === true,
     consume(a) { pr[a] = false; },
+    // Hold-to-confirm mechanics (record a sample, hum, coat, strength holds, the Choice) read holding(), never held():
+    // normally it is held(a); with options.holdToPress a press keeps it "held" until unlatch(a) (call it when your
+    // hold completes), a NO press, or CONFIG.latch seconds.
+    holding: (a) => dn[a] === true || (options.holdToPress === true && lat[a] >= 0 && clock.t - lat[a] < CONFIG.latch),
+    unlatch(a) { if (a) lat[a] = -1; else for (const k in lat) lat[k] = -1; },
     setScheme(s) {
       if (I.scheme === s) return;
       I.scheme = s;
@@ -103,7 +111,9 @@ const input = (() => {
         if (hit[a] > 0) hit[a]--; // presses queued within one frame come out on successive ticks
         re[a] = rel[a] === true || (!d && prev[a] === true);
         rel[a] = false; prev[a] = d; dn[a] = d;
+        if (pr[a]) lat[a] = clock.t;
       }
+      if (pr.no) for (const k in lat) if (k !== 'no') lat[k] = -1; // NO cancels a pressed "hold"
       const p = I.pointer;
       p.pressed = pPtr; p.released = rPtr; pPtr = rPtr = false;
       let x = (dn.right ? 1 : 0) - (dn.left ? 1 : 0), y = (dn.up ? 1 : 0) - (dn.down ? 1 : 0);
@@ -139,7 +149,7 @@ const input = (() => {
     if (kb[a] && !d) rel[a] = true;
     kb[a] = d;
   });
-  addEventListener('blur', () => { keysDown.clear(); for (const a of A) kb[a] = ms[a] = tch[a] = false; });
+  addEventListener('blur', () => { keysDown.clear(); for (const a of A) { kb[a] = ms[a] = tch[a] = false; lat[a] = -1; } });
 
   const onTouchUI = (e) => e.target.closest && e.target.closest('#touch'); // touch controls handle themselves, never move the pointer
   addEventListener('pointerdown', (e) => {
@@ -164,7 +174,7 @@ const input = (() => {
   addEventListener('gamepadconnected', () => { pads++; });
   addEventListener('gamepaddisconnected', () => { pads = Math.max(0, pads - 1); });
 
-  // touch buttons
+  // touch buttons (any [data-a] in #touch: YES NO SWAP BAG pause, and CHIP when the head has #t-chip)
   for (const b of touchEl.querySelectorAll('[data-a]')) {
     const a = b.dataset.a;
     b.addEventListener('pointerdown', (e) => { e.preventDefault(); b.setPointerCapture(e.pointerId); tch[a] = true; push(a); b.classList.add('on'); });
@@ -210,18 +220,39 @@ addEventListener('resize', () => {
 }
 
 // ------------------------------------------------------------ saves (localStorage, always in try/catch)
+// localStorage['two.save'] = { v, state, options, profile }. A save from a newer version is ignored; an older one is
+// merged over newState() so fields added since never come back undefined.
+const SAVE_V = 1;
 function saveGame() {
-  try { localStorage.setItem('two.save', JSON.stringify({ state, options, profile })); return true; } catch (e) { return false; }
+  try { localStorage.setItem('two.save', JSON.stringify({ v: SAVE_V, state, options, profile })); return true; } catch (e) { return false; }
+}
+function readSave() {
+  try { const s = JSON.parse(localStorage.getItem('two.save')); return s && typeof s === 'object' && !(s.v > SAVE_V) ? s : null; } catch (e) { return null; }
 }
 function loadGame() {
-  try { const s = JSON.parse(localStorage.getItem('two.save')); return (s && s.state) || null; } catch (e) { return null; }
+  const s = readSave();
+  if (!s || !s.state || typeof s.state !== 'object') return null;
+  const st = Object.assign(newState(), s.state);
+  if (!st.flags || typeof st.flags !== 'object' || Array.isArray(st.flags)) st.flags = {};
+  for (const k of ['inventory', 'samples', 'names', 'bugs']) if (!Array.isArray(st[k])) st[k] = [];
+  if (typeof st.scene !== 'string') st.scene = '1.1';
+  return st;
 }
 function hasSave() { return !!loadGame(); }
+function loadPrefs() { // boot: stored options and profile over the defaults (endingsSeen merged key by key)
+  const s = readSave();
+  if (!s) return;
+  if (s.options && typeof s.options === 'object') Object.assign(options, s.options);
+  if (s.profile && typeof s.profile === 'object') {
+    const seen = s.profile.endingsSeen;
+    Object.assign(profile, s.profile);
+    profile.endingsSeen = { A: !!(seen && seen.A), B: !!(seen && seen.B) };
+  }
+}
 function saveOptions() {
   try {
-    let s = null;
-    try { s = JSON.parse(localStorage.getItem('two.save')); } catch (e) { s = null; }
-    s = s || {}; s.options = options; s.profile = profile;
+    const s = readSave() || {};
+    s.v = SAVE_V; s.options = options; s.profile = profile;
     localStorage.setItem('two.save', JSON.stringify(s));
   } catch (e) { /* storage blocked: options live for this session only */ }
 }
@@ -232,9 +263,10 @@ const perf = (() => {
   const el = document.getElementById('perf'), cv = el.querySelector('canvas'), cx = cv.getContext('2d'), pre = el.querySelector('pre');
   const touch = matchMedia('(pointer: coarse)').matches;
   const top = Math.min(devicePixelRatio || 1, touch ? 1.5 : 2);
-  const levels = [2, 1.5, 1].filter((v) => v <= top);
+  const levels = (touch ? [1.5, 1, 0.75] : [2, 1.5, 1]).filter((v) => v <= top);   // phones may drop below 1 (roof, storms)
   if (!levels.length || levels[0] !== top) levels.unshift(top);
   let i = 0, on = false, n = 0, lvl = 0, winT = 0, winN = 0, good = 0, need = 3;
+  if (touch) { while (lvl < levels.length - 1 && levels[lvl] > 1) lvl++; renderer.setPixelRatio(levels[lvl]); }   // start lower on touch; climb with headroom
   const P = {
     adapt: false,
     toggle() { on = !on; el.classList.toggle('off', !on); },
@@ -261,10 +293,11 @@ const perf = (() => {
       }
       cx.fillStyle = 'rgba(255,255,255,.35)'; cx.fillRect(0, 64 - 16.7 * 64 / 50, 240, 1); cx.fillRect(0, 64 - 33.3 * 64 / 50, 240, 1);
       if (n++ % 15) return;
-      const last = ft[(i - 1 + N) % N], inf = renderer.info.render;
+      const last = ft[(i - 1 + N) % N], inf = renderer.info.render, mem = renderer.info.memory;
       const fl = typeof state !== 'undefined' ? Object.keys(state.flags).filter((k) => state.flags[k]).join(' ') : '';
-      pre.textContent = `${last.toFixed(1)} ms  max(10s) ${max.toFixed(1)} ms  pr ${renderer.getPixelRatio()}\n` +
-        `calls ${inf.calls}  tris ${inf.triangles}\n` +
+      pre.textContent = `${last.toFixed(1)} ms  max(10s) ${max.toFixed(1)} ms  pr ${renderer.getPixelRatio()}${P.adapt ? '' : ' (fixed)'}\n` +
+        `calls ${inf.calls}${inf.calls > 300 ? ' (!)' : ''}  tris ${inf.triangles}\n` +
+        `textures ${mem.textures}  geometries ${mem.geometries}  programs ${renderer.info.programs ? renderer.info.programs.length : 0}\n` +
         `scene ${typeof flow !== 'undefined' ? flow.sceneId : '-'}  step ${typeof flow !== 'undefined' ? flow.stepIndex : '-'}\n` +
         `cam ${typeof cam !== 'undefined' ? cam.name : '-'}\nflags: ${fl}`;
     },

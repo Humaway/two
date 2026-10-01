@@ -23,8 +23,28 @@ every line of dialogue is final and word for word.** This file is the contract b
 - `node tools/check-lines.mjs [--scene 2.3] [--all] [--counts]` checks that every quoted line of section 8–13 appears
   verbatim in some string literal in `src/` (curly quotes/apostrophes and spacing around `^` are normalised; nothing else).
 - Test hooks (spec §16): `?autoplay=1` auto-advances everything and plays every mini-game with its autoplayer;
-  `&scene=2.3` starts there (with that scene's grants); `&stop=2.5` ends after it; `&speed=8`; `&fast=1` runs every
-  cutscene as if skipped; `&ending=A|B` picks the Choice under autoplay. `window.TWO_TEST = { ready, done, scene, step, log }`.
+  `&scene=2.3` starts there (with the grants of every scene before it, **along the target's ending branch**: `A1`/`A2`
+  skip B's grants and vice versa; `C`/`PC` follow `&ending`, else A); `&stop=2.5` ends after it; `&speed=8`; `&fast=1`
+  runs every cutscene as if skipped; `&ending=A|B` is `TEST.ending`: the Choice's autoplayer must answer with it, and
+  after 3.7 the flow goes to `A1` or `B1` by `state.choice` (falling back to `TEST.ending`, then A).
+  `window.TWO_TEST = { ready, done, scene, step, log }`. Logs worth grepping: `scene <id> step <i> <kind>`, `hotspot <id>`,
+  `sample <id>`, `minigame <id> [skipped]`, and the warning `TWO: shader compiled mid-game in <scene> step <n> (<cam>)`
+  (something wasn't warmed at boot: run without `fast=1` too).
+- **Set inspection** (for set builders): `?setview=<setId>&env=<preset>` boots straight into that set (no scene, no UI,
+  no letterbox, no warm-up of anything else, fixed pixel ratio) and exposes `TWO_TEST.views()` →
+  `[{ kind: 'cam' | 'anchor', name }]` for every cam and anchor, `await TWO_TEST.view(kind, name)` (a cam is shown as a
+  `{ shot: 'SET' }` with its fixed/pan/rail base framing, an anchor as an `{ shot: 'INSERT' }`: from → at with its fov;
+  renders two frames, resolves `{ calls, tris, textures, geometries }`), `TWO_TEST.envs()` → preset names,
+  `await TWO_TEST.setEnv(name)`. The tool:
+  `node tools/setshots.mjs --file out/<you>.html --set parade [--env day] [--only name,name] [--dir out/shots-parade]
+  [--w 1280 --h 720]` writes one PNG per view (`cam-<name>.png`, `anchor-<name>.png`), prints a table of
+  calls/tris/textures/geometries per view, flags every view over **300 draw calls**, and exits 1 on any console error.
+  Build with your set file in `--mine` first. Read the PNGs.
+- **Boot warm-up** (`99-main.js`): audio, every `SETS` entry, every `LOOKS` entry (one rig each, its portrait baked;
+  `LOOKS[id].warm = n` pre-builds `n` rigs for a look seen twice at once, and `world.spawn` takes them from the pool),
+  and every drone model, from the first hook that exists: `DRONES.warm(warmObject)` (systems builds its own pool and
+  passes each model to `warmObject(obj3d)`), else `DRONE_MODELS` (`kind → () => Object3D`), else `buildDrone(kind)` for
+  each of `DRONE_KINDS` (default `courtesy guardian popup cleaning noise fun`).
 
 ## 2. File map and ownership
 
