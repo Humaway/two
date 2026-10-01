@@ -1,8 +1,62 @@
-// ============================================================ WORLD (ENGINE-B1)
-// Sets (one THREE.Scene each, the fixed light rig, env lerps, LRU of two live sets), actors (pooled rigs,
-// blob shadows, moves, anims, tics), the player (modern/tank, colliders, follower breadcrumbs), gameplay
-// cameras (zones + fixed/pan/rail/push, overrides), the cutscene camera (frame(), shots, moves),
-// split screen and time-lapse. Update/render paths only write into preallocated temporaries.
+// ============================================================ WORLD (ENGINE-B1, extended for TWO)
+// Sets (one THREE.Scene each, the fixed light rig, env lerps, an LRU of three live sets, staged pre-builds, sets
+// more than two scenes behind disposed), actors (pooled rigs, blob shadows, moves, anims, tics), the player
+// (modern/tank, colliders, a party of followers on one breadcrumb trail), gameplay cameras (zones + fixed/pan/rail/
+// push, chained corridor eases, overrides), the cutscene camera (frame(), shots, moves, roll, shake), split screen
+// (two live halves, each with its own moving shot; open/close slides), time-lapse, and helpers for systems (drones).
+// Update/render paths only write into preallocated temporaries.
+//
+// TWO additions to Rue's world (docs/engine/04-world.md documents the rest; ARCHITECTURE §5):
+// PARTY   player.follower(id | [ids] | null): the followers walk the leader's breadcrumb trail in a loose line (the k-th
+//         active one stops 1.3 + 0.9·k m behind), side-step out of his way, keep 0.6 m apart, never block the player
+//         (doorways stay open), never cut the camera (zones follow player.actor only), and reappear on the trail when
+//         left > 8 m behind off screen. player.followers = the actors (read-only); player.fol = the first.
+//         player.wait(id, on = true): that follower holds its spot (not moved, pushed or teleported) until
+//         player.wait(id, false), player.control(id) or a despawn; then it picks the trail up from where the leader
+//         went after it stopped. player.waiting(id) -> bool. (flow.holdPos(id) does the same by leaving the list.)
+// PLAY    modern controls: camera-relative, the stick direction locked across any cut until released (re-read from
+//         the shot you see, else the gameplay camera it is cutting/easing to); tank: options.controls = 'tank'.
+//         Walk CONFIG.walk 1.7 m/s, run CONFIG.run 3.4 m/s. A set cam with `ease: true | secs` eases (0.25 s,
+//         max 0.5) into the next cam instead of cutting, when that cam has `ease` too (chained corridor cameras).
+// SHOTS   cam.shot(step): kind = step.shot, case-insensitive, spaces = hyphens. Sizes ECU CLOSE MID WIDE TWO(-SHOT)
+//         THREE(-SHOT) TOP(-DOWN); INSERT, JARVIS(-CAM), POV, CAM, SET; LOW / HIGH / OTS / LOCKED and the moves PUSH
+//         PULL(-OUT) TRACK PAN TILT CRANE ORBIT WHIP CRASH(-ZOOM) frame at `size` (default MID). Every option:
+//         on, at, from, to, size, dist, height, angle (high|low|side|top), side (left|right|back|ots:<id>), offset,
+//         facing, locked, fov, move, dur, ease (linear|in|out), amount, track, card (flow), plus TWO's:
+//           half: 'right'          the shot goes to the right half of a split (else the main / left camera)
+//           roll: deg              camera roll (180 = upside down: "Luka's view, upside down")
+//           shake: amp | {amp,dur} a decaying jolt at the cut (also cam.shake(amp = 0.04, dur = 0.45)); none by default
+//           OTS over: id | from: id | on: [subject, shoulder] (else the nearest other actor); shoulder: 'left'|'right'
+//                                  (default right: the shoulder sits frame-left); angle: 'low' (from below) | 'high'
+//           LOCKED                 a framed shot that never reaims and never moves (= locked: true, move ignored)
+//           CRASH zoom: fov        the FOV it punches in to (default half the framing's); fov = the starting lens
+//           ORBIT spin: true       keeps turning past dur at its final speed (ease: 'in' = Chase's idea engine)
+//           CRANE dir: 'down'      from 2 m above down to the framing (from/to = metres of rise override)
+//           JARVIS                 `on` optional: default = everyone just beyond the screen, within 5 m
+//           WHIP                   0.2 s pan with overshoot, lens breath and a 1.6 px canvas blur (world.whipBlur)
+//         The framing helper (frame(subjects, size, opts) -> shared {pos, look, fov, up}) never leaves the lens inside
+//         or behind a wall: rays lens->aim (surfaces facing the lens) and aim->lens (surfaces facing the subject: a
+//         lens inside a wall or above a ceiling), and for groups lens->every face; it swings round (35/70/90 deg),
+//         else comes in front of the nearest surface (both faces of a thick wall), else takes the zone's set camera.
+//         Crane rises, orbit radii and pull-outs of framed shots are shrunk at the cut to what the room allows.
+//         Flag a mesh userData.noOcclude to let framing see through it. Narrow screens: compositions are fitted at
+//         16:9 and render() widens the vertical FOV to keep that horizontal field (world.fitNarrow, caps 140/100 deg).
+// SPLIT   world.split({ left: { set, shot | cam, env }, right: { set, shot | cam, env }, ratio = 0.5 }, { slide, dur })
+//         two live sets, both halves with their own moving shots (cam.shot({..., half: 'right'}) recuts the right);
+//         right.set is required to open, optional once split. slide: the right half slides in (0.6 s).
+//         world.split(null, { slide, keep: 'left' | 'right', dur }) closes it: the kept half widens to fill the frame
+//         (keep: 'right' makes the right set current, its actors and shot included, with its ambience). Not awaited by
+//         the flow; resolves when the slide ends. cam.project(v, 'right') projects through the right half.
+// SETS    at most world.liveMax = 3 live; a set not on screen for more than two scenes is disposed when a scene starts.
+//         world.prebuild(id) -> Promise: builds over three frames (build, upload + ray grids, prime) during a
+//         cutscene's last shot or a fade; load/show/spawn({set}) finish it at once; instant while skipping.
+//         world.prop/anchor/mark(name, setId?) look in a named live set (reddy26 and reddy40 share names).
+// SYSTEMS world.actorsIn(x, z, r, out) -> out (visible actors of the current set within r; pass your own array),
+//         world.colliders (the current set's boxes, live), world.collide(actorOrId, x, z) -> a.pos (pushed out of
+//         colliders and other actors), world.resolve(x, z, r = 0.3, out) -> out (x, floor, z) out of colliders,
+//         world.lineClear(x0, z0, x1, z1, pad = 0) -> bool (no collider box on the segment), world.floorAt(x, z),
+//         actor.moveTo(where, { collide: true }) (AI: slides along walls, ends where it stalls for 0.6 s).
+//         Debug: world.liveIds, world.pendingIds, world.splitId, cam.cameraR.
 
 const { world, cam, frame, player } = (() => {
   const TAU = Math.PI * 2, DEG = Math.PI / 180;
@@ -22,6 +76,10 @@ const { world, cam, frame, player } = (() => {
   // ------------------------------------------------------------ sets
   const live = new Map();          // setId -> entry, oldest first (LRU)
   let cur = null, splitE = null;
+  // scenes seen (state.scene changes): each live entry remembers the last scene it was on screen in (e.used), and a
+  // set more than two scenes behind is disposed when a new scene starts (spec §16: at most three sets alive)
+  let sceneN = 0, sceneSeen;
+  const pending = new Map(), pbQ = [];   // setId -> a staged prebuild { id, e, stage, res, p } (one stage per rendered frame), queued in order
 
   const envNew = () => ({ bg: new THREE.Color(0x808080), fog: new THREE.Color(0x808080), dens: 0.01, hs: new THREE.Color(), hg: new THREE.Color(0x444444),
     hi: 1, dc: new THREE.Color(), di: 1, dp: V().set(5, 10, 5), sc: new THREE.Color(), si: 0, sp: false, rain: 0 });
@@ -168,7 +226,7 @@ const { world, cam, frame, player } = (() => {
     const e = { id, def, scene, group, props, anchors, hemi, dir, spot, rain, puff: makePuff(),
       firstCam: Object.keys(def.cams || {})[0] || '',
       env: envNew(), from: envNew(), to: envNew(), envName: '', envT: 0, envDur: 0, envRes: null,
-      ctx: { t: 0, player: null, running: false, env: '', props } };
+      ctx: { t: 0, player: null, running: false, env: '', props }, used: sceneN };
     scene.add(e.puff);
     envApply(e, e.env);
     if (names.length) envSet(e, names[0]);
@@ -185,6 +243,7 @@ const { world, cam, frame, player } = (() => {
     }
   }
   function upload(e) { renderer.compile(e.scene, camera); e.scene.traverse(texUp); }
+  function accel(e) { e.group.updateMatrixWorld(true); e.group.traverse((o) => { if (o.isMesh && !o.isSkinnedMesh && !o.isInstancedMesh && o.geometry) rayGrid(o); }); }
   const PR = [];
   function prime(e) {   // draw all of it (hidden props too) into one pixel: every buffer uploads inside the build's faded frame, not when it first shows
     e.scene.traverse((o) => { PR.push(o, o.visible, o.frustumCulled); o.visible = true; o.frustumCulled = false; });
@@ -198,17 +257,45 @@ const { world, cam, frame, player } = (() => {
   function retire(e) {
     for (let i = A.length - 1; i >= 0; i--) if (A[i].set === e) despawnA(A[i]);
     settle(e, 'envRes');
+    if (RM.jarvis === e) RM.jarvis = null;
+    if (RR.jarvis === e) RR.jarvis = null;
     disposeGeo(e);                  // materials and textures stay cached (ART) so programs survive
     live.delete(e.id);
   }
   function trim() {
     for (const e of live.values()) { if (live.size <= W.liveMax) break; if (e !== cur && e !== splitE) retire(e); }
   }
-  function ensure(id) {             // live entry for id (builds it), marked most recently used
+  function ageOut() {               // a new scene: dispose sets last on screen more than two scenes ago
+    for (const e of live.values()) if (e !== cur && e !== splitE && sceneN - e.used > 2) retire(e);
+  }
+  function ensure(id) {             // live entry for id (builds it, or finishes its staged prebuild), marked most recently used
     let e = live.get(id);
-    if (e) { live.delete(id); live.set(id, e); return e; }
-    e = build(id); live.set(id, e); upload(e); prime(e); trim();
+    if (e) { live.delete(id); live.set(id, e); e.used = Math.max(e.used, sceneN); return e; }
+    const pb = pending.get(id);
+    if (pb) {
+      pending.delete(id); pbQ.splice(pbQ.indexOf(pb), 1);
+      e = pb.e || build(id);
+      if (pb.stage < 2) { upload(e); accel(e); }
+      if (pb.stage < 3) prime(e);
+    } else { e = build(id); upload(e); accel(e); prime(e); }
+    e.used = sceneN; live.set(id, e); trim();
+    if (pb) settle(pb, 'res');
     return e;
+  }
+  // world.prebuild(id): build a set ahead of time without a single long hitch: def.build() in one frame, the
+  // compile/texture upload in the next, the 1-px prime in the next (one stage per rendered frame, from render()).
+  // Call it during a cutscene's last shot or under a fade; world.load/show/spawn({set}) finish it at once if needed.
+  function pbStep() {                  // one stage per frame
+    const pb = pbQ[0];
+    if (pb.stage === 0) { pb.e = build(pb.id); pb.stage = 1; }
+    else if (pb.stage === 1) { upload(pb.e); accel(pb.e); pb.stage = 2; }
+    else {
+      prime(pb.e); pending.delete(pb.id); pbQ.shift();
+      pb.e.used = sceneN + 1;            // it's for the next scene: not aged out before it is shown
+      live.set(pb.id, pb.e); trim();
+      testLog('world: prebuilt ' + pb.id);
+      settle(pb, 'res');
+    }
   }
   function showE(e) {
     cur = e; W.set = e.def; W.setId = e.id;
@@ -255,9 +342,10 @@ const { world, cam, frame, player } = (() => {
     const a = {
       id, look, rig, root: rig.root, pos: rig.root.position, rotY: 0, anim: 'idle', expr: 'neutral', carry: null, follow: null,
       mood: null, habit: null, glanceAt: 'chase', walkAnim: look === 'rue19' ? 'swagger' : 'walk', set: null, shadow,
+      waiting: false, fw: 0,          // TWO: a follower told to wait holds its spot; fw = the next trail crumb it walks to
       p: { dur: 0, speed: 1, walk: false, still: false, yaw: 0.9, h: undefined },
       poseName: '', poseT: 0, ret: 'idle', back: false, playT: -1, playRes: null, glanceT: 2 + Math.random() * 4,
-      mv: { on: false, to: V(), speed: 0, face: NaN, loco: 'walk', y0: 0, d0: 1, res: null },
+      mv: { on: false, to: V(), speed: 0, face: NaN, loco: 'walk', y0: 0, d0: 1, res: null, collide: false, stuck: 0 },
       fc: { on: false, a0: 0, a1: 0, t: 0, dur: 0.3, res: null },
       held: null, heldBig: false, prev: V(), prevRot: 0, keep: V(),
     };
@@ -270,7 +358,7 @@ const { world, cam, frame, player } = (() => {
       const r = resolveWhere(where, a.pos, a.set);
       if (!isNaN(r)) a.rotY = r;
       a.prev.copy(a.pos); a.prevRot = a.rotY; a.root.rotation.y = a.rotY;
-      if (P.fol === a || P.actor === a) crumbN = 0;
+      if (P.actor === a) trailReset(); else if (FOL.indexOf(a) >= 0) a.fw = crumbW;   // a placed follower picks up the trail from here
     };
     a.moveTo = (where, o = {}) => {
       const m = a.mv;
@@ -287,6 +375,7 @@ const { world, cam, frame, player } = (() => {
       m.speed = o.speed || (a.heldBig ? CONFIG.carry : run ? CONFIG.run : CONFIG.walk);
       m.loco = a.heldBig ? 'carry' : run ? 'run' : a.walkAnim;
       m.y0 = a.pos.y; m.d0 = Math.max(0.001, Math.hypot(m.to.x - a.pos.x, m.to.z - a.pos.z));
+      m.collide = !!o.collide; m.stuck = 0;   // TWO: { collide: true } = pushed out of colliders/actors (AI), ends where it stalls
       if (skipping() || m.d0 < 0.02) {
         a.pos.set(m.to.x, floorAt(a.set, m.to.x, m.to.z, m.to.y), m.to.z);
         if (!isNaN(m.face)) a.rotY = m.face;
@@ -376,6 +465,16 @@ const { world, cam, frame, player } = (() => {
         if (LOCO[a.anim]) setAnim(a, 'idle');
         const res = m.res; m.res = null;
         if (!isNaN(m.face)) { startFace(a, m.face, 0.3); if (a.fc.on) a.fc.res = res; else if (res) res(); } else if (res) res();   // already facing: resolve now
+      } else if (m.collide && e) {     // AI move: slide along walls; a move that stops making progress ends where it is
+        const x0 = a.pos.x, z0 = a.pos.z;
+        collide(a, x0 + dx / d * step, z0 + dz / d * step, e, true);
+        a.rotY += angTo(a.rotY, Math.atan2(dx, dz)) * Math.min(1, 10 * dt);
+        if (Math.hypot(a.pos.x - x0, a.pos.z - z0) < step * 0.25) m.stuck += dt; else m.stuck = 0;
+        if (m.stuck > 0.6) {
+          m.on = false; a.p.walk = false;
+          if (LOCO[a.anim]) setAnim(a, 'idle');
+          settle(m, 'res');
+        }
       } else {
         a.pos.x += dx / d * step; a.pos.z += dz / d * step;
         a.pos.y = floorAt(e, a.pos.x, a.pos.z, m.y0 + (m.to.y - m.y0) * (1 - (d - step) / m.d0));
@@ -405,8 +504,9 @@ const { world, cam, frame, player } = (() => {
     if (a.root.parent) a.root.parent.remove(a.root);
     actors.delete(a.id); A.splice(A.indexOf(a), 1);
     if (P.actor === a) P.actor = null;
-    if (P.fol === a) P.fol = null;
-    a.set = null; a.root.visible = true; a.rig.seated = false;
+    const fi = FOL.indexOf(a);
+    if (fi >= 0) { FOL.splice(fi, 1); a.follow = null; }
+    a.set = null; a.root.visible = true; a.rig.seated = false; a.waiting = false;
     (pool[a.look] ||= []).push(a.rig);
   }
   function spawn(id, where, o = {}) {
@@ -428,29 +528,57 @@ const { world, cam, frame, player } = (() => {
     return a;
   }
 
-  // ------------------------------------------------------------ player + follower
+  // ------------------------------------------------------------ player + followers
+  // TWO: a party. player.follower(id | [ids] | null) makes the non-active playables trail the leader in a loose line
+  // on one breadcrumb trail (follower k stops 1.3 + 0.9·k m behind him, k counting only those not waiting). They step
+  // aside when he walks into them, keep a little space from each other, never block the player (he walks through
+  // them, so doorways stay open) and never cut the camera (zones only ever follow player.actor).
+  // player.wait(id, true) parks one where it stands (a two-person switch, "Hold this": it stays put, isn't teleported
+  // and isn't pushed aside); player.wait(id, false) and it picks the trail up again from where the leader went next.
   const CRN = 128, CR = new Float32Array(CRN * 3);
-  let crumbH = 0, crumbN = 0;       // ring buffer of the leader's positions (head = next write)
-  const crumb = (i, out) => out.set(CR[i * 3], CR[i * 3 + 1], CR[i * 3 + 2]);   // i = ring index
+  let crumbW = 0;                   // crumbs written since the last reset (absolute: ring index = i % CRN)
+  const FOL = [];                   // the follower actors, in order
+  const crumbAt = (i) => (i % CRN) * 3;
+  function trailReset() { crumbW = 0; for (let i = 0; i < FOL.length; i++) FOL[i].fw = 0; }
   const P = {
-    actor: null, enabled: false, speedMul: 1, running: false, fol: null, frozenT: 0, ctrlYaw: 0,
+    actor: null, enabled: false, speedMul: 1, running: false, frozenT: 0, ctrlYaw: 0,
+    followers: FOL,                 // read-only: the follower actors, in order
+    get fol() { return FOL[0] || null; },   // Rue's single follower (the first)
     control(id) {
       const a = id ? actors.get(id) : null;
       if (P.actor && P.actor !== a && LOCO[P.actor.anim]) setAnim(P.actor, 'idle');
       P.actor = a || null;
-      if (a) { if (P.fol === a) P.fol = null; a.follow = null; P.speedMul = a.heldBig ? 0.6 : 1; }
-      crumbN = 0;
+      if (a) {
+        const i = FOL.indexOf(a);
+        if (i >= 0) FOL.splice(i, 1);
+        a.follow = null; a.waiting = false; P.speedMul = a.heldBig ? 0.6 : 1;
+      }
+      for (let i = 0; i < FOL.length; i++) FOL[i].follow = a ? a.id : null;
+      trailReset();
     },
-    follower(id) {
-      if (P.fol) P.fol.follow = null;
-      P.fol = id ? actors.get(id) || null : null;
-      if (P.fol) P.fol.follow = P.actor ? P.actor.id : null;
-      crumbN = 0;
+    follower(ids) {                 // id | [ids] | null (an id that isn't spawned, or is the player, is ignored)
+      for (let i = 0; i < FOL.length; i++) FOL[i].follow = null;
+      FOL.length = 0;
+      const add = (id) => {
+        const f = typeof id === 'string' ? actors.get(id) : null;
+        if (f && f !== P.actor && FOL.indexOf(f) < 0) { FOL.push(f); f.follow = P.actor ? P.actor.id : null; }
+      };
+      if (Array.isArray(ids)) for (let i = 0; i < ids.length; i++) add(ids[i]); else add(ids);
+      trailReset();
     },
+    wait(id, on = true) {           // hold position (on) / follow again (off). Persists until cleared, control() or despawn
+      const a = typeof id === 'string' ? actors.get(id) : id;
+      if (!a || a === P.actor) return;
+      a.waiting = !!on;
+      if (on) { if (LOCO[a.anim] && !a.mv.on) setAnim(a, 'idle'); a.fw = crumbW; }   // later: the trail laid after this
+    },
+    waiting: (id) => { const a = actors.get(id); return !!(a && a.waiting); },
     frozen(sec) { P.frozenT = Math.max(P.frozenT, sec || 0); },
   };
-  function collide(a, x, z, e) {
-    const r = CONFIG.radius, cl = e.def.colliders;
+  // push a circle (r = CONFIG.radius) at x, z out of the set's colliders (and, withActors, of the other visible
+  // actors; the player is never blocked by his own followers); writes a.pos with the floor height
+  function collide(a, x, z, e, withActors) {
+    const r = CONFIG.radius, cl = e.def.colliders, me = a === P.actor;
     for (let it = 0; it < 2; it++) {
       if (cl) for (let i = 0; i < cl.length; i++) {
         const b = cl[i], cx = clamp(x, b[0], b[2]), cz = clamp(z, b[1], b[3]), dx = x - cx, dz = z - cz, d2 = dx * dx + dz * dz;
@@ -461,21 +589,24 @@ const { world, cam, frame, player } = (() => {
           if (m === l) x = b[0] - r; else if (m === rr) x = b[2] + r; else if (m === t) z = b[1] - r; else z = b[3] + r;
         }
       }
-      for (let i = 0; i < A.length; i++) {
+      if (withActors) for (let i = 0; i < A.length; i++) {
         const o = A[i];
-        if (o === a || o.set !== e || !o.root.visible || o === P.fol) continue;
+        if (o === a || o.set !== e || !o.root.visible || (me && FOL.indexOf(o) >= 0)) continue;
         const dx = x - o.pos.x, dz = z - o.pos.z, d2 = dx * dx + dz * dz, rr = r * 2;
         if (d2 < rr * rr && d2 > 1e-8) { const d = Math.sqrt(d2), k = (rr - d) / d; x += dx * k; z += dz * k; }
       }
     }
     a.pos.x = x; a.pos.z = z; a.pos.y = floorAt(e, x, z, a.pos.y);
   }
+  // the direction modern controls map the stick through: the camera you see (a shot), else where the gameplay
+  // camera is (or is easing to), so a release or a corridor ease never bends the lock
+  const viewYaw = () => (RM.on ? Math.atan2(cs.look.x - cs.pos.x, cs.look.z - cs.pos.z) : Math.atan2(gs.look.x - gs.pos.x, gs.look.z - gs.pos.z));
   function playerTick(dt) {
     const a = P.actor;
     P.running = false;
     if (!a || !P.enabled || a.set !== cur || a.mv.on) {
       if (a && LOCO[a.anim] && !a.mv.on) setAnim(a, 'idle');
-      P.ctrlYaw = Math.atan2(cs.look.x - cs.pos.x, cs.look.z - cs.pos.z);
+      P.ctrlYaw = viewYaw();
       return;
     }
     const mx = input.move.x, my = input.move.y, tank = options.controls === 'tank';
@@ -485,8 +616,9 @@ const { world, cam, frame, player } = (() => {
       if (Math.abs(mx) > 0.2) { a.rotY -= mx * CONFIG.turn * dt; turning = true; }
       if (Math.abs(my) > 0.2) { const s = my > 0 ? 1 : -0.6; dx = Math.sin(a.rotY) * s; dz = Math.cos(a.rotY) * s; mag = Math.abs(my); }
     } else {
+      // modern: camera-relative, and the direction stays locked across a camera cut until the stick/keys are released
       mag = Math.min(1, Math.hypot(mx, my));
-      if (mag < 0.15) { P.ctrlYaw = Math.atan2(cs.look.x - cs.pos.x, cs.look.z - cs.pos.z); mag = 0; }   // re-read the camera only while released
+      if (mag < 0.15) { P.ctrlYaw = viewYaw(); mag = 0; }   // re-read the camera only while released
       else {
         const fx = Math.sin(P.ctrlYaw), fz = Math.cos(P.ctrlYaw), n = Math.hypot(mx, my);
         dx = (fx * my - fz * mx) / n; dz = (fz * my + fx * mx) / n;
@@ -495,8 +627,8 @@ const { world, cam, frame, player } = (() => {
     }
     if (mag > 0) {
       const run = input.run && !a.heldBig && !(tank && my < 0);
-      const sp = (run ? CONFIG.run : CONFIG.walk) * P.speedMul * mag;
-      collide(a, a.pos.x + dx * sp * dt, a.pos.z + dz * sp * dt, cur);
+      const sp = (run ? CONFIG.run : CONFIG.walk) * P.speedMul * mag;   // walk 1.7 m/s, run 3.4 m/s (analog)
+      collide(a, a.pos.x + dx * sp * dt, a.pos.z + dz * sp * dt, cur, true);
       const loco = a.heldBig ? 'carry' : run ? 'run' : a.walkAnim;
       setAnim(a, loco); a.p.walk = false;
       a.p.speed = sp / (run ? CONFIG.run : a.heldBig ? CONFIG.carry : CONFIG.walk);
@@ -509,39 +641,90 @@ const { world, cam, frame, player } = (() => {
     return t5.z > 1 || Math.abs(t5.x) > 1.05 || Math.abs(t5.y) > 1.05;
   }
   function followerTick(dt) {
-    const f = P.fol, L = P.actor;
-    if (!f || !L || f === L || f.set !== L.set || f.mv.on || !P.enabled) return;
+    const L = P.actor;
+    if (!L || !FOL.length || !P.enabled) return;
     const e = L.set;
     // breadcrumbs: every 0.35 m the leader moves
-    const last = (crumbH - 1 + CRN) % CRN;
-    if (!crumbN || Math.hypot(L.pos.x - CR[last * 3], L.pos.z - CR[last * 3 + 2]) > 0.35) {
-      CR[crumbH * 3] = L.pos.x; CR[crumbH * 3 + 1] = L.pos.y; CR[crumbH * 3 + 2] = L.pos.z;
-      crumbH = (crumbH + 1) % CRN; crumbN = Math.min(CRN, crumbN + 1);
+    const last = crumbAt(crumbW + CRN - 1);
+    if (!crumbW || Math.hypot(L.pos.x - CR[last], L.pos.z - CR[last + 2]) > 0.35) {
+      const j = crumbAt(crumbW); CR[j] = L.pos.x; CR[j + 1] = L.pos.y; CR[j + 2] = L.pos.z; crumbW++;
     }
-    const dL = Math.hypot(f.pos.x - L.pos.x, f.pos.z - L.pos.z);
-    if (dL > 8 && offCamera(f)) {   // fell behind off-screen: reappear on the trail ~1.5 m behind
-      let i = (crumbH - 1 + CRN) % CRN, n = crumbN, acc = 0;
-      crumb(i, t4).copy(L.pos);
-      while (n-- > 1 && acc < 1.5) { const j = (i - 1 + CRN) % CRN; acc += Math.hypot(CR[j * 3] - CR[i * 3], CR[j * 3 + 2] - CR[i * 3 + 2]); i = j; }
-      if (crumbN > 1) crumb(i, t4); else t4.set(L.pos.x - Math.sin(L.rotY) * 1.4, L.pos.y, L.pos.z - Math.cos(L.rotY) * 1.4);
-      f.pos.copy(t4); f.prev.copy(t4); f.rotY = f.prevRot = L.rotY; crumbN = 0;
+    let rank = 0;
+    for (let k = 0; k < FOL.length; k++) {
+      const f = FOL[k];
+      if (f === L || f.set !== e || f.mv.on) continue;
+      if (f.waiting) { if (LOCO[f.anim]) setAnim(f, 'idle'); continue; }
+      folStep(f, L, e, rank++, dt);
+    }
+    for (let k = 0; k < FOL.length; k++) folSpace(FOL[k], k, L, e, dt);
+  }
+  function folStep(f, L, e, rank, dt) {
+    const dL = Math.hypot(f.pos.x - L.pos.x, f.pos.z - L.pos.z), gap = 1.3 + 0.9 * rank;
+    if (f.fw > crumbW) f.fw = crumbW;                     // the trail was reset since
+    if (f.fw < crumbW - CRN) f.fw = crumbW - CRN;          // overwritten: from the oldest crumb left
+    if (dL > 8 + gap && offCamera(f)) {   // fell behind off-screen: reappear on the trail about gap + 0.2 m behind him
+      const lo = Math.max(0, crumbW - CRN);
+      let i = crumbW - 1, acc = 0;
+      if (i >= lo) {
+        while (i > lo && acc < gap + 0.2) { const p = crumbAt(i), q = crumbAt(i - 1); acc += Math.hypot(CR[p] - CR[q], CR[p + 2] - CR[q + 2]); i--; }
+        const j = crumbAt(i); t4.set(CR[j], CR[j + 1], CR[j + 2]);
+      }
+      if (crumbW - lo < 2) t4.set(L.pos.x - Math.sin(L.rotY) * (gap + 0.1), L.pos.y, L.pos.z - Math.cos(L.rotY) * (gap + 0.1));
+      f.pos.copy(t4); f.prev.copy(t4); f.rotY = f.prevRot = L.rotY; f.fw = Math.max(i, 0) + 1;
       return;
     }
-    if (dL < 1.3) { if (LOCO[f.anim]) setAnim(f, 'idle'); return; }
-    let tail = (crumbH - crumbN + CRN) % CRN;
-    while (crumbN > 1 && Math.hypot(f.pos.x - CR[tail * 3], f.pos.z - CR[tail * 3 + 2]) < 0.3) { tail = (tail + 1) % CRN; crumbN--; }
-    const tx = crumbN ? CR[tail * 3] : L.pos.x, tz = crumbN ? CR[tail * 3 + 2] : L.pos.z;
+    if (dL < gap) { if (LOCO[f.anim]) setAnim(f, 'idle'); return; }
+    // a shortcut: when the trail doubles back past it (he turned round), join it at the newest crumb within reach
+    for (let i = crumbW - 1; i > f.fw + 1; i--) {
+      const j = crumbAt(i), dx = CR[j] - f.pos.x, dz = CR[j + 2] - f.pos.z;
+      if (dx * dx + dz * dz < 0.36) { if (lineClearIn(e, f.pos.x, f.pos.z, CR[j], CR[j + 2])) f.fw = i; break; }
+    }
+    while (f.fw < crumbW - 1) {          // skip the crumbs it's already standing on
+      const j = crumbAt(f.fw);
+      if (Math.hypot(f.pos.x - CR[j], f.pos.z - CR[j + 2]) >= 0.3) break;
+      f.fw++;
+    }
+    const has = f.fw < crumbW, j = crumbAt(f.fw);
+    const tx = has ? CR[j] : L.pos.x, tz = has ? CR[j + 2] : L.pos.z;
     const dx = tx - f.pos.x, dz = tz - f.pos.z, d = Math.hypot(dx, dz);
     if (d < 1e-4) return;
-    const run = dL > 3.5 || P.running, sp = run ? CONFIG.run : CONFIG.walk, step = Math.min(d, sp * dt);
+    const run = dL > 3.5 + 0.9 * rank || P.running, sp = run ? CONFIG.run : CONFIG.walk, step = Math.min(d, sp * dt);
     f.pos.x += dx / d * step; f.pos.z += dz / d * step; f.pos.y = floorAt(e, f.pos.x, f.pos.z, f.pos.y);
     f.rotY += angTo(f.rotY, Math.atan2(dx, dz)) * Math.min(1, 10 * dt);
     setAnim(f, run ? 'run' : f.walkAnim); f.p.speed = 1; f.p.walk = false;
   }
+  // personal space: a follower sidesteps out of the leader's path (sideways, never ahead of him) and keeps 0.6 m from
+  // the other followers; colliders still hold (it never steps into a wall). A waiting one stands its ground.
+  function folSpace(f, k, L, e, dt) {
+    if (f === L || f.set !== e || f.mv.on || f.waiting) return;
+    let px = 0, pz = 0;
+    const dx = f.pos.x - L.pos.x, dz = f.pos.z - L.pos.z, d = Math.hypot(dx, dz);
+    if (d < 0.75) {
+      const w = (0.75 - d) / 0.75, hx = Math.sin(L.rotY), hz = Math.cos(L.rotY), t = dx * hx + dz * hz;
+      let lx = dx - t * hx, lz = dz - t * hz, ll = Math.hypot(lx, lz);
+      if (ll < 1e-3) { lx = hz; lz = -hx; ll = 1; }      // dead ahead: to his right
+      px += lx / ll * w; pz += lz / ll * w;
+      if (t < 0 && d > 1e-3) { px += dx / d * w * 0.5; pz += dz / d * w * 0.5; }   // behind him: give a little ground too
+    }
+    for (let m = 0; m < FOL.length; m++) {
+      const o = FOL[m];
+      if (m === k || o.set !== e) continue;
+      const ox = f.pos.x - o.pos.x, oz = f.pos.z - o.pos.z, od = Math.hypot(ox, oz);
+      if (od < 0.6) { const w = (0.6 - od) / 0.6 * (o.waiting ? 1 : 0.5); if (od > 1e-3) { px += ox / od * w; pz += oz / od * w; } else { px += m < k ? 0.3 : -0.3; } }
+    }
+    const pl = Math.hypot(px, pz);
+    if (pl < 1e-3) return;
+    const sp = Math.min(1, pl) * 1.6, step = sp * dt;
+    collide(f, f.pos.x + px / pl * step, f.pos.z + pz / pl * step, e, false);
+    if (sp > 0.35 && (f.anim === 'idle' || f.anim === 'turn')) {   // a real step aside (folStep sets idle again next tick)
+      setAnim(f, f.walkAnim); f.p.speed = sp / CONFIG.walk; f.p.walk = false;
+      f.rotY += angTo(f.rotY, Math.atan2(px, pz)) * Math.min(1, 6 * dt);
+    }
+  }
   // Torchlight: while world.torch is on it rides in the player's right hand, aimed ahead at the ground
   function torchTick(e) {
     const s = e.spot, a = P.actor;
-    if (s.intensity <= 0 || shotAt.jarvis || !W.torchAuto || !a || a.set !== e) return;
+    if (s.intensity <= 0 || RM.jarvis === e || RR.jarvis === e || !W.torchAuto || !a || a.set !== e) return;
     const fx = Math.sin(a.rotY), fz = Math.cos(a.rotY);
     s.position.set(a.pos.x + fx * 0.3 - fz * 0.18, a.pos.y + 1.25, a.pos.z + fz * 0.3 + fx * 0.18);
     s.target.position.set(a.pos.x + fx * 7, a.pos.y + 0.1, a.pos.z + fz * 7);
@@ -554,7 +737,11 @@ const { world, cam, frame, player } = (() => {
   let nS = 0, nAct = 0, feetY = 0, eyeY = 0, logMiss = false;
   const DY = { ECU: -0.03, CLOSE: -0.08, MID: -0.35, TWO: -0.3, THREE: -0.35, TOP: 0 };
   const C25 = Math.cos(25 * DEG), S25 = Math.sin(25 * DEG), C20 = Math.cos(20 * DEG), S20 = Math.sin(20 * DEG);
-  const FO = { angle: null, side: null, dist: null, height: 0, fov: null, offset: 0, facing: false };  // frame options, filled per call
+  const FO = { angle: null, side: null, dist: null, height: 0, fov: null, offset: 0, facing: false, shoulder: null };  // frame options, filled per call
+  // the camera a framing reasons from (where "the current camera" is for side angles and fallbacks) and the share of
+  // the screen width its half has (0 = auto); the right half of a split sets both while it frames
+  let FC = null, FFR = 0;
+  const fcam = () => FC || cs;
 
   function addSubj(x, e) {
     if (nS >= 8 || x == null) return;
@@ -602,29 +789,104 @@ const { world, cam, frame, player } = (() => {
     if (o.height) P.y += o.height;
     return P;
   }
-  // first set surface FACING the lens between lens P and point L (what would actually render in front of the
-  // subject; back faces, hidden props and see-through glass don't count). 0 = clear. Shot cuts only, never per frame.
+  // first set surface FACING the ray's origin between P and L (raycasts only report front faces of one-sided
+  // materials: what would actually render; hidden props, see-through glass, skinned meshes and anything flagged
+  // userData.noOcclude (tinsel, leaves) don't count). 0 = clear. Shot cuts only, never per frame.
   const RC = new THREE.Raycaster(), HITS = [], tl = V(), tr = V();
   let hitD = 0;
+  // Big static meshes (a set's merged geometry: tens of thousands of triangles, which three.js would test one by
+  // one) get a coarse XZ grid of their triangles when the set is built (rayGrid), so a framing ray walks only the
+  // cells under it (2D DDA). Built under black with the set, never during a shot.
+  const GR = { ray: new THREE.Ray(), o: V(), d: V(), a: V(), b: V(), c: V(), p: V(), q: 0 };
+  let rayMin = 0;
+  function rayGrid(mesh) {
+    const g = mesh.geometry, pos = g.attributes.position, idx = g.index, n = (idx ? idx.count : pos.count) / 3 | 0;
+    if (n < 1500 || g.userData.rayGrid) return;
+    g.computeBoundingBox();
+    const bb = g.boundingBox, sx = bb.max.x - bb.min.x, sz = bb.max.z - bb.min.z;
+    const cs = Math.max(1, Math.sqrt(Math.max(1, sx * sz) / 2048)), nx = Math.max(1, Math.ceil(sx / cs)), nz = Math.max(1, Math.ceil(sz / cs));
+    const vi = (t, k) => (idx ? idx.getX(t * 3 + k) : t * 3 + k);
+    const range = (t, out) => {   // the triangle's cell range [cx0, cz0, cx1, cz1]
+      let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+      for (let k = 0; k < 3; k++) { const v = vi(t, k), x = pos.getX(v), z = pos.getZ(v); if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+      out[0] = clamp(Math.floor((x0 - bb.min.x) / cs), 0, nx - 1); out[1] = clamp(Math.floor((z0 - bb.min.z) / cs), 0, nz - 1);
+      out[2] = clamp(Math.floor((x1 - bb.min.x) / cs), 0, nx - 1); out[3] = clamp(Math.floor((z1 - bb.min.z) / cs), 0, nz - 1);
+    };
+    const cnt = new Int32Array(nx * nz + 1), r = [0, 0, 0, 0];
+    for (let t = 0; t < n; t++) { range(t, r); for (let z = r[1]; z <= r[3]; z++) for (let x = r[0]; x <= r[2]; x++) cnt[z * nx + x + 1]++; }
+    for (let i = 1; i <= nx * nz; i++) cnt[i] += cnt[i - 1];
+    const tri = new Int32Array(cnt[nx * nz]), fill = cnt.slice(0, nx * nz);
+    for (let t = 0; t < n; t++) { range(t, r); for (let z = r[1]; z <= r[3]; z++) for (let x = r[0]; x <= r[2]; x++) tri[fill[z * nx + x]++] = t; }
+    g.userData.rayGrid = { x0: bb.min.x, z0: bb.min.z, cs, nx, nz, start: cnt, tri, stamp: new Int32Array(n), n };
+  }
+  function gridCast(mesh) {          // RC's ray against a gridded mesh -> nearest hit distance in [RC.near, RC.far] or 0
+    const G = mesh.geometry.userData.rayGrid, pos = mesh.geometry.attributes.position, idx = mesh.geometry.index;
+    const m = mesh.material, side = m.side, cull = side !== THREE.DoubleSide;
+    // the world ray in the mesh's space (affine: the parameter t stays the world distance)
+    const inv = mesh.userData.rayInv || (mesh.userData.rayInv = new THREE.Matrix4());
+    inv.copy(mesh.matrixWorld).invert();
+    const o = GR.o.copy(RC.ray.origin).applyMatrix4(inv), d = GR.d.copy(RC.ray.origin).add(RC.ray.direction).applyMatrix4(inv).sub(o);
+    GR.ray.origin.copy(o); GR.ray.direction.copy(d);
+    const dd = d.lengthSq();
+    let t0 = RC.near, t1 = RC.far;
+    const xa = G.x0, xb = G.x0 + G.nx * G.cs, za = G.z0, zb = G.z0 + G.nz * G.cs;   // clip to the grid in XZ
+    if (Math.abs(d.x) < 1e-12) { if (o.x < xa || o.x > xb) return 0; } else { let ta = (xa - o.x) / d.x, tb = (xb - o.x) / d.x; if (ta > tb) { const t = ta; ta = tb; tb = t; } t0 = Math.max(t0, ta); t1 = Math.min(t1, tb); }
+    if (Math.abs(d.z) < 1e-12) { if (o.z < za || o.z > zb) return 0; } else { let ta = (za - o.z) / d.z, tb = (zb - o.z) / d.z; if (ta > tb) { const t = ta; ta = tb; tb = t; } t0 = Math.max(t0, ta); t1 = Math.min(t1, tb); }
+    if (t0 > t1) return 0;
+    const cs = G.cs, sx = d.x > 0 ? 1 : d.x < 0 ? -1 : 0, sz = d.z > 0 ? 1 : d.z < 0 ? -1 : 0;
+    let cx = clamp(Math.floor((o.x + d.x * t0 - xa) / cs), 0, G.nx - 1), cz = clamp(Math.floor((o.z + d.z * t0 - za) / cs), 0, G.nz - 1);
+    let tmx = sx ? (xa + (cx + (sx > 0 ? 1 : 0)) * cs - o.x) / d.x : Infinity, tmz = sz ? (za + (cz + (sz > 0 ? 1 : 0)) * cs - o.z) / d.z : Infinity;
+    const tdx = sx ? cs / Math.abs(d.x) : Infinity, tdz = sz ? cs / Math.abs(d.z) : Infinity;
+    const q = ++GR.q, st = G.stamp;
+    let best = Infinity;
+    for (let guard = 0; guard < 4096; guard++) {
+      const c = cz * G.nx + cx;
+      for (let k = G.start[c], ke = G.start[c + 1]; k < ke; k++) {
+        const t = G.tri[k];
+        if (st[t] === q) continue;
+        st[t] = q;
+        const i0 = idx ? idx.getX(t * 3) : t * 3, i1 = idx ? idx.getX(t * 3 + 1) : t * 3 + 1, i2 = idx ? idx.getX(t * 3 + 2) : t * 3 + 2;
+        GR.a.fromBufferAttribute(pos, i0); GR.b.fromBufferAttribute(pos, i1); GR.c.fromBufferAttribute(pos, i2);
+        const hit = side === THREE.BackSide ? GR.ray.intersectTriangle(GR.c, GR.b, GR.a, true, GR.p) : GR.ray.intersectTriangle(GR.a, GR.b, GR.c, cull, GR.p);
+        if (!hit) continue;
+        const tt = GR.p.sub(o).dot(d) / dd;
+        if (tt >= RC.near && tt <= RC.far && tt < best) best = tt;
+      }
+      const tn = Math.min(tmx, tmz);
+      if (best <= tn || tn > t1) break;   // every nearer hit would have been in the cells walked so far
+      if (tmx < tmz) { cx += sx; tmx += tdx; if (cx < 0 || cx >= G.nx) break; } else { cz += sz; tmz += tdz; if (cz < 0 || cz >= G.nz) break; }
+    }
+    if (GR.q > 2e9) { GR.q = 0; }
+    return best < Infinity ? best : 0;
+  }
   function rayWalk(o) {
-    if (!o.visible) return;
-    if (o.isMesh && !o.isSkinnedMesh) { const m = o.material; if (!(m && m.transparent && m.opacity < 0.6)) o.raycast(RC, HITS); }
+    if (!o.visible || o.userData.noOcclude) return;
+    if (o.isMesh && !o.isSkinnedMesh) {
+      const m = o.material;
+      if (!(m && m.transparent && m.opacity < 0.6)) {
+        if (o.geometry.userData.rayGrid && !o.isInstancedMesh && !Array.isArray(m)) { const t = gridCast(o); if (t > 0 && (!rayMin || t < rayMin)) rayMin = t; }
+        else o.raycast(RC, HITS);
+      }
+    }
     const ch = o.children;
     for (let i = 0; i < ch.length; i++) rayWalk(ch[i]);
   }
-  function occluded(P, L, e) {
+  function occluded(P, L, e, near = 0.02, endPad = 0.3) {
     tr.subVectors(L, P);
     const len = tr.length();
     if (len < 0.35) return 0;
-    RC.set(P, tr.divideScalar(len)); RC.near = 0.02; RC.far = len - 0.3;
-    HITS.length = 0; rayWalk(e.group);
-    let m = 0;
+    RC.set(P, tr.divideScalar(len)); RC.near = near; RC.far = len - endPad;
+    HITS.length = 0; rayMin = 0; rayWalk(e.group);
+    let m = rayMin;
     for (let i = 0; i < HITS.length; i++) if (!m || HITS[i].distance < m) m = HITS[i].distance;
     HITS.length = 0;
     return m;
   }
-  // is the lens low inside a collider (counter, desk: colliders have no height, so only below ~1.1 m), behind a surface facing it, or is someone who isn't in the shot
-  // standing between the lens and the subjects? (hitD = distance to the occluding surface, when that's the reason)
+  // Is the lens unusable? (a) low inside a collider (counter, desk: colliders have no height, so only below ~1.1 m),
+  // (b) someone who isn't in the shot stands between lens and subjects, (c) a surface facing the lens hides the
+  // subject (the lens is behind a wall), or (d) a surface facing the SUBJECT lies between them: the lens is inside a
+  // wall, above a ceiling or behind a one-sided backdrop, where the back faces vanish and the frame shows the void.
+  // hitD = the distance from the lens to the surface it must come in front of, when that's the reason.
   function blocked(L, d, D, o, size, e) {
     hitD = 0;
     lensAt(tl, L, d, D, o, size);
@@ -640,13 +902,29 @@ const { world, cam, frame, player } = (() => {
       if (t > 0.25 && t < D + 0.3 && Math.abs(ax * d.z - az * d.x) < 0.45) return true;
     }
     hitD = occluded(tl, L, e);
-    return hitD > 0;
+    if (hitD > 0) return true;
+    if (nS > 1) for (let i = 0; i < nS && i < 4; i++) {   // a group: every face must be clear too, not just the middle
+      hitD = occluded(tl, SP[i], e, 0.02, 0.12);
+      if (hitD > 0) return true;
+    }
+    const back = occluded(L, tl, e, 0.08, -0.05);   // from the subject out to (just past) the lens
+    if (back > 0) { hitD = Math.max(0.01, tl.distanceTo(L) - back); return true; }
+    return false;
+  }
+  // how far from L toward P (and up to 0.2 m past P) a lens can go before it meets a surface, whichever way the
+  // surface faces (a thick wall has two faces; a ceiling just above the lens counts). len + 0.2 = clear.
+  function clearTo(L, P, e) {
+    const len = L.distanceTo(P), f = occluded(P, L, e, 0.02, 0.05), b = occluded(L, P, e, 0.08, -0.2);
+    let c = len + 0.2;
+    if (f > 0) c = Math.min(c, len - f);
+    if (b > 0) c = Math.min(c, b);
+    return c;
   }
   const TURNS = [0, 0.6, -0.6, 1.2, -1.2, 1.57, -1.57];
   const GP = { set: null, pos: V() }, GST = { base: V(), pushT: 0 };   // a stand-in 'player' at a group, for set cameras
   function distFor(d, L, size, dist, fv, fit) {
     if (!fit) return dist ?? CONFIG.dist[size] ?? (size === 'TOP' ? 1.5 : CONFIG.dist.MID);
-    const tanH = Math.tan(fv * DEG / 2) * aspectNow(), mg = size === 'WIDE' ? 1 : 0.6;   // fit everyone with a margin
+    const tanH = Math.tan(fv * DEG / 2) * fitAspect(), mg = size === 'WIDE' ? 1 : 0.6;   // fit everyone with a margin
     let D = size === 'WIDE' ? CONFIG.dist.WIDE : 1.5;
     for (let i = 0; i < nS; i++) {
       const x = SP[i].x - L.x, z = SP[i].z - L.z;
@@ -654,12 +932,26 @@ const { world, cam, frame, player } = (() => {
     }
     return D;
   }
-  const aspectNow = () => { renderer.getSize(size2); return (splitE ? 0.5 : 1) * size2.x / Math.max(1, size2.y); };
+  // The aspect compositions are fitted at: never narrower than 16:9 (times this half's share of the width). On a
+  // narrower screen render() widens the lens so the same horizontal field shows: the composition survives phones
+  // (inside the 2.35:1 letterbox the frame is then identical) and a wide screen just sees more.
+  const REF = 16 / 9;
+  const fitAspect = () => {
+    renderer.getSize(size2);
+    const fr = FFR || (splitE ? SPL.ratio : 1), a = size2.x / Math.max(1, size2.y);
+    return fr * (W.fitNarrow ? Math.max(a, REF) : a);
+  };
+  function fitFov(fov, aspect, ref, cap) {   // vertical FOV that shows (at least) the horizontal field `fov` has at aspect `ref`
+    if (!W.fitNarrow || !(aspect > 0) || aspect >= ref) return fov;
+    const f = 2 * Math.atan(Math.tan(fov * DEG / 2) * ref / aspect) / DEG;
+    return f > cap ? Math.max(fov, cap) : f;
+  }
 
   function frameInto(out, on, size, o, e) {
     size = size || 'MID';
     const L = out.look, Pp = out.pos;
-    if (!aimInto(L, on, size, e)) { Pp.copy(cs.pos); L.copy(cs.look); out.fov = cs.fov; return false; }
+    const fc = fcam();
+    if (!aimInto(L, on, size, e)) { Pp.copy(fc.pos); L.copy(fc.look); out.fov = fc.fov; return false; }
     const f = t1.set(0, 0, 0);
     for (let i = 0; i < nS; i++) f.add(SF[i]);
     if (nS > 1 && !o.facing) {           // groups: look across the line between them
@@ -673,18 +965,24 @@ const { world, cam, frame, player } = (() => {
         f.copy(t3);
       }
     }
-    if (f.lengthSq() < 0.01) f.set(cs.pos.x - L.x, 0, cs.pos.z - L.z);
+    if (f.lengthSq() < 0.01) f.set(fc.pos.x - L.x, 0, fc.pos.z - L.z);
     if (f.lengthSq() < 1e-6) f.set(0, 0, 1);
     f.normalize();
     const side = o.side || '';
-    if (side.startsWith('ots:')) {       // over that actor's (right) shoulder, looking at the subject
+    if (side.startsWith('ots:')) {       // over that actor's shoulder (right by default: it sits frame-left), looking at the subject
       const oa = actors.get(side.slice(4));
-      if (oa) {
+      if (oa && oa.set === e) {
         oa.eyePos(t3);
         t2.set(t3.x - L.x, 0, t3.z - L.z).normalize();
-        Pp.set(t3.x + t2.x * 0.95 + t2.z * 0.38, t3.y + 0.06 + (o.height || 0), t3.z + t2.z * 0.95 - t2.x * 0.38);
-        L.lerp(t3, 0.12);                  // subject toward the right third, the shoulder on the left
+        const sh = o.shoulder === 'left' ? -0.38 : 0.38, back = o.dist ?? 0.95;
+        Pp.set(t3.x + t2.x * back + t2.z * sh, t3.y + 0.06 + (o.height || 0), t3.z + t2.z * back - t2.x * sh);
+        if (o.angle === 'low') Pp.y = Math.max(oa.pos.y + 0.5, Pp.y - 0.55);       // OTS · from below
+        else if (o.angle === 'high') Pp.y += 0.45;
+        const hit = occluded(t3, Pp, e, 0.05, -0.05);   // a wall behind the shoulder: come in front of it (at least 25 cm behind him)
+        if (hit > 0) { const len = t3.distanceTo(Pp), k = Math.max(0.25 / len, (hit - 0.12) / len); Pp.sub(t3).multiplyScalar(Math.min(1, k)).add(t3); }
+        L.lerp(t3, 0.12);                  // subject toward the far third, the shoulder in the near one
         out.fov = o.fov ?? CONFIG.fov;
+        out.up.set(-t2.x, 0, -t2.z);
         return true;
       }
     }
@@ -692,7 +990,7 @@ const { world, cam, frame, player } = (() => {
     if (side === 'back') d.copy(f).negate();
     else if (side === 'left') d.set(f.z, 0, -f.x);
     else if (side === 'right') d.set(-f.z, 0, f.x);
-    else if (o.angle === 'side') { d.set(f.z, 0, -f.x); if (d.x * (cs.pos.x - L.x) + d.z * (cs.pos.z - L.z) < 0) d.negate(); }   // profile on the camera's side
+    else if (o.angle === 'side') { d.set(f.z, 0, -f.x); if (d.x * (fc.pos.x - L.x) + d.z * (fc.pos.z - L.z) < 0) d.negate(); }   // profile on the camera's side
     else d.copy(f);
     const fv = o.fov ?? (size === 'ECU' ? CONFIG.ecuFov : CONFIG.fov), fit = o.dist == null && (size === 'TWO' || size === 'THREE' || (size === 'WIDE' && nS > 1));
     const top = o.angle === 'top' || size === 'TOP';
@@ -704,10 +1002,18 @@ const { world, cam, frame, player } = (() => {
       for (let k = 1; k <= nT; k++) {
         if (k === nT) {                   // nowhere clean: keep the intended angle but come in front of whatever is in the way,
           d.copy(t4); D = distFor(d, L, size, o.dist, fv, fit);   // or (a WIDE, or a group that can't) take the set's own camera for where they stand
-          if (blocked(L, d, D, o, size, e) && hitD > 0) { const len = tl.distanceTo(L); pull = (len - hitD - 0.15) / len; }
-          const zc = nS > 1 && (size === 'WIDE' || pull < 0.3) && zoneCam(e, L);
+          let inWall = false;
+          if (blocked(L, d, D, o, size, e) && hitD > 0) {   // come in front of the nearest surface on the line (both faces of a thick wall)
+            const len = tl.distanceTo(L), cl = clearTo(L, tl, e);
+            pull = Math.min(cl - 0.15, len) / len;
+            if (pull * len < 0.3) inWall = true;   // the surface is right at the subject: no lens fits in front of it
+            pull = Math.max(pull, 0.3 / len);
+          }
+          // nowhere for a real lens: a group (a WIDE, or squeezed under 30%), a single WIDE squeezed under half, or a
+          // subject up against the wall takes the set's own camera for where they stand
+          const zc = (inWall || (size === 'WIDE' && pull < 0.5) || (nS > 1 && pull < 0.3)) && zoneCam(e, L);
           if (zc && e.def.cams[zc]) { GP.set = e; GP.pos.set(L.x, L.y - 1.2, L.z); setCamInto(out, e, zc, GP, 0, true, GST); out.up.set(-d.x, 0, -d.z); return true; }
-          pull = clamp(pull, 0.25, 1);
+          pull = clamp(pull, 0.05, 1);
           break;
         }
         const c = Math.cos(TURNS[k]), sn = Math.sin(TURNS[k]);
@@ -730,7 +1036,7 @@ const { world, cam, frame, player } = (() => {
   }
   function fillFO(o) {
     FO.angle = o.angle || null; FO.side = o.side || null; FO.dist = o.dist ?? null; FO.height = o.height || 0;
-    FO.fov = o.fov ?? null; FO.offset = o.offset || 0; FO.facing = !!o.facing;
+    FO.fov = o.fov ?? null; FO.offset = o.offset || 0; FO.facing = !!o.facing; FO.shoulder = o.shoulder || null;
     return FO;
   }
   function frameFn(subjects, size = 'MID', opts = {}) {
@@ -740,13 +1046,14 @@ const { world, cam, frame, player } = (() => {
 
   // ------------------------------------------------------------ camera state
   const cs = { pos: V(), look: V(), fov: 40 }, cp = { pos: V(), look: V(), fov: 40 }, gs = { pos: V(), look: V(), fov: 45 };
+  const csR = { pos: V(), look: V(), fov: 40 }, cpR = { pos: V(), look: V(), fov: 40 };   // the right half of a split
   let snap = true, locked = false;
   const copyCam = (o, s) => { o.pos.copy(s.pos); o.look.copy(s.look); o.fov = s.fov; };
   const dirInto = (out, p, yaw, pitch, len) => out.set(p.x + Math.sin(yaw) * Math.cos(pitch) * len, p.y + Math.sin(pitch) * len, p.z + Math.cos(yaw) * Math.cos(pitch) * len);
   const yawOf = (p, l) => Math.atan2(l.x - p.x, l.z - p.z), pitchOf = (p, l) => Math.atan2(l.y - p.y, Math.hypot(l.x - p.x, l.z - p.z));
 
   // gameplay: set cams + zones, or an override
-  const G = { name: '', mode: null, opts: null, st: { base: V(), pushT: 0 } };
+  const G = { name: '', mode: null, opts: null, st: { base: V(), pushT: 0 }, ease: 0 };
   const zoneCam = (e, pa) => {         // pa = an actor or a point
     const zs = e.def.zones, p = pa && (pa.pos || pa);
     if (!p || !zs) return '';
@@ -809,6 +1116,11 @@ const { world, cam, frame, player } = (() => {
     else name = zoneCam(e, pa) || G.name || e.firstCam;
     if (!name) name = '(overview)';
     const cut = name !== G.name;
+    G.ease = 0;
+    if (cut && G.name && e.def.cams) {   // chained corridor cameras (both flagged { ease: true | secs }): a short ease, not a cut
+      const a = e.def.cams[G.name], b = e.def.cams[name];
+      if (a && b && a.ease && b.ease) G.ease = Math.min(0.5, b.ease === true ? 0.25 : +b.ease || 0.25);
+    }
     G.name = name;
     if (name === 'follow') followInto(gs, pa, G.opts, dt, cut);
     else if (name === 'fixed') {
@@ -820,17 +1132,28 @@ const { world, cam, frame, player } = (() => {
     return cut;
   }
 
-  // cutscene shots
+
+  // ------------------------------------------------------------ cutscene shots: two rigs
+  // RM is the main camera (the left half under a split), RR the right half's. Each has its own shot state, its own
+  // live camera (cs/csR, interpolated from cp/cpR) and its own borrowed JARVIS spot, so both halves move.
   const shotState = () => ({ kind: '', move: '', subj: null, size: 'MID', reaim: false, t: 0, dur: 0, ease: smooth,
     pos: V(), look: V(), fov: 40, pos0: V(), look0: V(), fov0: 40, up: V().set(0, 0, -1), off: V(), aim: V(), lat: V(), start: { pos: V(), look: V(), fov: 40 }, end: { pos: V(), look: V(), fov: 40 },
-    a0: 0, a1: 0, amount: 1, y0: 0, p0: 0, y1: 0, p1: 0, len: 1, len1: 1, fo: { ...FO }, trackSide: 'left', setcam: '', st: { base: V(), pushT: 0 } });
+    a0: 0, a1: 0, amount: 1, y0: 0, p0: 0, y1: 0, p1: 0, len: 1, len1: 1, fo: { ...FO }, trackSide: 'left', setcam: '', st: { base: V(), pushT: 0 },
+    roll: 0, spin: false, spinW: 0 });
   const S = shotState(), SR = shotState();
-  const shotAt = { on: false, near: 0.05, jarvis: null, spot: { c: new THREE.Color(), i: 0, a: 0 } };   // jarvis = the entry whose spot we borrowed
-  const ALIAS = { 'TWO-SHOT': 'TWO', 'THREE-SHOT': 'THREE', 'TOP-DOWN': 'TOP', 'JARVIS-CAM': 'JARVIS', LOW: 'MID', HIGH: 'MID', OTS: 'MID' };
+  const newRig = (s, c, p) => ({ s, cs: c, cp: p, on: false, near: 0.05, snap: true, jarvis: null, name: '', spot: { c: new THREE.Color(), i: 0, a: 0, p: V(), t: V() } });
+  const RM = newRig(S, cs, cp), RR = newRig(SR, csR, cpR);
+  const rigSet = (rg) => (rg === RM ? cur : splitE);
+  // shot names: case-insensitive, spaces/underscores = hyphens ('crash zoom', 'PULL OUT', 'top-down', 'Jarvis cam')
+  const NAMES = { 'TWO-SHOT': 'TWO', 'THREE-SHOT': 'THREE', 'TOP-DOWN': 'TOP', 'JARVIS-CAM': 'JARVIS', 'CRASH-ZOOM': 'CRASH', 'PULL-OUT': 'PULL',
+    'PUSH-IN': 'PUSH', 'CLOSE-UP': 'CLOSE', 'EXTREME-CLOSE-UP': 'ECU', MEDIUM: 'MID', 'OVER-THE-SHOULDER': 'OTS', 'WHIP-PAN': 'WHIP' };
+  const shotName = (x) => { const r = String(x || 'MID').toUpperCase().replace(/[\s_]+/g, '-'); return NAMES[r] || r; };
   const MOVES = { PUSH: 'push', PULL: 'pull', TRACK: 'track', PAN: 'pan', TILT: 'tilt', CRANE: 'crane', ORBIT: 'orbit', WHIP: 'whip', CRASH: 'crash' };
+  const MOVE_OK = { push: 1, pull: 1, track: 1, pan: 1, tilt: 1, crane: 1, orbit: 1, whip: 1, crash: 1, glide: 1 };
+  const SIZED = { LOW: 1, HIGH: 1, OTS: 1, LOCKED: 1 };   // shot names that frame at `size` (default MID), like the moves
   const SIZES = { ECU: 1, CLOSE: 1, MID: 1, WIDE: 1, TWO: 1, THREE: 1, TOP: 1 };
 
-  // base framing for any shot kind into o (a shotState) — used by cam.shot and the right half of a split
+  // base framing for any shot kind into o (a shotState), in set e
   function baseInto(o, step, e) {
     logMiss = true;
     const ok = baseKind(o, step, e);
@@ -841,14 +1164,43 @@ const { world, cam, frame, player } = (() => {
     }
     return ok;
   }
+  function nearestOther(id, e) {          // the visible actor nearest `id` (within 6 m), for an OTS that names no shoulder
+    const a = actors.get(id);
+    if (!a) return null;
+    let best = null, bd = 36;
+    for (let i = 0; i < A.length; i++) {
+      const o = A[i];
+      if (o === a || o.set !== e || !o.root.visible) continue;
+      const d = (o.pos.x - a.pos.x) ** 2 + (o.pos.z - a.pos.z) ** 2;
+      if (d < bd) { bd = d; best = o.id; }
+    }
+    return best;
+  }
+  function facesFront(an, lens) {          // JARVIS-CAM default faces: those beyond the screen (from the lens) within 5 m of it
+    let m = 0;
+    t2.subVectors(an.at, lens);
+    for (let i = 0; i < nS; i++) {
+      t1.subVectors(SP[i], an.at);
+      if (t1.dot(t2) <= 0 || t1.lengthSq() > 25) continue;
+      if (m !== i) { SP[m].copy(SP[i]); SF[m].copy(SF[i]); SA[m] = SA[i]; }
+      m++;
+    }
+    nS = m;
+  }
   function baseKind(o, step, e) {
-    let k = String(step.shot || 'MID').toUpperCase();
+    let k = shotName(step.shot);
     const raw = k;
-    if (MOVES[k]) k = String(step.size || 'MID').toUpperCase();
-    k = ALIAS[k] || k;
+    if (MOVES[k] || SIZED[k]) { k = shotName(step.size || 'MID'); if (MOVES[k] || SIZED[k]) k = 'MID'; }
     o.kind = k; o.subj = null; o.reaim = false; o.lat.set(0, 0, 0); o.up.set(0, 0, -1);
     Object.assign(o.fo, fillFO(step));
     if (raw === 'LOW' || raw === 'HIGH') o.fo.angle = raw.toLowerCase();
+    let on = step.on;
+    if (raw === 'OTS' && !String(o.fo.side || '').startsWith('ots:')) {   // over `over`'s (or `from`'s) shoulder, looking at `on`
+      let over = step.over || (typeof step.from === 'string' ? step.from : null);
+      if (!over && Array.isArray(on) && on.length === 2 && typeof on[0] === 'string') { over = on[1]; on = on[0]; }
+      if (!over && typeof on === 'string') over = nearestOther(on, e);
+      if (over) o.fo.side = 'ots:' + over;
+    }
     if (k === 'SET') { setCamInto(o, e, step.cam, P.actor, 0, true, o.st); o.setcam = step.cam; copyTo0(o); return true; }
     if (k === 'CAM') {
       o.pos0.fromArray(step.pos); o.look0.fromArray(step.look); o.fov0 = step.fov ?? CONFIG.fov;
@@ -856,183 +1208,249 @@ const { world, cam, frame, player } = (() => {
       return true;
     }
     if (k === 'INSERT' || k === 'JARVIS') {
-      const id = step.at ?? step.on, an = e.anchors[id];
-      if (k === 'INSERT' && !an && actors.get(id)) {   // an actor's hands/chest
+      const id = step.at ?? on, an = typeof id === 'string' ? e.anchors[id] : null;
+      if (k === 'INSERT' && !an && typeof id === 'string' && actors.get(id)) {   // an actor's hands/chest
         frameInto(F, id, 'CLOSE', fillFO({ angle: 'high', dist: step.dist ?? 0.8, fov: step.fov ?? 35 }), e);
         o.pos0.copy(F.pos); o.pos0.y -= 0.3; o.look0.copy(F.look); o.look0.y -= 0.35; o.fov0 = F.fov;
         return true;
       }
-      if (!an && Array.isArray(id)) { o.look0.fromArray(id); o.pos0.fromArray(step.from || [id[0], id[1] + 0.3, id[2] + 0.6]); o.fov0 = step.fov ?? 35; return true; }
-      if (!an) { testLog('cam: no anchor ' + id); return false; }
-      o.look0.copy(an.at);
-      if (an.from) o.pos0.copy(an.from); else o.pos0.set(an.at.x, an.at.y + 0.35, an.at.z + 0.6);
-      o.fov0 = step.fov ?? an.fov ?? (k === 'INSERT' ? 35 : CONFIG.fov);
-      if (k === 'INSERT' && step.angle === 'top') {
-        if (an.from) o.up.set(an.from.x - an.at.x, 0, an.from.z - an.at.z).normalize();
-        o.pos0.set(an.at.x, an.at.y + (step.dist ?? 0.7), an.at.z);
+      if (!an && Array.isArray(id)) { o.look0.fromArray(id); o.pos0.fromArray(step.from || [id[0], id[1] + 0.3, id[2] + 0.6]); o.fov0 = step.fov ?? 35; }
+      else if (!an) { testLog('cam: no anchor ' + id); return false; }
+      else {
+        o.look0.copy(an.at);
+        if (an.from) o.pos0.copy(an.from); else o.pos0.set(an.at.x, an.at.y + 0.35, an.at.z + 0.6);
+        o.fov0 = step.fov ?? an.fov ?? (k === 'INSERT' ? 35 : CONFIG.fov);
+        if (k === 'INSERT' && step.angle === 'top') {
+          if (an.from) o.up.set(an.from.x - an.at.x, 0, an.from.z - an.at.z).normalize();
+          o.pos0.set(an.at.x, an.at.y + (step.dist ?? 0.7), an.at.z);
+        }
       }
-      if (k === 'JARVIS' && step.on && gather(step.on, e)) {   // look out at the faces, lens wide enough for all of them
-        t3.set(0, 0, 0); for (let i = 0; i < nS; i++) t3.add(SP[i]); t3.divideScalar(nS); t3.y -= 0.05;
-        o.look0.copy(t3);
-        t2.subVectors(t3, o.pos0).normalize();
-        let ang = 0;
-        for (let i = 0; i < nS; i++) ang = Math.max(ang, t2.angleTo(t1.subVectors(SP[i], o.pos0)));
-        const vf = 2 * Math.atan(Math.tan(ang + 0.14) / aspectNow()) / DEG;
-        o.fov0 = clamp(Math.max(o.fov0, vf), 20, 70);
+      if (k === 'JARVIS') {                // look out at the faces (default: everyone just beyond the screen), lens wide enough for all
+        if (step.on != null && step.at != null) gather(step.on, e);
+        else { gather(null, e); if (an) facesFront(an, o.pos0); }
+        if (nS) {
+          t3.set(0, 0, 0); for (let i = 0; i < nS; i++) t3.add(SP[i]); t3.divideScalar(nS); t3.y -= 0.05;
+          o.look0.copy(t3);
+          t2.subVectors(t3, o.pos0).normalize();
+          let ang = 0;
+          for (let i = 0; i < nS; i++) ang = Math.max(ang, t2.angleTo(t1.subVectors(SP[i], o.pos0)));
+          const vf = 2 * Math.atan(Math.tan(ang + 0.14) / fitAspect()) / DEG;
+          o.fov0 = clamp(Math.max(o.fov0, vf), 20, 70);
+        }
       }
       return true;
     }
     if (k === 'POV') {
-      const a = actors.get(step.from);
+      const a = typeof step.from === 'string' ? actors.get(step.from) : null;
       if (a) { a.eyePos(o.pos0); o.pos0.x += Math.sin(a.rotY) * 0.06; o.pos0.z += Math.cos(a.rotY) * 0.06; }
-      else if (e.anchors[step.from]) o.pos0.copy(e.anchors[step.from].from || e.anchors[step.from].at);
+      else if (typeof step.from === 'string' && e.anchors[step.from]) o.pos0.copy(e.anchors[step.from].from || e.anchors[step.from].at);
       else pointOf(step.from, o.pos0, e);
-      if (!pointOf(step.at ?? step.on, o.look0, e) && a) o.look0.set(o.pos0.x + Math.sin(a.rotY) * 5, o.pos0.y, o.pos0.z + Math.cos(a.rotY) * 5);
+      if (!pointOf(step.at ?? on, o.look0, e) && a) o.look0.set(o.pos0.x + Math.sin(a.rotY) * 5, o.pos0.y, o.pos0.z + Math.cos(a.rotY) * 5);
       o.fov0 = step.fov ?? 45;
       return true;
     }
     if (!SIZES[k]) { testLog('cam: unknown shot ' + raw); k = o.kind = 'MID'; }
-    if (!frameInto(F, step.on, k, o.fo, e)) {
-      if (step.on != null) return false;
+    if (!frameInto(F, on, k, o.fo, e)) {
+      if (on != null) return false;
       setCamInto(o, e, e.firstCam, null, 0, true, o.st); copyTo0(o); return true;   // WIDE of nobody: the set's first camera
     }
     o.pos0.copy(F.pos); o.look0.copy(F.look); o.fov0 = F.fov; o.up.copy(F.up);
-    o.subj = step.on ?? null; o.size = k;
-    o.reaim = !step.locked && nAct > 0 && k !== 'TOP';
-    if (o.fo.offset) o.lat.set(t2.z * o.fo.offset, 0, -t2.x * o.fo.offset);   // t2 = camera direction from frameInto
+    o.subj = on ?? null; o.size = k;
+    o.reaim = !step.locked && raw !== 'LOCKED' && k !== 'TOP' && nAct > 0;
+    // a reaim keeps the composition: whatever the framing added to the plain aim (offset, OTS shoulder bias, a zone cam)
+    if (o.reaim && aimInto(t5, on, k, e)) o.lat.subVectors(o.look0, t5);
     return true;
   }
   function copyTo0(o) { o.pos0.copy(o.pos); o.look0.copy(o.look); o.fov0 = o.fov; }
 
-  function endShotExtras() {
-    if (shotAt.jarvis) { const s = shotAt.jarvis.spot, sv = shotAt.spot; s.color.copy(sv.c); s.intensity = sv.i; s.angle = sv.a; }
-    shotAt.jarvis = null;
+  function endShotExtras(rg) {
+    const j = rg.jarvis;
+    if (j) { const s = j.spot, sv = rg.spot; s.color.copy(sv.c); s.intensity = sv.i; s.angle = sv.a; s.position.copy(sv.p); s.target.position.copy(sv.t); }
+    rg.jarvis = null;
   }
-  function shot(step) {
-    if (!cur || !step) return;
-    endShotExtras();
-    settle(rel, 'res'); rel.on = false;
-    copyCam(S.start, cs);
-    if (!baseInto(S, step, cur)) {        // nothing to frame: hold the current angle
-      copyCam(S, cs); copyTo0(S); S.kind = 'CAM'; S.move = ''; S.subj = null; S.reaim = false;
-      C.cutscene = true; shotAt.on = true; return;
+  function shotInto(rg, step) {
+    const e = rigSet(rg), s = rg.s, c = rg.cs, was = rg.on;
+    if (!e || !step) return;
+    endShotExtras(rg);
+    if (rg === RM) { settle(rel, 'res'); rel.on = false; }
+    copyCam(s.start, c);
+    FC = c; FFR = rg === RR ? 1 - SPL.ratio : 0;
+    const ok = baseInto(s, step, e);
+    FC = null; FFR = 0;
+    s.roll = (+step.roll || 0) * DEG; s.spin = false;
+    rg.on = true; rg.near = 0.05; C.cutscene = true;
+    if (!ok) {                             // nothing to frame: hold the current angle (a fresh right half: a plain view)
+      if (rg === RR && !was) { c.pos.set(0, 2, 6); c.look.set(0, 1, 0); c.fov = 40; RR.snap = true; }
+      copyCam(s, c); copyTo0(s); s.kind = 'CAM'; s.move = ''; s.subj = null; s.reaim = false;
+      return;
     }
-    const k = S.kind, raw = String(step.shot || '').toUpperCase();
-    let move = step.move ? String(step.move).toLowerCase().replace(/[^a-z].*$/, '') : MOVES[raw] || '';
-    if (k === 'CAM' && step.to) move = 'glide';
-    S.move = move; S.t = 0; S.ease = EASE[step.ease] || smooth;
-    S.dur = move === 'whip' ? step.dur ?? 0.2 : move === 'crash' ? step.dur ?? 0.12 : step.dur ?? 3;
-    S.off.subVectors(S.pos0, S.look0);
-    S.aim.copy(S.look0);
-    S.len = Math.max(0.5, S.off.length());
-    if (move === 'push') { S.a0 = 1; S.a1 = step.amount ?? 0.6; }
-    else if (move === 'pull') { S.a0 = 1; S.a1 = 1 / (step.amount ?? 0.6); }
-    else if (move === 'crane') { S.a0 = step.from ?? 0; S.a1 = step.to ?? 2; S.amount = step.amount ?? 1; }
-    else if (move === 'orbit') { S.a0 = (step.from ?? 0) * DEG; S.a1 = (step.to ?? 90) * DEG; }
-    else if (move === 'crash') { S.a1 = step.fov ?? S.fov0 * 0.5; if (typeof sfx === 'function' && !skipping()) sfx('sting'); }
-    else if (move === 'track') { const tr = step.track || 'alongside'; S.trackSide = tr === 'ahead' ? 'front' : tr === 'behind' ? 'back' : step.side === 'right' ? 'right' : 'left'; }
+    const k = s.kind, raw = shotName(step.shot);
+    let move = raw === 'LOCKED' ? '' : step.move ? String(step.move).toLowerCase().replace(/[^a-z].*$/, '') : MOVES[raw] || '';
+    if (move === 'glide' || (k === 'CAM' && step.to)) move = k === 'CAM' && step.to ? 'glide' : '';
+    if (move && !MOVE_OK[move]) { testLog('cam: unknown move ' + step.move); move = ''; }
+    s.move = move; s.t = 0; s.ease = EASE[step.ease] || smooth;
+    s.dur = move === 'whip' ? step.dur ?? 0.2 : move === 'crash' ? step.dur ?? 0.12 : step.dur ?? 3;
+    s.off.subVectors(s.pos0, s.look0);
+    s.aim.copy(s.look0);
+    s.len = Math.max(0.5, s.off.length());
+    if (move === 'push') { s.a0 = 1; s.a1 = step.amount ?? 0.6; }
+    else if (move === 'pull') { s.a0 = 1; s.a1 = 1 / (step.amount ?? 0.6); }
+    else if (move === 'crane') {           // metres of lens rise (dir: 'down' = from 2 m above to the framing)
+      const down = step.dir === 'down';
+      s.a0 = typeof step.from === 'number' ? step.from : down ? 2 : 0; s.a1 = typeof step.to === 'number' ? step.to : down ? 0 : 2; s.amount = step.amount ?? 1;
+    } else if (move === 'orbit') {         // degrees; spin: keep turning past dur at the final speed (the idea engine)
+      s.a0 = (typeof step.from === 'number' ? step.from : 0) * DEG; s.a1 = (typeof step.to === 'number' ? step.to : 90) * DEG;
+      s.spin = !!step.spin; s.spinW = (s.a1 - s.a0) * (s.ease(1) - s.ease(0.999)) / 0.001 / Math.max(0.05, s.dur);
+    } else if (move === 'crash') { s.a1 = step.zoom ?? s.fov0 * 0.5; if (typeof sfx === 'function' && !skipping() && step.sting !== false) sfx('sting'); }
+    else if (move === 'track') { const tr = step.track || 'alongside'; s.trackSide = tr === 'ahead' ? 'front' : tr === 'behind' ? 'back' : step.side === 'right' ? 'right' : 'left'; }
     else if (move === 'pan' || move === 'tilt') {
-      S.y0 = yawOf(S.pos0, S.look0); S.p0 = pitchOf(S.pos0, S.look0); S.y1 = S.y0; S.p1 = S.p0; S.len1 = S.len;
+      s.y0 = yawOf(s.pos0, s.look0); s.p0 = pitchOf(s.pos0, s.look0); s.y1 = s.y0; s.p1 = s.p0; s.len1 = s.len;
       if (typeof step.to === 'string' || Array.isArray(step.to)) {
-        if (pointOf(step.to, t3, cur)) { S.y1 = S.y0 + angTo(S.y0, yawOf(S.pos0, t3)); S.p1 = pitchOf(S.pos0, t3); S.len1 = Math.max(0.5, S.pos0.distanceTo(t3)); }
-      } else if (move === 'tilt') { S.p0 += (step.from ?? 0) * DEG; S.p1 = S.p0 - (step.from ?? 0) * DEG + (step.to ?? 25) * DEG; }
-      else { S.y0 -= (step.from ?? 0) * DEG; S.y1 = S.y0 + (step.from ?? 0) * DEG - (step.to ?? 30) * DEG; }   // degrees, + = right
+        if (pointOf(step.to, t3, e)) { s.y1 = s.y0 + angTo(s.y0, yawOf(s.pos0, t3)); s.p1 = pitchOf(s.pos0, t3); s.len1 = Math.max(0.5, s.pos0.distanceTo(t3)); }
+      } else {
+        const fr = typeof step.from === 'number' ? step.from : 0;
+        if (move === 'tilt') { s.p0 += fr * DEG; s.p1 = s.p0 - fr * DEG + (typeof step.to === 'number' ? step.to : 25) * DEG; }
+        else { s.y0 -= fr * DEG; s.y1 = s.y0 + fr * DEG - (typeof step.to === 'number' ? step.to : 30) * DEG; }   // degrees, + = right
+      }
     } else if (move === 'whip') {
-      S.y0 = yawOf(S.start.pos, S.start.look); S.p0 = pitchOf(S.start.pos, S.start.look);
-      S.y1 = yawOf(S.pos0, S.look0); S.p1 = pitchOf(S.pos0, S.look0); S.len1 = S.len;
+      s.y0 = yawOf(s.start.pos, s.start.look); s.p0 = pitchOf(s.start.pos, s.start.look);
+      s.y1 = yawOf(s.pos0, s.look0); s.p1 = pitchOf(s.pos0, s.look0); s.len1 = s.len;
     }
-    C.cutscene = true; shotAt.on = true; shotAt.near = 0.05;
-    if (skipping() && move !== 'track') S.t = S.dur;
-    if (move === 'glide') { S.start.pos.copy(S.pos0); S.start.look.copy(S.look0); S.start.fov = S.fov0; }   // CAM glides from its own pos
-    if (move !== 'whip') { cs.pos.copy(S.pos0); cs.look.copy(S.look0); cs.fov = S.fov0; }
-    snap = true;
-    shotTick(0);
+    // framed shots only: an explicit lens (CAM, INSERT, POV, JARVIS, SET) or facing: true is the author's call
+    if (!skipping() && SIZES[k] && !s.fo.facing && (move === 'crane' || move === 'orbit' || move === 'pull')) moveRoom(s, e);
+    if (skipping() && move !== 'track') s.t = s.dur;
+    if (move === 'glide') { s.start.pos.copy(s.pos0); s.start.look.copy(s.look0); s.start.fov = s.fov0; }   // CAM glides from its own pos
+    if (move !== 'whip') { c.pos.copy(s.pos0); c.look.copy(s.look0); c.fov = s.fov0; }
+    if (rg === RM) snap = true; else RR.snap = true;
+    shotTick(rg, 0);
     if (k === 'JARVIS') {                  // screens watch people: blue light from the screen onto the faces
-      const s = cur.spot, sv = shotAt.spot, an = cur.anchors[step.at];
-      sv.c.copy(s.color); sv.i = s.intensity; sv.a = s.angle; shotAt.jarvis = cur;
-      s.position.copy(an ? an.at : S.pos0); s.target.position.copy(S.look0);
-      const d = s.position.distanceTo(S.look0);
-      s.color.set(0x7fb0ff); s.intensity = 2.5 * Math.pow(Math.max(0.3, d), 1.5); s.angle = 0.7;
+      const sp = e.spot, sv = rg.spot, an = typeof step.at === 'string' ? e.anchors[step.at] : null;
+      sv.c.copy(sp.color); sv.i = sp.intensity; sv.a = sp.angle; sv.p.copy(sp.position); sv.t.copy(sp.target.position); rg.jarvis = e;
+      sp.position.copy(an ? an.at : s.pos0); sp.target.position.copy(s.look0);
+      const d = sp.position.distanceTo(s.look0);
+      sp.color.set(0x7fb0ff); sp.intensity = 2.5 * Math.pow(Math.max(0.3, d), 1.5); sp.angle = 0.7;
       if (an) {                           // the camera sits behind the screen: start the lens just past it
-        t1.subVectors(an.at, S.pos0); t2.subVectors(S.look0, S.pos0);
+        t1.subVectors(an.at, s.pos0); t2.subVectors(s.look0, s.pos0);
         const sd = t1.length();
-        if (t1.dot(t2) > 0 && sd < t2.length() - 0.3) shotAt.near = sd + 0.15;
+        if (t1.dot(t2) > 0 && sd < t2.length() - 0.3) rg.near = sd + 0.15;
       }
     }
-    C.name = String(step.shot) + (step.move ? ' ' + step.move : '') + (step.on != null ? ' ' + step.on : step.at != null ? ' ' + step.at : '');
+    if (step.shake) { const sh = step.shake; C.shake(typeof sh === 'number' ? sh : sh.amp ?? 0.04, typeof sh === 'number' ? 0.45 : sh.dur ?? 0.45); }
+    rg.name = String(step.shot) + (step.move ? ' ' + step.move : '') + (step.on != null ? ' ' + step.on : step.at != null ? ' ' + step.at : '');
+    if (rg === RM) C.name = rg.name;
   }
-  function shotTick(dt) {
+  // A move must not carry the lens through a ceiling or a wall either: at the cut (a handful of rays, never per
+  // frame) a crane's rise, an orbit's radius and a pull's reach shrink to what the room allows.
+  function moveRoom(s, e) {
+    const L = s.look0;
+    if (s.move === 'pull') {
+      tl.copy(s.off).multiplyScalar(s.a1).add(L);
+      const c = clearTo(L, tl, e);
+      if (c < s.len * s.a1 + 0.15) s.a1 = Math.max(1, (c - 0.15) / s.len);
+    } else if (s.move === 'crane') {
+      for (let pass = 0; pass < 2; pass++) {
+        const key = pass ? 'a1' : 'a0', sc = pass ? s.amount : 1;
+        for (let it = 0; it < 6 && Math.abs(s[key]) > 0.05; it++) {
+          tl.copy(s.off).multiplyScalar(sc).add(L); tl.y += s[key];
+          if (clearTo(L, tl, e) >= L.distanceTo(tl) + 0.15) break;
+          s[key] *= 0.65;
+        }
+      }
+    } else if (s.move === 'orbit') {
+      const span = s.spin ? TAU : s.a1 - s.a0;
+      let k = 1;
+      for (let i = 1; i <= 8; i++) {
+        const a = s.a0 + span * i / 8, co = Math.cos(a), sn = Math.sin(a);
+        tl.set(L.x + s.off.x * co + s.off.z * sn, L.y + s.off.y, L.z - s.off.x * sn + s.off.z * co);
+        const len = L.distanceTo(tl), c = clearTo(L, tl, e);
+        if (c < len + 0.15) k = Math.min(k, Math.max(0.2, (c - 0.15) / len));
+      }
+      if (k < 1) { s.off.multiplyScalar(k); s.len = Math.max(0.5, s.off.length()); }
+    }
+  }
+  function shotTick(rg, dt) {
     if (locked) return;
-    const s = S;
-    if (s.kind === 'SET') { setCamInto(cs, cur, s.setcam, P.actor, dt, false, s.st); return; }
+    const s = rg.s, c = rg.cs, e = rigSet(rg);
+    if (!e) return;
+    if (s.kind === 'SET') { setCamInto(c, e, s.setcam, P.actor, dt, false, s.st); return; }
     s.t += dt;
     const u = s.dur > 0 ? Math.min(1, s.t / s.dur) : 1, k = s.ease(u);
-    if (s.subj != null && s.kind !== 'TOP' && aimInto(s.aim, s.subj, s.size, cur)) s.aim.add(s.lat); else s.aim.copy(s.look0);
+    if (s.subj != null && s.kind !== 'TOP' && aimInto(s.aim, s.subj, s.size, e)) s.aim.add(s.lat); else s.aim.copy(s.look0);
     switch (s.move) {
       case 'push': case 'pull': case 'crane': {
         const sc = s.move === 'crane' ? 1 + (s.amount - 1) * k : s.a0 + (s.a1 - s.a0) * k;
-        cs.pos.copy(s.off).multiplyScalar(sc).add(s.aim);
-        if (s.move === 'crane') cs.pos.y += s.a0 + (s.a1 - s.a0) * k;
-        cs.look.copy(s.aim);
+        c.pos.copy(s.off).multiplyScalar(sc).add(s.aim);
+        if (s.move === 'crane') c.pos.y += s.a0 + (s.a1 - s.a0) * k;
+        c.look.copy(s.aim);
         break;
       }
       case 'orbit': {
-        const a = s.a0 + (s.a1 - s.a0) * k, c = Math.cos(a), sn = Math.sin(a);
-        cs.pos.set(s.aim.x + s.off.x * c + s.off.z * sn, s.aim.y + s.off.y, s.aim.z - s.off.x * sn + s.off.z * c);
-        cs.look.copy(s.aim);
+        const a = s.spin && s.t > s.dur ? s.a1 + s.spinW * (s.t - s.dur) : s.a0 + (s.a1 - s.a0) * k, co = Math.cos(a), sn = Math.sin(a);
+        c.pos.set(s.aim.x + s.off.x * co + s.off.z * sn, s.aim.y + s.off.y, s.aim.z - s.off.x * sn + s.off.z * co);
+        c.look.copy(s.aim);
         break;
       }
       case 'track': {   // moves with the subject exactly; only the angle eases when they turn
         const tr = s.fo.side; s.fo.side = s.trackSide; s.fo.facing = true;
-        if (frameInto(F, s.subj, s.size, s.fo, cur)) {
+        FC = c; FFR = rg === RR ? 1 - SPL.ratio : 0;
+        if (frameInto(F, s.subj, s.size, s.fo, e)) {
           t5.subVectors(F.pos, F.look);
           if (s.t < 0.02) s.off.copy(t5); else s.off.lerp(t5, damp(3, dt));
-          cs.pos.copy(F.look).add(s.off); cs.look.copy(F.look); cs.fov = F.fov;
+          c.pos.copy(F.look).add(s.off); c.look.copy(F.look); c.fov = F.fov;
         }
+        FC = null; FFR = 0;
         s.fo.side = tr;
         break;
       }
       case 'pan': case 'tilt':
-        cs.pos.copy(s.pos0);
-        dirInto(cs.look, cs.pos, s.y0 + (s.y1 - s.y0) * k, s.p0 + (s.p1 - s.p0) * k, s.len + (s.len1 - s.len) * k);
+        c.pos.copy(s.pos0);
+        dirInto(c.look, c.pos, s.y0 + (s.y1 - s.y0) * k, s.p0 + (s.p1 - s.p0) * k, s.len + (s.len1 - s.len) * k);
         break;
-      case 'whip': {   // very fast pan with an overshoot and a lens breath: reads as motion blur, costs nothing
+      case 'whip': {   // very fast pan with an overshoot, a lens breath and (render) a brief blur: reads as motion blur
         const w = Math.sin(Math.PI * u), dy = angTo(s.y0, s.y1);
-        cs.pos.lerpVectors(s.start.pos, s.pos0, k);
-        dirInto(cs.look, cs.pos, s.y0 + dy * k + Math.sign(dy) * 0.16 * w, s.p0 + (s.p1 - s.p0) * k, s.len);
-        cs.fov = s.start.fov + (s.fov0 - s.start.fov) * k + 9 * w;
-        if (u >= 1) { s.move = ''; cs.pos.copy(s.pos0); cs.look.copy(s.look0); cs.fov = s.fov0; }
+        c.pos.lerpVectors(s.start.pos, s.pos0, k);
+        dirInto(c.look, c.pos, s.y0 + dy * k + Math.sign(dy) * 0.16 * w, s.p0 + (s.p1 - s.p0) * k, s.len);
+        c.fov = s.start.fov + (s.fov0 - s.start.fov) * k + 9 * w;
+        if (u >= 1) { s.move = ''; c.pos.copy(s.pos0); c.look.copy(s.look0); c.fov = s.fov0; }
         break;
       }
       case 'crash': {   // snaps onto the face
         const e2 = EASE.out(u);
-        cs.pos.copy(s.pos0); cs.look.copy(s.aim);
-        if (s.subj != null && aimInto(t5, s.subj, 'CLOSE', cur)) cs.look.lerp(t5, e2);
-        cs.fov = s.fov0 + (s.a1 - s.fov0) * e2;
+        c.pos.copy(s.pos0); c.look.copy(s.aim);
+        if (s.subj != null && aimInto(t5, s.subj, 'CLOSE', e)) c.look.lerp(t5, e2);
+        c.fov = s.fov0 + (s.a1 - s.fov0) * e2;
         break;
       }
       case 'glide':
-        cs.pos.lerpVectors(s.start.pos, s.end.pos, k); cs.look.lerpVectors(s.start.look, s.end.look, k);
-        cs.fov = s.start.fov + (s.end.fov - s.start.fov) * k;
+        c.pos.lerpVectors(s.start.pos, s.end.pos, k); c.look.lerpVectors(s.start.look, s.end.look, k);
+        c.fov = s.start.fov + (s.end.fov - s.start.fov) * k;
         break;
       default:
-        if (s.reaim) cs.look.lerp(s.aim, damp(2.5, dt));   // the operator keeps the subject framed (a head lifting, a step)
+        if (s.reaim) c.look.lerp(s.aim, damp(2.5, dt));   // the operator keeps the subject framed (a head lifting, a step)
     }
   }
 
   const rel = { on: false, t: 0, dur: 0.8, pos: V(), look: V(), fov: 40, res: null };
+  const SHK = { t: 0, dur: 0, amp: 0 };   // cam.shake: off unless asked for (no handheld wobble anywhere)
   function camTick(dt) {
     copyCam(cp, cs);
+    if (splitE) copyCam(cpR, csR);
     const cut = gameTick(dt);
-    if (shotAt.on) shotTick(dt);
-    else if (rel.on) {
-      rel.t += dt;
-      const k = smooth(rel.t / rel.dur);
-      cs.pos.lerpVectors(rel.pos, gs.pos, k); cs.look.lerpVectors(rel.look, gs.look, k); cs.fov = rel.fov + (gs.fov - rel.fov) * k;
-      if (rel.t >= rel.dur) { rel.on = false; settle(rel, 'res'); }
-    } else { copyCam(cs, gs); if (cut) snap = true; }
-    if (!shotAt.on) C.name = G.name;
+    if (RM.on) shotTick(RM, dt);
+    else {
+      if (cut && G.ease > 0 && !rel.on && !skipping()) { rel.pos.copy(cs.pos); rel.look.copy(cs.look); rel.fov = cs.fov; rel.t = 0; rel.dur = G.ease; rel.on = true; }
+      if (rel.on) {
+        rel.t += dt;
+        const k = smooth(rel.t / rel.dur);
+        cs.pos.lerpVectors(rel.pos, gs.pos, k); cs.look.lerpVectors(rel.look, gs.look, k); cs.fov = rel.fov + (gs.fov - rel.fov) * k;
+        if (rel.t >= rel.dur) { rel.on = false; settle(rel, 'res'); }
+      } else { copyCam(cs, gs); if (cut) snap = true; }
+    }
+    if (splitE && RR.on) shotTick(RR, dt);
+    if (!RM.on) C.name = G.name;
+    if (SHK.t > 0) SHK.t -= dt;
     if (snap) { copyCam(cp, cs); snap = false; }
+    if (RR.snap) { copyCam(cpR, csR); RR.snap = false; }
   }
 
   const PROJ = { x: 0, y: 0, visible: false };
@@ -1040,11 +1458,17 @@ const { world, cam, frame, player } = (() => {
   const C = {
     name: '', cutscene: false,
     get camera() { return camera; },
-    shot,
+    get cameraR() { return camR; },
+    // cam.shot(step): a shot on the main camera, or with half: 'right' on the right half of a split
+    shot(step) {
+      if (!step) return;
+      if (step.half === 'right') { if (splitE) shotInto(RR, step); else testLog('cam: a right-half shot with no split'); return; }
+      shotInto(RM, step);
+    },
     lock(on) { locked = !!on; },
     release(dur = 0.8) {
-      endShotExtras();
-      shotAt.on = false; C.cutscene = false; locked = false;
+      endShotExtras(RM);
+      RM.on = false; C.cutscene = false; locked = false;
       settle(rel, 'res');
       if (!cur) return Promise.resolve();
       G.name = ''; gameTick(0);
@@ -1057,11 +1481,18 @@ const { world, cam, frame, player } = (() => {
       G.mode = mode || null; G.opts = opts;
       if (!mode) G.name = '';
     },
-    project(v) {
-      t5.copy(v).project(camera);
+    // cam.shake(amp = 0.04 m, dur = 0.45 s): a decaying jolt (an explosion, a slam). Opt-in only; nothing while skipping
+    shake(amp = 0.04, dur = 0.45) {
+      if (skipping() || !(amp > 0)) return;
+      SHK.amp = amp; SHK.dur = SHK.t = Math.max(0.05, dur);
+    },
+    // world point -> shared { x, y, visible } in CSS px of the whole canvas (half: 'right' = through the right half's camera)
+    project(v, half) {
+      const right = half === 'right' && !!splitE;
+      t5.copy(v).project(right ? camR : camera);
       renderer.getSize(size2);
-      const w = splitE ? lastLW || size2.x / 2 : size2.x;
-      PROJ.x = (t5.x + 1) / 2 * w; PROJ.y = (1 - t5.y) / 2 * size2.y;
+      const lv = splitE ? lastLW || Math.round(size2.x * SPL.ratio) - 2 : size2.x, x0 = right ? lv + 4 : 0, w = right ? size2.x - x0 : lv;
+      PROJ.x = x0 + (t5.x + 1) / 2 * w; PROJ.y = (1 - t5.y) / 2 * size2.y;
       PROJ.visible = t5.z < 1 && t5.z > -1 && Math.abs(t5.x) <= 1 && Math.abs(t5.y) <= 1;
       return PROJ;
     },
@@ -1076,22 +1507,70 @@ const { world, cam, frame, player } = (() => {
   }
 
   // ------------------------------------------------------------ split screen + time-lapse
-  const slide = { on: false, t: 0, res: null };
+  // world.split({ left: { set, shot | cam, env }, right: { set, shot | cam, env }, ratio = 0.5 }, { slide, dur = 0.6 })
+  // Both halves are live sets with live actors and their own moving shots (cam.shot({..., half: 'right'}) recuts
+  // the right). Called again while split, it recuts whichever halves it names (right.set is then optional).
+  // world.split(null, { slide, keep = 'left' | 'right', dur = 0.6 }) closes it: the kept half widens to fill the frame
+  // (keep: 'right' makes the right half's set the current one, shot and all).
+  const SPL = { ratio: 0.5, mode: '', t: 0, dur: 0.6, keep: 'left', res: null };
   function split(spec, o = {}) {
     if (!spec) {
       if (!splitE) return Promise.resolve();
-      if (o.slide && !skipping()) { slide.on = true; slide.t = 0; return new Promise((r) => { slide.res = r; }); }
-      splitE = null; return Promise.resolve();
+      settle(SPL, 'res');
+      SPL.keep = o.keep === 'right' ? 'right' : 'left';
+      if (o.slide && !skipping()) { SPL.mode = 'close'; SPL.t = 0; SPL.dur = o.dur ?? 0.6; return new Promise((r) => { SPL.res = r; }); }
+      SPL.mode = ''; endSplit(); return Promise.resolve();
     }
-    const L = spec.left || {}, R = spec.right || {};
-    if (L.set && (!cur || L.set !== cur.id)) showE(ensure(L.set));
-    splitE = ensure(R.set);
-    slide.on = false;
-    const ls = L.shot ?? L.cam, rs = R.shot ?? R.cam;
-    if (ls) C.shot(typeof ls === 'string' ? { shot: 'SET', cam: ls } : ls);
-    if (!baseInto(SR, typeof rs === 'string' ? { shot: 'SET', cam: rs } : rs || { shot: 'WIDE' }, splitE)) { SR.pos0.set(0, 2, 6); SR.look0.set(0, 1, 0); SR.fov0 = 40; }
-    camR.position.copy(SR.pos0); camR.fov = SR.fov0; aimCam(camR, SR.look0, SR.up); camR.updateProjectionMatrix();
+    const L = spec.left, R = spec.right || {}, was = !!splitE;
+    if (L && L.set && (!cur || L.set !== cur.id)) showE(ensure(L.set));
+    const rid = R.set || (splitE && splitE.id);
+    if (!rid) { testLog('world.split: right.set is required'); return Promise.resolve(); }
+    const re = ensure(rid);
+    if (re !== splitE) { endShotExtras(RR); RR.on = false; splitE = re; }
+    if (L && L.env) envSet(cur, L.env, 0);
+    if (R.env) envSet(splitE, R.env, 0);
+    if (spec.ratio) SPL.ratio = clamp(spec.ratio, 0.2, 0.8); else if (!was) SPL.ratio = 0.5;
+    if (!was || SPL.mode === 'close') {
+      settle(SPL, 'res');
+      SPL.mode = !was && o.slide && !skipping() ? 'open' : ''; SPL.t = 0; SPL.dur = o.dur ?? 0.6; SPL.keep = 'left';
+    }
+    const ls = L && (L.shot ?? L.cam), rs = R.shot ?? R.cam;
+    if (ls) shotInto(RM, typeof ls === 'string' ? { shot: 'SET', cam: ls } : ls);
+    if (rs || !RR.on) shotInto(RR, typeof rs === 'string' ? { shot: 'SET', cam: rs } : rs || { shot: 'WIDE' });
     return Promise.resolve();
+  }
+  function copyShot(d, s) {
+    for (const k in s) {
+      const v = s[k];
+      if (v && v.isVector3) d[k].copy(v);
+      else if (k === 'start' || k === 'end') copyCam(d[k], v);
+      else if (k === 'fo') Object.assign(d.fo, v);
+      else if (k === 'st') { d.st.base.copy(v.base); d.st.pushT = v.pushT; }
+      else d[k] = v;
+    }
+  }
+  function endSplit() {
+    if (!splitE) return;
+    const e = splitE;
+    if (SPL.keep === 'right') {           // the right half becomes the world: its set, its actors, its shot
+      endShotExtras(RM);
+      copyShot(S, SR); copyCam(cs, csR); copyCam(cp, cpR);
+      RM.on = RR.on; RM.near = RR.near; RM.jarvis = RR.jarvis; RR.jarvis = null; RM.name = C.name = RR.name;
+      const a = RM.spot, b = RR.spot; a.c.copy(b.c); a.i = b.i; a.a = b.a; a.p.copy(b.p); a.t.copy(b.t);
+      if (RM.on) C.cutscene = true;
+      splitE = null;
+      if (e !== cur) { showE(e); ambience(e); trim(); }
+      snap = true;
+    } else { endShotExtras(RR); splitE = null; }
+    RR.on = false; SPL.keep = 'left'; SPL.mode = '';
+  }
+  function leftWidth(w) {                 // px of the canvas the left (main) half covers, slides included
+    if (!splitE) return w;
+    const r = SPL.ratio;
+    if (!SPL.mode) return Math.round(w * r);
+    const k = smooth(SPL.t / SPL.dur);
+    if (SPL.mode === 'open') return Math.round(w * (1 + (r - 1) * k));
+    return Math.round(w * (SPL.keep === 'right' ? r * (1 - k) : r + (1 - r) * k));
   }
   const TL = { on: false, t: 0, dur: 8, cycles: 3, a: envNew(), b: envNew(), keys: [], ki: 0, res: null, wasLocked: false };
   function fireKey(kk) {
@@ -1135,23 +1614,37 @@ const { world, cam, frame, player } = (() => {
   function update(dt) {
     const e = cur;
     if (!e) return;
+    if (typeof state !== 'undefined' && state && state.scene !== sceneSeen) { sceneSeen = state.scene; sceneN++; ageOut(); }
+    const sp = splitE && splitE !== e ? splitE : null;
+    e.used = sceneN; if (sp) sp.used = sceneN;
     envTick(e, dt);
-    if (splitE) envTick(splitE, dt);
+    if (sp) envTick(sp, dt);
     if (TL.on) tlTick(dt);
     for (let i = 0; i < A.length; i++) { const a = A[i]; if (shown(a)) { a.prev.copy(a.pos); a.prevRot = a.rotY; } }
     playerTick(dt);
     followerTick(dt);
     for (let i = 0; i < A.length; i++) if (shown(A[i])) actorTick(A[i], dt);
     setTick(e, dt);
-    if (splitE) setTick(splitE, dt);
+    if (sp) setTick(sp, dt);
     torchTick(e);
     camTick(dt);
-    if (slide.on && (slide.t += dt) >= 0.6) { slide.on = false; splitE = null; settle(slide, 'res'); }
+    if (SPL.mode && (SPL.t += dt) >= SPL.dur) { const m = SPL.mode; SPL.mode = ''; if (m === 'close') endSplit(); settle(SPL, 'res'); }
   }
-  const lookI = V(), UPZ = V().set(0, 0, -1);
+  function shakeInto(p, l) {              // deterministic decaying jolt (no allocation)
+    const k = SHK.amp * smooth(SHK.t / SHK.dur), T = clock.t;
+    p.x += k * Math.sin(T * 53.7); p.y += k * Math.sin(T * 47.1 + 1.7); p.z += k * Math.sin(T * 59.3 + 4.1);
+    l.x += k * 0.6 * Math.sin(T * 41.3 + 0.5); l.y += k * 0.6 * Math.sin(T * 37.9 + 2.9);
+  }
+  let blurOn = false;
+  function setBlur(on) {                  // WHIP: the canvas is blurred for the 0.2 s of the pan (a style flip, not per frame)
+    blurOn = on;
+    renderer.domElement.style.filter = on && W.whipBlur > 0 ? 'blur(' + W.whipBlur + 'px)' : '';
+  }
+  const lookI = V(), lookR = V(), UPZ = V().set(0, 0, -1);
   function render(alpha) {
     const e = cur;
     if (!e) return;
+    if (pbQ.length) pbStep();             // a staged prebuild: one stage per rendered frame
     renderer.getSize(size2);
     const w = size2.x, h = size2.y, dtA = alpha * CONFIG.step;
     for (let i = 0; i < A.length; i++) {   // interpolate between the last two ticks, pose once per frame
@@ -1161,47 +1654,93 @@ const { world, cam, frame, player } = (() => {
       a.root.rotation.y = a.prevRot + angTo(a.prevRot, a.rotY) * alpha;
       if (a.root.visible) a.rig.pose(a.poseName || 'idle', a.poseT + dtA, a.p);
     }
+    const sp = splitE, lw = leftWidth(w), lv = sp ? Math.max(0, lw - 2) : w;   // a thin black divide between the halves
     if (snap) copyCam(cp, cs);           // a cut since the last tick: never draw a frame in between the two shots
     camera.position.lerpVectors(cp.pos, cs.pos, alpha);
     lookI.lerpVectors(cp.look, cs.look, alpha);
-    aimCam(camera, lookI, shotAt.on ? S.up : UPZ);
-    const fov = cp.fov + (cs.fov - cp.fov) * alpha, near = shotAt.on ? shotAt.near : 0.05;
-    if (camera.near !== near) { camera.near = near; lastLW = 0; }
-    const lw = splitE ? Math.round(w * (slide.on ? 0.5 + 0.5 * smooth(slide.t / 0.6) : 0.5)) : w;
-    if (camera.fov !== fov || lw !== lastLW || h !== lastH) { camera.fov = fov; camera.aspect = lw / h; camera.updateProjectionMatrix(); }
-    if (!splitE) {
+    if (SHK.t > 0) shakeInto(camera.position, lookI);
+    aimCam(camera, lookI, RM.on ? S.up : UPZ);
+    if (RM.on && S.roll) camera.rotateZ(S.roll);
+    // narrow screens (and narrow halves): widen the lens to keep the 16:9 horizontal field (shots up to 140°, play 100°)
+    const fov = fitFov(cp.fov + (cs.fov - cp.fov) * alpha, lv / h, REF * lv / w, RM.on ? 140 : 100), near = RM.on ? RM.near : 0.05;
+    if (camera.fov !== fov || camera.near !== near || lv !== lastLW || h !== lastH) { camera.fov = fov; camera.near = near; camera.aspect = Math.max(1, lv) / h; camera.updateProjectionMatrix(); }
+    const blur = !skipping() && ((RM.on && S.move === 'whip') || (!!sp && RR.on && SR.move === 'whip'));
+    if (blur !== blurOn) setBlur(blur);
+    if (!sp) {
       renderer.render(e.scene, camera);
     } else {
       renderer.setScissorTest(false); renderer.setClearColor(0x000000, 1); renderer.clear();
       renderer.setScissorTest(true);
-      const lv = slide.on ? lw : lw - 2;   // a thin black divide between the halves
-      renderer.setViewport(0, 0, lv, h); renderer.setScissor(0, 0, lv, h);
-      renderer.render(e.scene, camera);
-      if (!slide.on) {
-        if (w !== lastW || h !== lastH) { camR.aspect = (w - lw - 2) / h; camR.updateProjectionMatrix(); }
-        renderer.setViewport(lw + 2, 0, w - lw - 2, h); renderer.setScissor(lw + 2, 0, w - lw - 2, h);
-        renderer.render(splitE.scene, camR);
+      if (lv > 1) { renderer.setViewport(0, 0, lv, h); renderer.setScissor(0, 0, lv, h); renderer.render(e.scene, camera); }
+      const rx = lw + 2, rw = w - rx;
+      if (rw > 1) {
+        if (RR.snap) copyCam(cpR, csR);
+        camR.position.lerpVectors(cpR.pos, csR.pos, alpha);
+        lookR.lerpVectors(cpR.look, csR.look, alpha);
+        aimCam(camR, lookR, RR.on ? SR.up : UPZ);
+        if (RR.on && SR.roll) camR.rotateZ(SR.roll);
+        const fr = fitFov(cpR.fov + (csR.fov - cpR.fov) * alpha, rw / h, REF * rw / w, 140), nr = RR.on ? RR.near : 0.05, ar = rw / h;
+        if (camR.fov !== fr || camR.near !== nr || camR.aspect !== ar) { camR.fov = fr; camR.near = nr; camR.aspect = ar; camR.updateProjectionMatrix(); }
+        renderer.setViewport(rx, 0, rw, h); renderer.setScissor(rx, 0, rw, h);
+        renderer.render(sp.scene, camR);
       }
       renderer.setScissorTest(false); renderer.setViewport(0, 0, w, h);
     }
-    lastLW = lw; lastW = w; lastH = h;
+    lastLW = lv; lastW = w; lastH = h;
     if (typeof AUDIO !== 'undefined' && AUDIO.listener) AUDIO.listener(camera);   // after the render: matrixWorld is current
     for (let i = 0; i < A.length; i++) if (shown(A[i])) A[i].pos.copy(A[i].keep);
   }
 
+  // ------------------------------------------------------------ systems helpers (drones, AI): no allocation if you pass `out`
+  const RV = V();
+  function segBox(x0, z0, x1, z1, b, pad) {   // does the segment cross the (padded) box? (slab test)
+    let t0 = 0, t1 = 1;
+    const dx = x1 - x0, dz = z1 - z0;
+    if (Math.abs(dx) < 1e-9) { if (x0 < b[0] - pad || x0 > b[2] + pad) return false; }
+    else { let ta = (b[0] - pad - x0) / dx, tb = (b[2] + pad - x0) / dx; if (ta > tb) { const t = ta; ta = tb; tb = t; } if (ta > t0) t0 = ta; if (tb < t1) t1 = tb; if (t0 > t1) return false; }
+    if (Math.abs(dz) < 1e-9) { if (z0 < b[1] - pad || z0 > b[3] + pad) return false; }
+    else { let ta = (b[1] - pad - z0) / dz, tb = (b[3] + pad - z0) / dz; if (ta > tb) { const t = ta; ta = tb; tb = t; } if (ta > t0) t0 = ta; if (tb < t1) t1 = tb; if (t0 > t1) return false; }
+    return true;
+  }
+
+  function lineClearIn(e, x0, z0, x1, z1, pad = 0) {
+    const cl = e && e.def.colliders;
+    if (cl) for (let i = 0; i < cl.length; i++) if (segBox(x0, z0, x1, z1, cl[i], pad)) return false;
+    return true;
+  }
+
   // ------------------------------------------------------------ world
+  const NOCOL = [];
   const W = {
     set: null, setId: null, actors, torchAuto: true, camera,
-    liveMax: 2,                     // live sets kept (the epilogue's match cuts hold three: no builds between shots)
+    liveMax: 3,                     // live sets kept (spec §16: at most three; a split + the next scene's prebuild fit)
+    fitNarrow: true,                // widen the FOV on screens narrower than 16:9 (compositions survive phones)
+    whipBlur: 1.6,                  // px of canvas blur during a WHIP (0 = none)
     get torch() { return cur ? cur.spot : null; },
     get scene() { return cur ? cur.scene : null; },
+    get splitId() { return splitE ? splitE.id : null; },
+    get liveIds() { return [...live.keys()]; },          // debug/tests: live sets, oldest first (+ staged prebuilds)
+    get pendingIds() { return [...pending.keys()]; },
+    get colliders() { return (cur && cur.def.colliders) || NOCOL; },   // the current set's [[x0, z0, x1, z1], …] (live)
     async load(id, o = {}) {
       const e = ensure(id);
       if (o.env) envSet(e, o.env, 0);
       showE(e);
       trim();
     },
-    preload(id) { ensure(id); return Promise.resolve(); },
+    preload(id) { ensure(id); return Promise.resolve(); },   // synchronous build: under black only (prebuild spreads it out)
+    prebuild(id) {
+      if (!SETS[id]) { testLog('world.prebuild: no SETS.' + id); return Promise.resolve(); }
+      const e = live.get(id);
+      if (e) { e.used = Math.max(e.used, sceneN + 1); return Promise.resolve(); }
+      const pb = pending.get(id);
+      if (pb) return pb.p;
+      if (skipping()) { ensure(id).used = sceneN + 1; return Promise.resolve(); }
+      const n = { id, e: null, stage: 0, res: null, p: null };
+      n.p = new Promise((r) => { n.res = r; });
+      pending.set(id, n); pbQ.push(n);
+      return n.p;
+    },
     adopt(look, rig) { (pool[look] ||= []).push(rig); },   // boot's warmed rigs: the first spawn of each look builds nothing
     show(id) { showE(ensure(id)); trim(); },
     warm(id) {
@@ -1232,13 +1771,15 @@ const { world, cam, frame, player } = (() => {
       const c = CHARACTERS[id];
       if (c && c.voice && c.voice.also) for (const part of id.split('_')) if (actors.has(part)) actors.get(part).rig.talk(on);
     },
-    prop(name) {
+    // props/anchors/marks: the current set, or a named live set (reddy26 and reddy40 share names)
+    prop(name, setId) {
+      if (setId) { const e = live.get(setId); return e ? e.props[name] : undefined; }
       if (cur && cur.props[name]) return cur.props[name];
       for (const e of live.values()) if (e.props[name]) return e.props[name];
       return undefined;
     },
-    anchor: (name) => cur && cur.anchors[name],
-    mark: (name) => cur && cur.def.marks && cur.def.marks[name],
+    anchor: (name, setId) => { const e = setId ? live.get(setId) : cur; return e && e.anchors[name]; },
+    mark: (name, setId) => { const e = setId ? live.get(setId) : cur; return e && e.def.marks && e.def.marks[name]; },
     // world.puff(where, {n, color, speed, life, gravity}) — pooled smoke (default) or sparks ({color: 0xffd060, gravity: 6})
     puff(where, o = {}) {
       const e = cur;
@@ -1258,9 +1799,38 @@ const { world, cam, frame, player } = (() => {
       }
       pz.visible = true;
     },
+    // --- for systems (drones, AI); cheap enough per tick ---
+    actorsIn(x, z, r, out) {        // visible actors in the current set within r m of (x, z) -> out (cleared; pass your own array)
+      out = out || [];
+      out.length = 0;
+      for (let i = 0; i < A.length; i++) {
+        const a = A[i];
+        if (a.set !== cur || !a.root.visible) continue;
+        const dx = a.pos.x - x, dz = a.pos.z - z;
+        if (dx * dx + dz * dz <= r * r) out.push(a);
+      }
+      return out;
+    },
+    collide(a, x, z) {              // move actor a (or id) to x, z pushed out of colliders and other actors -> a.pos
+      const o = typeof a === 'string' ? actors.get(a) : a;
+      if (!o || !o.set) return null;
+      collide(o, x, z, o.set, true);
+      return o.pos;
+    },
+    resolve(x, z, r = CONFIG.radius, out = RV) {   // a circle at x, z pushed out of the current set's colliders -> out (x, floor, z)
+      const cl = cur && cur.def.colliders;
+      if (cl) for (let it = 0; it < 2; it++) for (let i = 0; i < cl.length; i++) {
+        const b = cl[i], cx = clamp(x, b[0], b[2]), cz = clamp(z, b[1], b[3]), dx = x - cx, dz = z - cz, d2 = dx * dx + dz * dz;
+        if (d2 >= r * r) continue;
+        if (d2 > 1e-8) { const d = Math.sqrt(d2), k = (r - d) / d; x += dx * k; z += dz * k; }
+        else { const l = x - b[0], rr = b[2] - x, t = z - b[1], bo = b[3] - z, m = Math.min(l, rr, t, bo); if (m === l) x = b[0] - r; else if (m === rr) x = b[2] + r; else if (m === t) z = b[1] - r; else z = b[3] + r; }
+      }
+      return out.set(x, floorAt(cur, x, z, 0), z);
+    },
+    lineClear: (x0, z0, x1, z1, pad = 0) => lineClearIn(cur, x0, z0, x1, z1, pad),   // no collider box (full height: colliders have none) crosses the segment
+    floorAt: (x, z) => floorAt(cur, x, z, 0),
     update, render, split, timelapse,
   };
 
   return { world: W, cam: C, frame: frameFn, player: P };
 })();
-
