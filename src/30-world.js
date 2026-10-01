@@ -57,6 +57,11 @@
 //         world.lineClear(x0, z0, x1, z1, pad = 0) -> bool (no collider box on the segment), world.floorAt(x, z),
 //         actor.moveTo(where, { collide: true }) (AI: slides along walls, ends where it stalls for 0.6 s).
 //         Debug: world.liveIds, world.pendingIds, world.splitId, cam.cameraR.
+// MISC    world.envName: the current set's env preset name. world.torchAuto is reset to true whenever a set is shown.
+//         cam.override(mode, { ..., ease: secs }) blends into (or, with null, out of) an override instead of cutting;
+//         'fixed' takes pos/look arrays a mini-game may mutate in place every tick, damped by lag / lookLag (seconds).
+//         Colliders are live: a set may push, splice or move boxes in def.colliders at runtime (pushed bins, opening
+//         doors); collisions, drone cones and lineClear read them every tick.
 
 const { world, cam, frame, player } = (() => {
   const TAU = Math.PI * 2, DEG = Math.PI / 180;
@@ -136,7 +141,7 @@ const { world, cam, frame, player } = (() => {
   function ambience(e) {
     if (typeof AUDIO === 'undefined') return;
     const a = e.def.ambience || {};
-    if (AUDIO.ambience) AUDIO.ambience({ rain: e.env.rain > 0, loops: a.loops || [] });
+    if (AUDIO.ambience) AUDIO.ambience({ rain: e.env.rain > 0 && (a.rain || true), loops: a.loops || [] });   // the set's rain kind ('glass', 'roof', ...)
     if (AUDIO.setRoom) AUDIO.setRoom(a.room || 'none');
   }
 
@@ -300,11 +305,13 @@ const { world, cam, frame, player } = (() => {
   function showE(e) {
     cur = e; W.set = e.def; W.setId = e.id;
     G.name = ''; snap = true;          // (the flow sets AUDIO.ambience/room after world.load)
+    W.torchAuto = true;                // a set that parks the spot as a lamp (torchAuto = false) never leaks it to the next
   }
 
   // ------------------------------------------------------------ actors
   const actors = new Map(), A = [], pool = {};
-  const ONE = { nod: 0.9, shake: 1, shrug: 1.2, give: 1.4, lanyard_on: 2, knock: 1.2, glance: 1.3, stand: 1 };  // one-shots (ART defaults)
+  // one-shots: Rue's defaults + TWO's (04-art ANIM_ONE: tether_throw, chip_ping, coat_throw, get_up_hurt, ...)
+  const ONE = { nod: 0.9, shake: 1, shrug: 1.2, give: 1.4, lanyard_on: 2, knock: 1.2, glance: 1.3, stand: 1, ...(typeof ANIM_ONE !== 'undefined' ? ANIM_ONE : {}) };
   const LOCO = { walk: 1, run: 1, carry: 1, swagger: 1, turn: 1 };
   let kind = '';                    // what resolveWhere last found: mark | actor | anchor | point
 
@@ -1123,10 +1130,12 @@ const { world, cam, frame, player } = (() => {
     }
     G.name = name;
     if (name === 'follow') followInto(gs, pa, G.opts, dt, cut);
-    else if (name === 'fixed') {
-      const o = G.opts;
-      gs.pos.fromArray(o.pos);
-      if (Array.isArray(o.look)) gs.look.fromArray(o.look); else if (pa) gs.look.set(pa.pos.x, pa.pos.y + 1.2, pa.pos.z);
+    else if (name === 'fixed') {       // TWO: pos/look arrays may be mutated every tick (a tracking camera); lag/lookLag damp them
+      const o = G.opts, la = typeof o.look === 'string' && o.look !== 'player' ? actors.get(o.look) : null;
+      t3.fromArray(o.pos);
+      if (Array.isArray(o.look)) t4.fromArray(o.look); else if (la || pa) { const q = la || pa; t4.set(q.pos.x, q.pos.y + 1.2, q.pos.z); } else t4.copy(gs.look);
+      if (cut || !(o.lag > 0)) gs.pos.copy(t3); else gs.pos.lerp(t3, damp(1 / o.lag, dt));
+      if (cut || !(o.lookLag > 0)) gs.look.copy(t4); else gs.look.lerp(t4, damp(1 / o.lookLag, dt));
       gs.fov = o.fov ?? 45;
     } else setCamInto(gs, e, name, pa, dt, cut, G.st);
     return cut;
@@ -1476,10 +1485,19 @@ const { world, cam, frame, player } = (() => {
       rel.pos.copy(cs.pos); rel.look.copy(cs.look); rel.fov = cs.fov; rel.t = 0; rel.dur = dur; rel.on = true;
       return new Promise((r) => { rel.res = r; });
     },
+    // cam.override('follow' | 'fixed' | 'set' | null, opts): opts.ease = seconds to blend from the current view into
+    // the new gameplay camera (also when clearing it) instead of cutting. 'fixed': { pos, look: [x,y,z] | 'player' |
+    // actorId, fov, lag, lookLag } (lag/lookLag: damping time constants in s, so a mini-game can mutate pos/look in
+    // place every tick for a tracking camera: the boss's bossCam); 'follow': { dist, height, lag, fov, look }; 'set': { name }.
     override(mode, opts = {}) {
       if (mode !== G.mode || mode === 'fixed' || mode === 'set') G.name = '';   // cut; a new 'follow' distance eases in
-      G.mode = mode || null; G.opts = opts;
+      G.mode = mode || null; G.opts = opts || {};
       if (!mode) G.name = '';
+      const ez = opts && +opts.ease;
+      if (ez > 0 && !RM.on && cur && !skipping()) {   // blend from what's on screen now (gameTick sees the cut, the blend carries it)
+        settle(rel, 'res');
+        rel.pos.copy(cs.pos); rel.look.copy(cs.look); rel.fov = cs.fov; rel.t = 0; rel.dur = Math.min(4, ez); rel.on = true;
+      }
     },
     // cam.shake(amp = 0.04 m, dur = 0.45 s): a decaying jolt (an explosion, a slam). Opt-in only; nothing while skipping
     shake(amp = 0.04, dur = 0.45) {
@@ -1717,6 +1735,7 @@ const { world, cam, frame, player } = (() => {
     fitNarrow: true,                // widen the FOV on screens narrower than 16:9 (compositions survive phones)
     whipBlur: 1.6,                  // px of canvas blur during a WHIP (0 = none)
     get torch() { return cur ? cur.spot : null; },
+    get envName() { return cur ? cur.envName : ''; },   // the current set's env preset name (the last one set by name)
     get scene() { return cur ? cur.scene : null; },
     get splitId() { return splitE ? splitE.id : null; },
     get liveIds() { return [...live.keys()]; },          // debug/tests: live sets, oldest first (+ staged prebuilds)

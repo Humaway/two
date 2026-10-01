@@ -127,7 +127,8 @@ button { font: inherit; color: inherit; cursor: pointer; pointer-events: auto; b
 #ui.talking #bark { bottom: calc(3.5vh + 170px); }
 
 /* time card: small, low left, fades in and out over ~3 s, never blocks */
-#timecard { left: 6vw; bottom: 9vh; z-index: 11; opacity: 0; text-shadow: 0 1px 3px #000, 0 0 14px rgba(0,0,0,.7); }
+#timecard { left: 6vw; bottom: 9vh; z-index: 11; opacity: 0; text-shadow: 0 1px 3px #000, 0 0 14px rgba(0,0,0,.7); transition: bottom .3s ease-out; }
+#ui.talking #timecard { bottom: calc(3.5vh + 168px); }   /* above the dialogue box while someone talks */
 #timecard b { display: block; font-family: var(--title); font-weight: 400; font-size: 19px; letter-spacing: .05em; color: #fff; }
 #timecard hr { width: 44px; margin: 7px 0 6px; border: 0; border-top: 1px solid var(--yes); }
 #timecard span { display: block; font-size: 13px; letter-spacing: .22em; text-transform: uppercase; color: #cfd6e8; }

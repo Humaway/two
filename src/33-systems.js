@@ -40,13 +40,18 @@
 //     to them; the hug -> stealth.capture). Out of the cone for stealth.forgetAfter (2 s) while amber: back to patrol.
 //     Escort needs stealth.active. Cones are clipped by the set's colliders and DRONES.cover boxes (cover blocks sight).
 //   DRONES.get(id) · remove(id) · clear() · all (live list) · reset() (spawn state; retry) · pause(on) · calm()
-//   DRONES.lure(at, sampleId, { r, dur, line }) -> thenable { n, ids, done }: drones within SAMPLES[id].lure.r go and
-//     investigate for lure.dur, then return ('laugh' gets DRONES.lines.laugh). DRONES.lureMenu(at, { fallback, test })
-//     -> Promise<sampleId | null>: Chase picks from state.samples (fallback ['radio']) and plays it there.
+//   DRONES.lure(at, sampleId, { r, dur, line, over, y, disc = 0.6 }) -> thenable { n, ids, done }: drones within
+//     SAMPLES[id].lure.r go and investigate for lure.dur, then return ('laugh' gets DRONES.lines.laugh). They hover a
+//     metre short of it (over: right above it; y: at that height while investigating) and, transfixed, their cone
+//     collapses to a disc of radius `disc` (false keeps the cone) lying on the lure's surface when `at` is [x, y, z].
+//     DRONES.lureMenu(at, { fallback, test, ...lure options }) -> Promise<sampleId | null>: Chase picks from
+//     state.samples (fallback ['radio']) and plays it there.
 //   DRONES.alert(who) (curious at him) · turn(who) (red, facing him) · goTo(id, at, { speed, then }) -> Promise ·
 //     face(id, where) · release(id) (back to its patrol) · light(id, state) · inCone(id, actorId) -> bool ·
 //     cover(id, [x0, z0, x1, z1] | null) (a live array: move it and the cones follow) · walls (false: colliders don't
-//     block cones) · zap(droneId, actorId, { line }) -> Promise (1.6's static discharge: sparks, smoke, white flash)
+//     block cones) · zap(droneId, actorId, { line }) -> Promise (1.6's static discharge: sparks, smoke, white flash) ·
+//     claw(id, k = 1, dur = 0.4) (the noise drone's claw: 0 closed .. 1 open). Cones read the set's colliders live every
+//     tick, so boxes a set moves, adds or removes at runtime (a pushed rack, a bin, a door) block or unblock sight.
 //   DRONES.lines = { escort, laugh } (drone barks; null silences one) · DRONES.warm(warmObject) (boot)
 // ---- stealth: capture -> Safe Room -> retry at the last checkpoint with drones reset ----------------------------
 //   stealth.begin({ checkpoints: [{ id, box: [x0, z0, x1, z1] | zone: camName, at: where | { luka: where, ... } }],
@@ -143,6 +148,7 @@ const { chip, AR, DRONES, stealth, safeRoom, strengthHold, pairSwitch } = (() =>
 #ar .popup { color: #22466e; text-shadow: none; background: rgba(250,252,255,.88); border: 1px solid #fff; border-radius: 14px; white-space: pre-wrap;
   box-shadow: 0 0 16px var(--ssglow, rgba(120,190,255,.55)), 0 4px 14px rgba(0,30,80,.25); font-weight: 600; letter-spacing: .02em; padding: 8px 14px; }
 #ar .popup b { color: var(--ss, #2f86e0); font-size: 10px; letter-spacing: .16em; margin-bottom: 2px; }
+body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack, body.saferoom #signal { visibility: hidden; }
 @keyframes arflick { 0%, 46%, 49%, 81%, 84%, 100% { opacity: .96; } 47% { opacity: .5; } 82% { opacity: .78; } }
 `;
   const arEl = document.createElement('div'); arEl.id = 'ar';
@@ -520,7 +526,8 @@ const { chip, AR, DRONES, stealth, safeRoom, strengthHold, pairSwitch } = (() =>
     return { id: '', set: null, scene: null, kind: '', obj: null, cone: coneMake(), beam: beamMake(), rays: new Float32Array(NR + 1), shadow: sh, q: qMake(),
       x: 0, y: 0, z: 0, px: 0, py: 0, pz: 0, yaw: 0, pyaw: 0, vx: 0, vz: 0, tilt: 0, hx: 0, hz: 0, hyaw: 0, hover: 1.55, phase: 0, t: 0,
       path: new Float32Array(128), pn: 0, loop: true, seg: 0, s: 0, dir: 1, speed: 1, pause: 0.5, pauseT: 0,
-      len: 3.2, half: 0.42, hasCone: true, ai: true, sweep: 0, sweepP: 5, showPath: true,
+      len: 3.2, half: 0.42, len0: 3.2, half0: 0.42, hasCone: true, ai: true, sweep: 0, sweepP: 5, showPath: true,
+      coneK: 0, disc: 0.6, discY: NaN, yOff: 0, lureY: NaN, clawK: 0.3, clawTo: 0.3, clawV: 2.5,
       st: 'patrol', stT: 0, tgt: null, sus: 0, lost: 0, lx: 0, lz: 0, light: '',
       gx: 0, gz: 0, gs: 1.4, gRes: null, after: 'idle', faceX: 0, faceZ: 0, faceOn: false, lureTok: 0, lureT: 0, lureDur: 0, arrived: false };
   }
@@ -547,6 +554,7 @@ const { chip, AR, DRONES, stealth, safeRoom, strengthHold, pairSwitch } = (() =>
     d.yaw = d.hyaw; d.seg = 0; d.s = 0; d.dir = 1; d.pauseT = 0; d.vx = d.vz = 0; d.tilt = 0; d.t = 0;
     d.y = floorY(d.x, d.z) + d.hover; d.px = d.x; d.pz = d.z; d.py = d.y; d.pyaw = d.yaw;
     d.lx = d.x; d.lz = d.z; d.lureTok = 0; d.arrived = false;
+    d.coneK = 0; d.len = d.len0; d.half = d.half0; d.discY = NaN; d.lureY = NaN; d.yOff = 0;
     if (d.gRes) { const r = d.gRes; d.gRes = null; r(); }
     d.st = ''; setSt(d, 'patrol');
     if (d.hasCone) rays(d);
@@ -649,10 +657,24 @@ const { chip, AR, DRONES, stealth, safeRoom, strengthHold, pairSwitch } = (() =>
       }
       case 'idle': d.vx = d.vz = 0; if (d.faceOn) turnTo(d, d.faceX, d.faceZ, 3, dt); break;
     }
-    d.y = floorY(d.x, d.z) + d.hover;
+    // a lured drone that has arrived hovers at the lure's height (o.y) and, transfixed, its cone collapses to a disc
+    const tr = d.st === 'lured' && d.arrived, fl = floorY(d.x, d.z);
+    d.yOff += ((tr && d.lureY === d.lureY ? d.lureY - fl - d.hover : 0) - d.yOff) * Math.min(1, 3 * dt);
+    d.y = fl + d.hover + d.yOff;
+    const ck = tr && d.disc > 0 ? 1 : 0;
+    if (d.coneK !== ck) {
+      d.coneK = skipping() ? ck : ck > d.coneK ? Math.min(1, d.coneK + dt * 2.5) : Math.max(0, d.coneK - dt * 2.5);
+      const k = smooth(d.coneK);
+      d.len = d.len0 + (d.disc - d.len0) * k; d.half = d.half0 + (PI - d.half0) * k;
+    }
     if (d.hasCone) rays(d);
     const u = d.obj.userData;
     if (u.brush) u.brush.rotation.y += dt * 9;   // a cleaning drone's brush
+    if (d.clawK !== d.clawTo && u.setClaw) {     // the noise drone's claw (DRONES.claw)
+      const st = dt * d.clawV;
+      d.clawK = Math.abs(d.clawTo - d.clawK) <= st ? d.clawTo : d.clawK + Math.sign(d.clawTo - d.clawK) * st;
+      u.setClaw(d.clawK);
+    }
   }
   function dronesTick(dt) {
     if (graceT > 0) graceT -= dt;
@@ -676,8 +698,8 @@ const { chip, AR, DRONES, stealth, safeRoom, strengthHold, pairSwitch } = (() =>
       d.tilt += (clamp(fwd * 0.12, -0.18, 0.25) - d.tilt) * 0.12;
       d.obj.position.set(x, y + Math.sin(tt * 2.1 + d.phase) * 0.045, z);
       d.obj.rotation.set(d.tilt, yaw, Math.sin(tt * 1.3 + d.phase) * 0.03);
-      const fy = y - d.hover;
-      if (d.hasCone) { d.cone.position.set(x, fy + 0.025, z); d.cone.rotation.y = yaw; d.beam.position.set(x, fy + 0.02, z); d.beam.scale.y = Math.max(0.1, y - fy - 0.12); }
+      const fy = y - d.hover - d.yOff, cy = d.coneK > 0 && d.discY === d.discY ? fy + (d.discY - fy) * smooth(d.coneK) : fy;   // the disc lies on the lure's surface (a table)
+      if (d.hasCone) { d.cone.position.set(x, cy + 0.025, z); d.cone.rotation.y = yaw; d.beam.position.set(x, cy + 0.02, z); d.beam.scale.y = Math.max(0.1, y - cy - 0.12); }
       if (d.shadow) d.shadow.position.set(x, fy + 0.012, z);
       if (d.q.visible) { d.q.position.set(x, y + 0.42 + Math.sin(tt * 5) * 0.03, z); d.q.quaternion.copy(cq); }
     }
@@ -728,7 +750,8 @@ const { chip, AR, DRONES, stealth, safeRoom, strengthHold, pairSwitch } = (() =>
       else if (d.pn >= 2) d.hyaw = Math.atan2(d.path[2] - d.path[0], d.path[3] - d.path[1]);
       else d.hyaw = fr === fr ? fr : 0;
       const c = o.cone;
-      d.hasCone = c !== false; d.len = (c && c.len) || 3.2; d.half = (c && c.half) || 0.42;
+      d.hasCone = c !== false; d.len = d.len0 = (c && c.len) || 3.2; d.half = d.half0 = (c && c.half) || 0.42;
+      d.clawK = d.clawTo = 0.3; if (d.obj.userData.setClaw) d.obj.userData.setClaw(0.3);
       d.ai = o.ai !== false; d.sweep = ((o.sweep || 0) * PI) / 180; d.sweepP = o.sweepPeriod || 5; d.showPath = o.showPath !== false;
       d.light = '';
       dReset(d);
@@ -772,6 +795,7 @@ const { chip, AR, DRONES, stealth, safeRoom, strengthHold, pairSwitch } = (() =>
       const S = (SAMPLES && SAMPLES[sampleId]) || {}, lr = S.lure || { r: 5, dur: 4 }, r = o.r ?? lr.r, dur = o.dur ?? lr.dur;
       const out = { n: 0, ids: [], done: null, then: (a, b) => out.done.then(a, b) };
       if (!whereInto(at, t1)) { out.done = Promise.resolve(); return out; }
+      const lureAt3 = Array.isArray(at) && at.length > 2;   // a point on a surface (a café table): the disc lies on it
       lureEnd();
       const tok = ++LURE.tok;
       LURE.at.copy(t1);
@@ -781,9 +805,10 @@ const { chip, AR, DRONES, stealth, safeRoom, strengthHold, pairSwitch } = (() =>
         const dist = Math.hypot(d.x - t1.x, d.z - t1.z);
         if (dist > r) continue;
         leave(d);
-        const k = dist > 1.1 ? (dist - 1.1) / dist : 0;   // hover a metre short of it, on its own side
-        d.gx = d.x + (t1.x - d.x) * k; d.gz = d.z + (t1.z - d.z) * k; d.faceX = t1.x; d.faceZ = t1.z;
+        const k = o.over ? 1 : dist > 1.1 ? (dist - 1.1) / dist : 0;   // hover a metre short of it, on its own side (over: right above it)
+        d.gx = d.x + (t1.x - d.x) * k; d.gz = d.z + (t1.z - d.z) * k; d.faceX = t1.x + (o.over ? t1.x - d.x : 0) * 0.01; d.faceZ = t1.z + (o.over ? t1.z - d.z : 0) * 0.01;
         d.arrived = false; d.lureT = 0; d.lureDur = dur; d.lureTok = tok;
+        d.disc = o.disc === false ? 0 : o.disc ?? 0.6; d.discY = lureAt3 ? t1.y : NaN; d.lureY = typeof o.y === 'number' ? o.y : NaN;
         if (skipping()) { d.x = d.px = d.gx; d.z = d.pz = d.gz; }
         setSt(d, 'lured');
         out.n++; out.ids.push(d.id);
@@ -825,6 +850,12 @@ const { chip, AR, DRONES, stealth, safeRoom, strengthHold, pairSwitch } = (() =>
     },
     release(id) { const d = dById.get(id); if (d) setSt(d, 'return'); },
     light(id, st) { const d = dById.get(id); if (d) lightD(d, st); },
+    claw(id, k = 1, dur = 0.4) {   // the noise drone's claw: k 0 closed .. 1 open, eased over dur (instant while skipping)
+      const d = dById.get(id);
+      if (!d || !d.obj.userData.setClaw) return;
+      d.clawTo = clamp(+k || 0, 0, 1); d.clawV = 1 / Math.max(0.02, dur);
+      if (skipping() || !(dur > 0)) { d.clawK = d.clawTo; d.obj.userData.setClaw(d.clawK); }
+    },
     state: (id) => { const d = dById.get(id); return d ? d.st : null; },
     inCone(id, who) { const d = dById.get(id), a = typeof who === 'string' ? world.actor(who) : who; return !!(d && a && inCone(d, a)); },
     cover(id, box) {
@@ -1074,10 +1105,12 @@ const { chip, AR, DRONES, stealth, safeRoom, strengthHold, pairSwitch } = (() =>
     }
     srCam(0);
     SR.on = true;
+    document.body.classList.add('saferoom');   // no HUD, swap indicator or objective in the Safe Room
   }
   function srOff() {
     if (!SR.on) return;
     SR.on = false;
+    document.body.classList.remove('saferoom');
     const a = SR.actor;
     SR.actor = null;
     if (a) { if (SR.home) SR.home.add(a.root); a.play('idle'); a.rig.seated = false; a.place(SR.back); }   // (onRetry may place him again)

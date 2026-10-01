@@ -154,7 +154,7 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
       if (cam.cutscene) await cam.release(flow.skipping ? 0 : 0.8);
       if (g !== G) return;
     }
-    if (!cutDepth) { flow.skipping = false; clock.scale = 1; }
+    if (!cutDepth) { flow.skipping = false; clock.scale = 1; flow.slowmo = 1; slowT = 0; }
     if (flow.roaming && !flow.busy) player.enabled = true;
   }
 
@@ -186,6 +186,11 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
       if (sk || typeof ui.timeCard !== 'function') return;
       const p = ui.timeCard(s.timeCard, s.place);
       return s.wait && p && p.then ? p : undefined;
+    }
+    if ('slowmo' in s) { // {slowmo: 0.3, dur: 1.5}: slow motion for dur seconds on screen (not awaited; never while skipping)
+      if (sk) { flow.slowmo = 1; slowT = 0; return; }
+      flow.slowmo = Math.max(0.05, Math.min(1, +s.slowmo || 1)); slowT = s.dur > 0 ? s.dur : 0;
+      return;
     }
     if ('quiet' in s) { // {quiet: 'hh:mm:ss' | null}: the HUD's QUIET IN (state; applied when skipping too)
       state.quiet = s.quiet;
@@ -532,8 +537,10 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
   }
 
   // ---------------------------------------------------------- per tick / per frame
+  let slowT = 0; // seconds of slow motion left (on screen)
   function tick(dt) {
-    clock.scale = cutDepth && input.held('no') ? 3 : 1; // hold NO to fast-forward a cutscene
+    if (slowT > 0 && (slowT -= dt / flow.slowmo) <= 0) { slowT = 0; flow.slowmo = 1; }
+    clock.scale = (cutDepth && input.held('no') ? 3 : 1) * (flow.skipping ? 1 : flow.slowmo); // hold NO to fast-forward a cutscene; slow motion
     if (mg && !mg.paused && !panelOpen && mg.m.update) {
       try { mg.m.update(dt); } catch (e) { console.error('TWO: minigame update()', e); mg.api.finish({ error: true }); }
     }
@@ -605,7 +612,7 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
   function stop() {
     G++;
     if (mg) mg.api.finish({ aborted: true });
-    flow.skipping = false; flow.roaming = false; flow.busy = false; flow.sceneId = null; flow.skipOffer = false;
+    flow.skipping = false; flow.roaming = false; flow.busy = false; flow.sceneId = null; flow.skipOffer = false; flow.slowmo = 1; slowT = 0;
     panelOpen = false; cutDepth = 0; clock.scale = 1; inventory.selected = null; tutOn = false;
     for (const n in loops) { for (const h of loops[n]) h.stop(0.4); loops[n].length = 0; }
     player.enabled = false;
@@ -709,12 +716,13 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
   const flow = {
     skipping: false, scene: null, sceneId: null, stepIndex: 0, result: null,
     swap: false, follow: null, playable: null, roaming: false, busy: false, skipOffer: false,
+    slowmo: 1,                        // slow-motion factor multiplied into clock.scale (the {slowmo, dur} step; reset when the cutscene ends)
     get cutscene() { return cutDepth > 0; }, // a cutscene (or a spot's steps) is running: the pause menu offers Skip Scene
     get minigameId() { return mg ? mg.id : null; },
     start, next, nextId, stop, minigame,
     skip() { // pause menu: run the rest of this cutscene instantly (state steps still apply)
       if (!cutDepth) return;
-      flow.skipping = true; popup.clear();
+      flow.skipping = true; flow.slowmo = 1; slowT = 0; popup.clear();
       if (cardOn) { ui.card(null); cardOn = false; }
     },
     skipMinigame() { // pause menu "Skip this mini-game" (only once offered): finish it as skipped (+ its skipResult)
