@@ -128,6 +128,12 @@
         await waitUntil(() => !stealth.busy || c.flow.skipping);
         log('captures ' + stealth.captures);
         stealth.end(); DRONES.clear(); await c.cam.release(0);
+        // the Quiet Corner (3.1): drawn by systems, then the host set's own corner when it has the marks (hq_atrium)
+        await safeRoom({ variant: 'quiet', who: 'luka' });
+        const mk = W.set.marks;
+        mk.quiet_beanbag = [-6.0, 0, -6.0, 0.6]; mk.quiet_drone = [-7.0, 2.1, -4.6, 2.5];
+        await safeRoom({ variant: 'quiet', who: 'luka', onRetry: () => log('host corner retry') });
+        delete mk.quiet_beanbag; delete mk.quiet_drone;
         c.state.flags.dev_drones = true;
       } }],
       // ---- 6. a strength hold (the roller door)

@@ -320,8 +320,9 @@ the first button after 0.3 s.
   `chip.show(on)` (the view for POV shots / cutscenes, no Signal), `chip.peek(sec = 1.5) → Promise` (autoplay's CHIP),
   `chip.reset()`.
 - `AR.add({ id?, kind = 'sign', text, title?, at: where | on: actorId | prop: name, oy, w, color, size = 1, maxD }) →
-  id`; kinds `sign price name code tag ad thought popup path` (`path`: `{ points: [[x, z] | [x, y, z], …], loop, w }`,
-  a crawling dashed floor line; a patrolling drone's route shows as `path:<droneId>`). `AR.set(id, patch)`,
+  id` (`w` = the label's width in metres in the world, kept within readable limits, px when ≥ 40; `color` = CSS or
+  `0xRRGGBB`; the sets' `ar` lists go straight in: `for (const a of SETS.x.ar) AR.add(a)`); kinds `sign price name code tag ad thought popup path` (`path`: `{ points | path: [[x, z] | [x, y, z], …] | the name of one of the set's `paths`, or arc: { c: [x, z], r, a0,
+  a1 } (yaw radians), loop, w }`, a crawling dashed floor line; a patrolling drone's route shows as `path:<droneId>`). `AR.set(id, patch)`,
   `AR.remove(id)`, `AR.clear()`, `AR.show(true | false | null)` (null = follow Chip View). A `where` is a mark, actor,
   anchor, prop, `[x, z]` or `[x, y, z]`. Labels belong to the set they were made in.
 
@@ -352,7 +353,9 @@ the first button after 0.3 s.
   autoplay drones never go past curious unless `autoCapture`.
 - `safeRoom({ variant: 'room' | 'quiet', who, onRetry }) → Promise` (13.7): drawn by 33-systems over the hidden set (no
   set load; the HUD hides): white, the padded room, DRONE "You are not in trouble. ^ You are in danger.", SafeSense
-  "Would you like to try again? [YES]", retry at the checkpoint with drones reset. ~4 s plus the YES.
+  "Would you like to try again? [YES]", retry at the checkpoint with drones reset. ~4 s plus the YES. `variant: 'quiet'`
+  (3.1, Blend In) uses the current set's own Quiet Corner when it has marks `quiet_beanbag` + `quiet_drone` (and anchor
+  `quiet_corner` for the shot), as `hq_atrium` does; otherwise systems draws one.
 
 ### 5.8 Holds and two-person switches
 

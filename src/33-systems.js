@@ -26,9 +26,11 @@
 //   chip.reset()                   Signal back to 0
 // ---- AR: world-anchored labels, visible only in Chip View (pooled DOM layer #ar over the tint, projected per frame) ---
 //   AR.add({ id?, kind = 'sign', text, title?, at: where | on: actorId | prop: name, oy, w, color, size = 1, maxD }) -> id
+//     w: width in metres in the world (it stays that wide, within readable limits; px when >= 40); color: CSS or 0xRRGGBB.
 //     kinds: sign · price · name (a badge over a head: on: id) · code · tag · ad (text 'TITLE · line · line') · thought ·
-//     popup (SafeSense glass) · path ({ points: [[x, z] | [x, y, z], ...], loop, w }: a crawling dashed floor polyline,
-//     drawn in 3-D; every drone with a path shows its patrol route as 'path:<droneId>' automatically).
+//     popup (SafeSense glass) · path ({ points | path: [[x, z] | [x, y, z], ...] | the name of one of the set's `paths`,
+//     or arc: { c: [x, z], r, a0, a1 } (yaw radians), loop, w }: a crawling dashed floor polyline, drawn in 3-D; every
+//     drone with a path shows its patrol route as 'path:<droneId>' automatically).
 //   AR.set(id, { text, title, at, on, oy }) · AR.remove(id) · AR.clear() · AR.show(true | false | null) (null = follow
 //   Chip View) · AR.visible. A `where` is a mark, actor id, anchor, prop name, [x, z] or [x, y, z].
 // ---- DRONES: Courtesy Drones (art: buildDrone(kind); a plain pod stands in when it is missing) -----------------
@@ -63,7 +65,8 @@
 //   Events: stealth:capture (who), stealth:retry (checkpoint key), stealth:checkpoint (key).
 // ---- safeRoom(o) -> Promise: the fail state (13.7), its own tiny scene drawn full-screen; the current set stays loaded --
 //   { variant: 'room' (padded white room, beanbag, kettle, YOU ARE SAFE NOW, a drone in the corner) | 'quiet' (3.1's
-//   Quiet Corner: a beanbag behind a partition), who = state.active (sits on the beanbag), onRetry() }.
+//   Quiet Corner: a beanbag behind a partition; when the current set has its own corner, marks quiet_beanbag +
+//   quiet_drone and anchor quiet_corner (hq_atrium), that is used instead), who = state.active (sits), onRetry() }.
 //   DRONE: "You are not in trouble. ^ You are in danger." -> SafeSense [YES] -> onRetry under the fade. About 4 s + YES.
 // ---- strengthHold(o) -> thenable handle { k, full, held, done, cancel() } (resolves true when lifted) ---------------
 //   { who = 'luka', label = 'Lift', dur = 1.6, keep (stays up only while held: the roller door), at (face it), anim,
@@ -155,12 +158,12 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
   { const cv = document.getElementById('chipview'), uiEl = document.getElementById('ui');   // over the tint, under pop-ups
     if (cv && cv.parentNode) cv.parentNode.insertBefore(arEl, cv.nextSibling); else if (uiEl) uiEl.append(arEl);
     const st = document.createElement('style'); st.textContent = CSS; document.head.append(st); }
-  const LBL = [], lblFree = [], lblById = new Map();
+  const LBL = [], lblFree = [], lblById = new Map(), AR_PXM = 60;   // CSS px per metre of a label's `w` at scale 1
   let arVis = false, arForce = null, arSeq = 0;
   function lblMake() {
     const el = document.createElement('div'), b = document.createElement('b'), s = document.createElement('span');
     el.className = 'arl'; el.style.visibility = 'hidden'; el.append(b, s); arEl.append(el);
-    return { el, b, s, id: '', set: null, kind: '', at: V(), on: null, prop: null, oy: 0, maxD: 30, size: 1, x: -1e5, y: -1e5, k: -1, shown: false, auto: false };
+    return { el, b, s, id: '', set: null, kind: '', at: V(), on: null, prop: null, oy: 0, maxD: 30, size: 1, wm: 0, x: -1e5, y: -1e5, k: -1, shown: false, auto: false };
   }
   for (let i = 0; i < 16; i++) lblFree.push(lblMake());   // the DOM exists before play
   function lblText(L, text, title) {
@@ -207,6 +210,17 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     g.setDrawRange(0, n * 6);
     g.attributes.position.needsUpdate = true; g.attributes.uv.needsUpdate = true;
   }
+  // a path's points: o.points | o.path ([[x, z] | [x, y, z], ...] or the name of one of the set's `paths`) | o.arc
+  // ({ c: [x, z], r, a0, a1 }: an arc swept from yaw a0 to a1, the engine's convention: direction (sin a, cos a))
+  function pathPts(o) {
+    let p = o.points || o.path;
+    if (typeof p === 'string') { const ps = world.set && world.set.paths; p = ps && ps[p]; if (!p) console.warn('TWO: AR path: no path ' + (o.points || o.path)); }
+    if (!p && o.arc) {
+      const a = o.arc, n = 16; p = [];
+      for (let i = 0; i <= n; i++) { const t = a.a0 + ((a.a1 - a.a0) * i) / n; p.push([a.c[0] + Math.sin(t) * a.r, a.c[1] + Math.cos(t) * a.r]); }
+    }
+    return p || null;
+  }
   function ribDrop(r) {
     if (r.mesh.parent) r.mesh.parent.remove(r.mesh);
     r.mesh.visible = false; ribById.delete(r.id); r.id = ''; r.set = null;
@@ -221,19 +235,23 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
       if (kind === 'path') {
         if (!world.scene) return id;
         const r = ribFree.pop() || ribMake();
-        ribFill(r, o.points, !!o.loop, o.w);   // (one shared colour and dash: every route reads alike)
+        ribFill(r, pathPts(o), !!o.loop, o.w);   // (one shared colour and dash: every route reads alike)
         r.id = id; r.set = world.setId; world.scene.add(r.mesh); r.mesh.visible = arVis;
         RIB.push(r); ribById.set(id, r);
         return id;
       }
       const L = lblFree.pop() || lblMake();
-      L.id = id; L.set = world.setId; L.kind = kind; L.auto = !!o.auto; L.maxD = o.maxD ?? (kind === 'ad' ? 60 : 30);
+      L.id = id; L.set = world.setId; L.kind = kind; L.auto = !!o.auto;
+      L.wm = o.w > 0 && o.w < 40 ? o.w : 0;   // w: the label's width in metres in the world (a sign panel's width), or px when >= 40
+      L.maxD = o.maxD ?? (kind === 'ad' ? 60 : Math.max(30, L.wm * 10));
       L.on = typeof o.on === 'string' ? o.on : null; L.prop = !L.on && typeof o.prop === 'string' ? o.prop : null;
       L.oy = o.oy ?? (L.on ? 0.32 : 0); L.size = o.size || 1;
       if (kind === 'ad' || L.auto) arEl.prepend(L.el); else arEl.append(L.el);   // ads under everything you need to read
       if (!L.on && !L.prop && !whereInto(o.at, L.at)) L.at.set(0, -999, 0);
       L.el.className = 'arl ' + kind;
-      L.el.style.width = o.w ? o.w + 'px' : ''; L.el.style.color = o.color || ''; L.el.style.borderColor = o.color || '';
+      L.el.style.width = L.wm ? Math.round(L.wm * AR_PXM) + 'px' : o.w ? o.w + 'px' : '';
+      const col = typeof o.color === 'number' ? '#' + (o.color & 0xffffff).toString(16).padStart(6, '0') : o.color || '';   // 0xff3a3a or a CSS colour
+      L.el.style.color = col; L.el.style.borderColor = col;
       lblText(L, o.text, o.title);
       L.x = L.y = -1e5; L.k = -1; L.shown = false; L.el.style.visibility = 'hidden';
       LBL.push(L); lblById.set(id, L);
@@ -241,7 +259,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     },
     set(id, o = {}) {
       const L = lblById.get(id);
-      if (!L) { const r = ribById.get(id); if (r && o.points) ribFill(r, o.points, !!o.loop, o.w); return; }
+      if (!L) { const r = ribById.get(id); if (r && (o.points || o.path || o.arc)) ribFill(r, pathPts(o), !!o.loop, o.w); return; }
       if ('text' in o || 'title' in o) lblText(L, 'text' in o ? o.text : L.s.textContent, 'title' in o ? o.title : L.b.textContent || null);
       if ('on' in o) L.on = o.on || null;
       if (o.at != null) { L.on = null; L.prop = null; whereInto(o.at, L.at); }
@@ -272,7 +290,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     const vis = arForce != null ? arForce : chip.on;
     if (vis !== arVis) arSetVisible(vis);
     if (!vis) return;
-    const cp = cam.camera.position, sid = world.setId;
+    const cp = cam.camera.position, sid = world.setId, focal = innerHeight / 2 / Math.tan(cam.camera.fov * PI / 360);   // px per metre at 1 m
     for (let i = 0; i < LBL.length; i++) {
       const L = LBL[i];
       if (L.set !== sid) { lblHide(L); continue; }
@@ -289,7 +307,8 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
       if (d > L.maxD) { lblHide(L); continue; }
       const s = cam.project(t3);
       if (!s.visible) { lblHide(L); continue; }
-      const k = clamp((L.kind === 'ad' ? 9 : 6) / Math.max(0.5, d), 0.45, 1.5) * L.size;
+      // a label w metres wide stays that wide in the world (within readable limits); others shrink gently with distance
+      const k = (L.wm ? clamp(focal / (AR_PXM * Math.max(0.5, d)), 0.4, 1.6) : clamp((L.kind === 'ad' ? 9 : 6) / Math.max(0.5, d), 0.45, 1.5)) * L.size;
       if (!L.shown) { L.shown = true; L.el.style.visibility = 'inherit'; }
       if (Math.abs(s.x - L.x) > 0.5 || Math.abs(s.y - L.y) > 0.5 || Math.abs(k - L.k) > 0.02) {   // DOM writes only when it moved
         L.x = s.x; L.y = s.y; L.k = k;
@@ -1124,6 +1143,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     emit('saferoom', variant);
     const tint = variant === 'quiet' ? '#1e2733' : '#eef1f5';
     chipOff();
+    if (variant === 'quiet' && world.mark('quiet_beanbag')) return hostCorner(o, who, g);   // 3.1: hq_atrium's own corner
     await ui.fade(1, 0.3, tint);
     if (g !== gen) return;
     srOn(variant, who);
@@ -1137,6 +1157,34 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     await ui.fade(1, 0.3, tint);
     srOff();
     if (typeof music === 'function' && music.silence) music.silence(false);
+    if (g !== gen) return;
+    if (o.onRetry) o.onRetry();
+    log('safe room retry');
+    ui.fade(0, 0.4);
+  }
+
+  // The host set's own Quiet Corner (hq_atrium.md §9: marks quiet_beanbag + quiet_drone, anchor quiet_corner) instead of
+  // the drawn one: the captured character sits on the set's beanbag, a drone hovers at quiet_drone, the corner's shot.
+  async function hostCorner(o, who, g) {
+    const a = who ? world.actor(who) : null, bk = SR.back, m = world.mark('quiet_drone');
+    await ui.fade(1, 0.3, '#1e2733');
+    if (g !== gen) return;
+    if (a) { bk[0] = a.pos.x; bk[1] = a.pos.y; bk[2] = a.pos.z; bk[3] = a.rotY; a.place('quiet_beanbag'); a.play(anim(['sit', 'sit_bench']), { h: 0.3 }); }
+    if (m) { DRONES.spawn('_quiet_drone', { at: [m[0], 0, m[2]], hover: m[1] || 2.1, cone: false, ai: false, showPath: false }); DRONES.face('_quiet_drone', 'quiet_beanbag'); }
+    cam.shot(world.anchor('quiet_corner') ? { shot: 'INSERT', at: 'quiet_corner' } : { shot: 'MID', on: who || 'quiet_beanbag' });
+    document.body.classList.add('saferoom');
+    if (typeof music === 'function' && music.silence) music.silence(true);
+    ui.fade(0, 0.35);
+    await say('drone', SR_LINE, { auto: 0.6 });
+    if (g !== gen) return;
+    await popup({ style: 'safesense', msg: SR_ASK, buttons: ['YES'], at: 'center', w: 380 }).done;
+    if (g !== gen) return;
+    await ui.fade(1, 0.3, '#1e2733');
+    document.body.classList.remove('saferoom');
+    if (typeof music === 'function' && music.silence) music.silence(false);
+    DRONES.remove('_quiet_drone');
+    if (a) { a.play('idle'); a.rig.seated = false; a.place(bk); }
+    cam.release(0);
     if (g !== gen) return;
     if (o.onRetry) o.onRetry();
     log('safe room retry');
