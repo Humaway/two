@@ -1373,8 +1373,8 @@ SETS.rue_house = (() => {
   };
   const AMB = {   // spec §10 (every name is a bed in 03-audio: AUDIO.loopNames())
     knock24: { loops: ['cicadas', 'birds', 'surf_far', 'wind_soft'], room: 'none' },
-    explore24: { loops: ['fan', 'clock', ['cicadas', 0.4], ['birds', 0.35]], room: 'room' },
-    tea24: { loops: ['fan', 'clock', ['cicadas', 0.4], ['birds', 0.35]], room: 'room' },
+    explore24: { loops: ['fan', 'clock', { name: 'cicadas', vol: 0.5, lp: 1400 }, { name: 'birds', vol: 0.45, lp: 1800 }], room: 'room' },   // outside, muffled by the walls
+    tea24: { loops: ['fan', 'clock', { name: 'cicadas', vol: 0.5, lp: 1400 }, { name: 'birds', vol: 0.45, lp: 1800 }], room: 'room' },
     gate24: { loops: ['cicadas', ['wind_soft', 0.85], 'surf_far'], room: 'none' },
     cork31: { loops: ['fan', 'clock', ['birds', 0.5]], room: 'room' },
   };
