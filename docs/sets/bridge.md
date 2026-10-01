@@ -47,7 +47,7 @@ theirs.
 | `2.5_alarm` | same | `noon25` | `alarm25` | At the scooters behind the booth both towers turn red; six drones peel off; "Go." |
 | PLAY chase (mini-game `scooter`) | 13:10, the storm closer ahead | `chase25` (lerp 20 s from `noon25`) | `chase25` | Three-lane straight; drones drop in; hover-cars yield in the left lane; dash prompts; Chase records **Drone whir** |
 | `2.5_laugh` | on the hump | `chase25` | `chase25` (`chase.cruise(true)`) | TRACK side-on, six drones in a neat line; CLOSEs; Luka's laugh (**Luka (laughing)** granted) |
-| End of chase | Brighton end, 13:14, first far thunder | `mangrove25` (lerp 6 s) | `end25` | Swerve onto the boardwalk into the mangroves; the drones stop at the edge: "Uneven terrain detected…" |
+| End of chase | Brighton end, 13:14, first far thunder | `mangrove25` (lerp 6 s) | `end25` | Swerve onto the boardwalk into the mangroves; the drones stop at the edge (the DRONE line: "Uneven terrain detected. ^ For your safety, pursuit has ended. ^ Have a lovely day!") |
 | `2.5_manager` | (hq_top cutaway) | — | — | The glass shows low-res drone footage of two scooters disappearing into the mangroves (§9) |
 | Credits vignette (optional) | an evening after rain | `credits25` | `credits25` | All three gates up, cars gliding through one by one: *Teddy has said yes to everyone since Monday.* |
 
@@ -553,7 +553,7 @@ The scan (PLAY 4) and Teddy's yes (PLAY 5) are scripted beats, not hotspots: con
 
 **`2.5_alarm`** — `s25_towers_red`: `tower_E.alarm(true)`, `tower_W.alarm(true)`, `tower_drones.release()` and six
 `DRONES` spawned at the docks rising to y 9 then turning toward the dock; "Go.": `s25_launch` (CLOSE Chase (2040) by
-framing helper). Then `chase.mount` the riders and hand over to the mini-game.
+framing helper). Then `SETS.bridge.mount()` the riders (Luka driver + Chase pillion on scooter_1, Chase (2040) on scooter_2) and hand over to the mini-game.
 
 **`2.5_laugh`** (content; `chase.cruise(true, { drones: ['d25_c1', …, 'd25_c6'] })` before step 1, `false` after)
 1. TRACK side-on: `{ shot: 'WIDE', on: ['luka', 'chase40'], move: 'track', track: 'alongside', side: 'right' }`

@@ -283,7 +283,8 @@ e.g. `seat_B2Rbw` = [1.12, 0, 4.49, PI]. The named ones:
 
 ### 7.1 Cams and zones
 
-"Fixed angles down the aisle": high in the corners near the ceiling (y 2.12), chained along the carriage. Zone changes
+"Fixed angles down the aisle": high in the corners just under the coving (ceiling height at |x| 0.95 is 2.22, at
+|x| 1.10 it is 2.15 — lenses sit ≥ 0.1 below it), chained along the carriage. Zone changes
 use the 0.25 s chained-camera ease (`ease: 0.25`, spec §11) if the engine supports it (04-world §15.4 item 1); otherwise
 they hard-cut.
 
@@ -293,9 +294,9 @@ cams: {
   aisle_B_near: { type: 'fixed', pos: [-0.95, 2.12, 1.20],  look: [0.30, 0.55, 8.90],   fov: 56, ease: 0.25 },  // B3–B4
   aisle_A_far:  { type: 'fixed', pos: [-0.95, 2.12, -10.25],look: [0.30, 0.55, -1.40],  fov: 46, ease: 0.25 },  // A3–A4
   aisle_A_near: { type: 'fixed', pos: [0.95, 2.12, -1.20],  look: [-0.30, 0.55, -8.90], fov: 56, ease: 0.25 },  // A1–A2
-  vest_M:       { type: 'fixed', pos: [1.25, 2.12, 0.85],   look: [-0.90, 0.70, -0.50], fov: 64 },
-  vest_A:       { type: 'fixed', pos: [1.25, 2.12, -8.75],  look: [-0.80, 0.70, -10.30], fov: 64 },
-  vest_B:       { type: 'fixed', pos: [-1.25, 2.12, 8.75],  look: [0.80, 0.70, 10.30],  fov: 64 },
+  vest_M:       { type: 'fixed', pos: [1.10, 2.05, 0.85],   look: [-0.90, 0.70, -0.50], fov: 64 },
+  vest_A:       { type: 'fixed', pos: [1.10, 2.05, -8.75],  look: [-0.80, 0.70, -10.30], fov: 64 },
+  vest_B:       { type: 'fixed', pos: [-1.10, 2.05, 8.75],  look: [0.80, 0.70, 10.30],  fov: 64 },
 },
 zones: [
   { box: [-1.42, -11.0, 1.42, -8.6], cam: 'vest_A' },

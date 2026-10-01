@@ -433,7 +433,7 @@ down; `brick_phone.show(true)`) → `s24_rue_arch` → `s24_rue_kettle` …, wai
 | `s24_explore_room` | [−3.5, 3.0, −3.0] | [2.4, 4.9, −0.5] | 56 | establishing the front room (Rue slow in the arch) |
 | `s24_tea_wide` | [−3.6, 3.25, −0.5] | [−3.0, 4.25, −4.55] | 56 | `2.4_tea` master: from the arch toward the louvres — Rue left, Luka's back, Chase right, **the louvres behind them with Chase (2040) small at the gate** |
 | `s24_tea_rue` | [−5.40, 3.55, −2.10] | [−2.60, 3.65, −2.00] | 40 | over the boys toward Rue, mantel behind him |
-| `s24_twoshot_boys` | [−2.30, 3.45, −2.30] | [−4.75, 3.62, −2.05] | 40 | `2.4_tea` 7 TWO-SHOT: Luka and Chase look at each other (from beside Rue's chair) |
+| `s24_twoshot_boys` | [−2.30, 3.45, −2.30] | [−4.65, 3.62, −1.75] | 40 | `2.4_tea` 7 TWO-SHOT: Luka and Chase look at each other (from beside Rue's chair) |
 | `s24_rue_to_luka` | [−5.40, 3.55, −2.10] | [−3.10, 3.60, −3.20] | 34 | `2.4_tea` 17 CLOSE Rue, to Luka (Luka's eyeline) |
 | `s24_louvre_pov` | [−1.00, 1.55, 13.90] | [−5.25, 3.55, −1.95] | 30 | `2.4_tea` 11 POV: Rue looks through the louvres at the man at his gate |
 | `s24_yard_wide` | [−0.3, 1.6, 8.6] | [7.4, 2.3, 12.2] | 52 | `2.4_gate` 1 WIDE: Rue coming down the stairs (hand on the rail), Chase (2040) at the gate, frangipani between |
@@ -455,7 +455,7 @@ No stealth on this set. Exterior cams sit high on the street side and on the ver
 cams: {
   yard:       { type: 'pan',   pos: [-8.2, 3.4, 14.6],  base: [0.4, 1.4, 6.0],   look: 'player', fov: 52, limit: 0.50 },  // first = default
   stairs:     { type: 'fixed', pos: [1.6, 1.0, 9.0],    look: [-0.1, 3.3, 2.0],  fov: 48 },   // low, looking up the steps to the door
-  verandah:   { type: 'fixed', pos: [-6.6, 4.6, 2.55],  look: [0.6, 3.3, 0.6],   fov: 50 },   // verandah W end: door, bell, stair top
+  verandah:   { type: 'fixed', pos: [-6.6, 4.35, 2.4],  look: [0.6, 3.3, 0.6],   fov: 50 },   // verandah W end, under the bullnose roof (4.66 here)
   street:     { type: 'pan',   pos: [7.5, 2.4, 22.0],   base: [0.0, 1.2, 13.5],  look: 'player', fov: 46, limit: 0.50 },  // filmable only
   room_left:  { type: 'fixed', pos: [2.55, 5.05, -0.45], look: [-4.6, 2.6, -3.6], fov: 56 },  // mantel, Rue's chair, the arch
   room_right: { type: 'fixed', pos: [-6.50, 5.05, -0.45], look: [1.4, 2.7, -4.2], fov: 56 },  // corkboard, sideboard, hall door
