@@ -343,6 +343,28 @@ const { world, cam, frame, player } = (() => {
   const floorAt = (e, x, z, y) => (e && e.def.floor ? e.def.floor(x, z) : y);
   const setAnim = (a, name, restart) => { if (restart) { a.anim = a.poseName = name; a.poseT = 0; } else if (a.anim !== name) a.anim = name; };
   const isUpper = (n) => n !== 'idle' && ANIMS[n] && ANIMS[n].upper && !ONE[n];
+  // play(name, o): anim-specific options (low, h0, h1, z, slump, reach, sit, ...) go straight into the anim's p.
+  // PCTL are play()'s own (handled below, never copied); PKEEP (h, yaw) persist as in Rue (a seat height outlives the
+  // anim that set it, so a one-shot over 'sit' returns to the same seat). A base anim's other options last until the
+  // next base play(); a one-shot's options (h and yaw included) are put back when it returns (pBack).
+  const PCTL = { loop: 1, dur: 1, speed: 1, still: 1, wait: 1, nowait: 1 }, PKEEP = { h: 1, yaw: 1 };
+  const SEAT = { sit: 1, sit_bench: 1 };   // anims that seat the rig at once (an upper anim the same tick keeps the legs)
+  function pSet(a, o, one) {
+    const p = a.p;
+    if (one) {                     // a one-shot: remember what it overwrites
+      for (const k in o) { if (PCTL[k] || o[k] === undefined || (PKEEP[k] && o[k] == null)) continue; if (!(k in a.pS)) a.pS[k] = p[k]; p[k] = o[k]; }
+      return;
+    }
+    for (let i = 0; i < a.pX.length; i++) if (p[a.pX[i]] === a.pXV[i]) p[a.pX[i]] = undefined;   // the last base anim's own (unless re-set since)
+    a.pX.length = 0; a.pXV.length = 0;
+    for (const k in o) {
+      if (PCTL[k] || o[k] === undefined || (PKEEP[k] && o[k] == null)) continue;
+      p[k] = o[k];
+      if (!PKEEP[k]) { a.pX.push(k); a.pXV.push(o[k]); }
+    }
+  }
+  const NOOPT = {};
+  function pBack(a) { for (const k in a.pS) { a.p[k] = a.pS[k]; delete a.pS[k]; } }   // a one-shot returned: its options go
 
   function newActor(id, look, rig) {
     let shadow = rig.root.getObjectByName('blob');
@@ -352,7 +374,8 @@ const { world, cam, frame, player } = (() => {
       id, look, rig, root: rig.root, pos: rig.root.position, rotY: 0, anim: 'idle', expr: 'neutral', carry: null, follow: null,
       mood: null, habit: null, glanceAt: 'chase', walkAnim: look === 'rue19' ? 'swagger' : 'walk', set: null, shadow,
       waiting: false, fw: 0,          // TWO: a follower told to wait holds its spot; fw = the next trail crumb it walks to
-      p: { dur: 0, speed: 1, walk: false, still: false, yaw: 0.9, h: undefined },
+      p: { dur: 0, speed: 1, walk: false, still: false, yaw: 0.9, h: undefined, sit: undefined },
+      pX: [], pXV: [], pS: {},         // play()'s anim options: the base anim's keys + values, a one-shot's saved values
       poseName: '', poseT: 0, ret: 'idle', back: false, playT: -1, playRes: null, glanceT: 2 + Math.random() * 4,
       mv: { on: false, to: V(), speed: 0, face: NaN, loco: 'walk', y0: 0, d0: 1, res: null, collide: false, stuck: 0 },
       fc: { on: false, a0: 0, a1: 0, t: 0, dur: 0.3, res: null },
@@ -403,15 +426,28 @@ const { world, cam, frame, player } = (() => {
       }
       return startFace(a, rot, dur);
     };
+    // play(anim, o): o.dur / loop / speed / still / h / yaw as in Rue, and every other option goes to the anim's p
+    // (play('polish', { low: true }), play('lift_strain', { h0, h1, dur }), play('glass_reach', { reach })).
+    // Seated: 'sit' / 'sit_bench' / 'sit_floor_wall' seat the rig at once, so an upper-body anim played next (even the
+    // same tick) keeps the seated legs (play('sit', { h: 0.48 }); play('piano_play')); o.sit: true seats an upper anim
+    // directly, o.sit: false stands the rig up for it. Walking (moveTo) always stands a seated rig up.
     a.play = (anim, o = {}) => {
       settle(a, 'playRes');
       const one = ONE[anim], back = !!one || o.loop === false, dur = o.dur ?? one ?? 0;
+      if (a.back) pBack(a);            // a one-shot cut short: its options go before anything else is decided
       if (back) a.ret = anim === 'stand' ? 'idle' : ONE[a.anim] || LOCO[a.anim] ? (a.back ? a.ret : 'idle') : a.anim;
       a.p.dur = o.dur || 0; a.p.speed = o.speed ?? 1; a.p.still = !!o.still;
-      if (o.h != null) a.p.h = o.h;
-      if (o.yaw != null) a.p.yaw = o.yaw;
+      const r = a.rig;
+      if (SEAT[anim]) { r.seated = true; r.floorSit = false; }
+      else if (anim === 'sit_floor_wall') { r.seated = true; r.floorSit = true; }
+      if (o.sit === true) r.seated = true;
+      else if (o.sit === false) { r.seated = false; r.floorSit = false; }
       a.back = back;
-      if (skipping()) { a.back = false; a.playT = -1; setAnim(a, back ? a.ret : anim, true); return Promise.resolve(); }
+      if (skipping()) {
+        if (!back) pSet(a, o, false); else { if (o.h != null) a.p.h = o.h; if (o.yaw != null) a.p.yaw = o.yaw; }   // (Rue: h / yaw always land)
+        a.back = false; a.playT = -1; setAnim(a, back ? a.ret : anim, true); return Promise.resolve();
+      }
+      pSet(a, o, back);
       setAnim(a, anim, true);
       a.playT = back ? (dur || 1.2) : dur > 0 ? dur : -1;
       if (a.playT > 0) return new Promise((r) => { a.playRes = r; });
@@ -466,7 +502,10 @@ const { world, cam, frame, player } = (() => {
     const m = a.mv, e = a.set;
     if (m.on) {
       const dx = m.to.x - a.pos.x, dz = m.to.z - a.pos.z, d = Math.hypot(dx, dz), step = m.speed * dt;
-      if (isUpper(a.anim)) { a.p.walk = true; a.p.speed = m.speed / CONFIG.walk; }
+      if (isUpper(a.anim)) {
+        a.p.walk = true; a.p.speed = m.speed / CONFIG.walk;
+        if (a.rig.seated || a.p.sit) { a.rig.seated = false; a.rig.floorSit = false; a.p.sit = false; }   // walking: up off the seat
+      }
       else { setAnim(a, m.loco); a.p.speed = m.speed / (m.loco === 'run' ? CONFIG.run : m.loco === 'carry' ? CONFIG.carry : CONFIG.walk); }
       if (d <= step) {
         a.pos.x = m.to.x; a.pos.z = m.to.z; a.pos.y = floorAt(e, a.pos.x, a.pos.z, m.to.y);
@@ -498,7 +537,7 @@ const { world, cam, frame, player } = (() => {
       if (f.t >= f.dur) { f.on = false; settle(f, 'res'); }
     }
     if (a.playT > 0 && (a.playT -= dt) <= 0) {
-      if (a.back) { a.back = false; setAnim(a, a.ret || 'idle'); }
+      if (a.back) { a.back = false; pBack(a); setAnim(a, a.ret || 'idle'); }
       a.p.dur = 0; a.playT = -1; settle(a, 'playRes');
     }
     if (a.habit === 'glance' && a.anim === 'idle' && !m.on && !a.playRes && (a.glanceT -= dt) <= 0) glance(a);
@@ -532,6 +571,7 @@ const { world, cam, frame, player } = (() => {
     }
     if (a.set !== e) { e.scene.add(a.root); a.set = e; }
     a.visible = true;
+    pBack(a); pSet(a, NOOPT, false);   // a (re)spawn starts from Rue's options: no crouch, no reach left over
     setAnim(a, 'idle', true); a.back = false; a.playT = -1; settle(a, 'playRes');
     a.place(where);
     return a;
@@ -1671,6 +1711,8 @@ const { world, cam, frame, player } = (() => {
     renderer.domElement.style.filter = on && W.whipBlur > 0 ? 'blur(' + W.whipBlur + 'px)' : '';
   }
   const lookI = V(), lookR = V(), UPZ = V().set(0, 0, -1);
+  // idle(): a frame with nothing drawn (an opaque full-screen mini-game card covers the world): staged prebuilds go on
+  function idle() { if (pbQ.length) pbStep(); }
   function render(alpha) {
     const e = cur;
     if (!e) return;
@@ -1861,7 +1903,7 @@ const { world, cam, frame, player } = (() => {
     },
     lineClear: (x0, z0, x1, z1, pad = 0) => lineClearIn(cur, x0, z0, x1, z1, pad),   // no collider box (full height: colliders have none) crosses the segment
     floorAt: (x, z) => floorAt(cur, x, z, 0),
-    update, render, split, timelapse,
+    update, render, idle, split, timelapse,
   };
 
   return { world: W, cam: C, frame: frameFn, player: P };

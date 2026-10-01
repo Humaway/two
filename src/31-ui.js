@@ -311,7 +311,13 @@ const { say, choose, ask } = (() => {
   const node = document.createTextNode(''); txt.append(node);
   const btns = [];
   const D = { mode: null, res: null, id: '', faceId: null, text: '', len: 0, i: 0, acc: 0, cps: 48, beats: [], bi: 0, pause: 0, typing: false,
-    n: 0, fast: false, q: false, censor: false, cwait: false, auto: 0, after: 0, talk: [], sel: 0, n2: 0, dis: [], opt: null, shown: false, hide: 0 };
+    n: 0, fast: false, q: false, censor: false, cwait: false, auto: 0, after: 0, talk: [], sel: 0, n2: 0, dis: [], opt: null, shown: false, hide: 0,
+    framed: true, keep: -1 };
+  // The box lingers 0.07 s after a line in case another line (or a choice) follows. A slow frame runs several ticks
+  // before the awaiting code gets to call choose(), so it never hides before a frame has been drawn since the line
+  // ended (framed), and a choose() within KEEP s of a line keeps that line (the question) above its options.
+  const KEEP = 0.3;
+  on('render', () => { D.framed = true; });
 
   let glitchT = 0;
   const talk = (on) => { if (typeof world !== 'undefined' && world.talk) for (let k = 0; k < D.talk.length; k++) world.talk(D.talk[k], on); };
@@ -328,7 +334,9 @@ const { say, choose, ask } = (() => {
     if (typeof AUDIO !== 'undefined') AUDIO.duck(false);
   }
   function finish(v) { // resolve the current request; the box lingers a few ticks in case another line follows
-    const r = D.res; D.mode = null; D.res = null; D.hide = 0; D.cwait = false;
+    const r = D.res;
+    if (D.mode === 'say') D.keep = clock.t + KEEP;
+    D.mode = null; D.res = null; D.hide = 0; D.cwait = false; D.framed = false;
     more.classList.add('off'); optsEl.classList.add('off');
     if (r) r(v);
   }
@@ -419,12 +427,19 @@ const { say, choose, ask } = (() => {
   const autoPick = () => { const t = D.opt.test; if (t != null && !D.dis.includes(t)) return t; for (let k = 0; k < D.n2; k++) if (!D.dis.includes(k)) return k; return 0; };
   const autoAnswer = () => { let v = D.opt.test ?? true; if (v && D.opt.yesDisabled) v = false; else if (!v && D.opt.noDisabled) v = true; return v; };
 
+  // choose(labels, { disabled, test, prompt, who, name, tag, portrait }): prompt = the question, shown with the options
+  // (who = its speaker: name + portrait, else a plain line like ask's); without a prompt the line just said stays up.
   function choose(labels, o = {}) {
     if (D.res) finish();
     D.opt = o; D.dis = o.disabled || []; D.n2 = labels.length;
     if (ui.skipping()) return Promise.resolve(autoPick());
     return new Promise((res) => {
-      if (!D.shown) { node.data = ''; box.classList.add('noname', 'noface', 'notext'); D.faceId = null; }
+      if (o.prompt != null && o.prompt !== '') {
+        if (o.who) header(o.who, o); else { box.classList.add('noname', 'noface'); D.faceId = null; }
+        box.classList.remove('notext');
+        node.data = String(o.prompt).replace(/ ?\^ ?/g, ' ').trim();   // a beat means nothing in a question shown whole
+      } else if (!D.shown && !(clock.t <= D.keep)) { node.data = ''; box.classList.add('noname', 'noface', 'notext'); D.faceId = null; }
+      D.keep = -1;
       showBox(); more.classList.add('off');
       D.mode = 'choose'; D.res = res; D.after = 0;
       D.sel = 0; while (D.sel < labels.length - 1 && D.dis.includes(D.sel)) D.sel++;
@@ -436,7 +451,7 @@ const { say, choose, ask } = (() => {
     D.opt = o; D.dis = []; D.n2 = 2;
     if (ui.skipping()) return Promise.resolve(autoAnswer());
     return new Promise((res) => {
-      showBox(); more.classList.add('off');
+      showBox(); more.classList.add('off'); D.keep = -1;
       box.classList.add('noname', 'noface'); box.classList.remove('notext'); D.faceId = null;
       node.data = question;
       D.mode = 'ask'; D.res = res; D.after = 0;
@@ -456,10 +471,10 @@ const { say, choose, ask } = (() => {
     ui.sfx('glitch', { vol: 0.5 });
   };
   say.busy = () => D.mode !== null && !D.cwait;
-  say.reset = () => { D.mode = null; D.res = null; D.cwait = false; talk(false); hideBox(); glitchT = 0; box.classList.remove('glitch'); };
+  say.reset = () => { D.mode = null; D.res = null; D.cwait = false; D.keep = -1; talk(false); hideBox(); glitchT = 0; box.classList.remove('glitch'); };
   say.update = (dt) => {
     if (glitchT > 0 && (glitchT -= dt) <= 0) box.classList.remove('glitch');
-    if (D.mode === null) { if (D.shown && (D.hide += dt) > 0.07) hideBox(); return; }
+    if (D.mode === null) { if (D.shown && (D.hide += dt) > 0.07 && D.framed) hideBox(); return; }
     const skip = ui.skipping();
     if (D.mode === 'say') {
       if (skip) { talk(false); return finish(); }

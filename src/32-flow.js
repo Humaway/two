@@ -524,7 +524,7 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
     testLog('minigame ' + id);
     clearOverlay(); ovEl.classList.remove('off'); mgEl.textContent = '';
     return new Promise((res) => {
-      const me = { m, id, paused: 0, api: null, fails: 0 };
+      const me = { m, id, paused: 0, api: null, fails: 0, opaque: m.opaque === true };
       const api = me.api = {
         finish(r) {
           if (mg !== me) return;
@@ -536,6 +536,10 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
         },
         fail() { if (mg !== me) return; me.fails++; mgFails[id] = (mgFails[id] || 0) + 1; offerSkip(id, m); },   // one failure (a retry inside the game)
         get fails() { return mgFails[id] || 0; },
+        // opaque(true): the game covers the whole screen (an opaque card), so the 3D world isn't drawn under it (it still
+        // updates; drawing resumes while api.play runs and when the game ends). Default MINIGAMES[id].opaque, else off.
+        opaque(on = true) { if (mg === me) me.opaque = !!on; },
+        get isOpaque() { return me.opaque; },
         overlay: { canvas: ovEl, ctx: ovEl.getContext('2d'), get w() { return innerWidth; }, get h() { return innerHeight; },
           show(b) { ovEl.classList.toggle('off', !b); } },
         ui: mgEl, world, cam, input, sfx: typeof sfx === 'function' ? sfx : sfxFn, AUDIO: audio(), say, ask, choose, popup, hud,
@@ -737,6 +741,7 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
     slowmo: 1,                        // slow-motion factor multiplied into clock.scale (the {slowmo, dur} step; reset when the cutscene ends)
     get cutscene() { return cutDepth > 0; }, // a cutscene (or a spot's steps) is running: the pause menu offers Skip Scene
     get minigameId() { return mg ? mg.id : null; },
+    get opaque() { return !!(mg && mg.opaque && !mg.paused); },   // a full-screen opaque mini-game card is up: the loop skips world.render
     start, next, nextId, stop, minigame,
     skip() { // pause menu: run the rest of this cutscene instantly (state steps still apply)
       if (!cutDepth) return;

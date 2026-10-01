@@ -368,6 +368,9 @@ body.chipable #t-chip { display: block; }
   #bark, #ui.touchui #bark, #ui.touchui.talking #bark { bottom: auto; top: 176px; left: 12px; width: calc(100vw - 24px); }
   #take, #ui.touchui #take { top: 262px; bottom: auto; left: 12px; right: auto; }
   #timecard, #ui.touchui #timecard { left: 16px; bottom: auto; top: 44%; }
+  /* the swap portraits (left 18–114 px, bottom 190–274 px) own the left of that row: the prompt pill and the meter go above them */
+  #ui.touchui #swap:not(.off) ~ #prompt { bottom: 284px; max-width: calc(100vw - 24px); overflow: hidden; text-overflow: ellipsis; }
+  #ui.touchui:has(#swap:not(.off)) #meter { bottom: 330px; }
 }
 
 /* F2 overlay */

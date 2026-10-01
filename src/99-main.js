@@ -27,17 +27,18 @@ async function boot() {
     if (hasWorld()) world.update(step);
   }
   let reN = 0;
+  const isOpaque = () => typeof flow !== 'undefined' && flow.opaque;   // an opaque full-screen mini-game card: no 3D under it
   function frame(now) {
     requestAnimationFrame(frame);
     const ms = now - last;
     last = now;
-    perf.frame(ms);
+    perf.frame(ms, isOpaque());
     input.poll();
     acc += Math.min(ms / 1000, CONFIG.maxFrame) * (TEST.auto ? TEST.speed : 1) * clock.scale;   // (autoplay's speed scales slow motion too)
     for (let n = 0; acc >= step && n < 12; n++) { tick(); acc -= step; }
     if (acc >= step) acc %= step; // more than 12 ticks behind: drop it rather than spiral
     renderer.info.reset();
-    if (hasWorld() && (!TEST.auto || TEST.re === 1 || ++reN % TEST.re === 0)) world.render(acc / step);
+    if (hasWorld() && (!TEST.auto || TEST.re === 1 || ++reN % TEST.re === 0)) { if (isOpaque()) world.idle(); else world.render(acc / step); }
     emit('render', acc / step);
     perf.draw();
     if (renderer.info.programs.length > progN) {   // every shader should have been compiled by the loader

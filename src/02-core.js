@@ -68,7 +68,10 @@ const input = (() => {
 
   const I = {
     move: { x: 0, y: 0 }, run: false, scheme: touchDevice ? 'touch' : 'kb', lastKey: '',
-    pointer: { x: innerWidth / 2, y: innerHeight / 2, down: false, pressed: false, released: false, over: null },
+    // pointer: x/y now (CSS px); downX/downY where the last press started and upX/upY where it ended (recorded in the
+    // events, so a whole drag that lands inside one tick still has its start: p.pressed && p.released in one tick)
+    pointer: { x: innerWidth / 2, y: innerHeight / 2, down: false, pressed: false, released: false, over: null,
+      downX: innerWidth / 2, downY: innerHeight / 2, downT: 0, upX: innerWidth / 2, upY: innerHeight / 2, button: 0 },
     gesture: null, // set by boot(): called synchronously inside the first key/pointer event (audio unlock)
     pressed: (a) => pr[a] === true,
     held: (a) => dn[a] === true,
@@ -159,14 +162,15 @@ const input = (() => {
     gesture();
     if (onTouchUI(e)) return;
     const p = I.pointer;
-    p.x = e.clientX; p.y = e.clientY; p.down = true; p.over = e.target; pPtr = true;
+    p.x = p.downX = e.clientX; p.y = p.downY = e.clientY; p.down = true; p.over = e.target; pPtr = true;
+    p.downT = clock.t; p.button = e.button;
     if (e.button === 2) { ms.no = true; push('no'); return; }
     if (e.button === 0 && !(e.target.closest && e.target.closest('button, [data-noyes], input, textarea'))) { ms.yes = true; push('yes'); }
   });
   addEventListener('pointermove', (e) => { if (onTouchUI(e)) return; const p = I.pointer; p.x = e.clientX; p.y = e.clientY; p.over = e.target; });
   addEventListener('pointerup', (e) => {
     if (onTouchUI(e)) return;
-    const p = I.pointer; p.x = e.clientX; p.y = e.clientY; p.down = false; rPtr = true;
+    const p = I.pointer; p.x = p.upX = e.clientX; p.y = p.upY = e.clientY; p.down = false; rPtr = true;
     if (ms.yes) { ms.yes = false; rel.yes = true; }
     if (ms.no) { ms.no = false; rel.no = true; }
   });
@@ -274,9 +278,9 @@ const perf = (() => {
   const P = {
     adapt: false,
     toggle() { on = !on; el.classList.toggle('off', !on); },
-    frame(ms) {
+    frame(ms, idle) {               // idle: nothing 3D was drawn (an opaque mini-game card): graphed, never adapted on
       ft[i] = ms; i = (i + 1) % N;
-      if (!P.adapt) return;
+      if (!P.adapt || idle) return;
       winT += Math.min(ms, 50); winN++; // one hitch (tab switch, GC) shouldn't drop the resolution
       if (winT < 2000) return;
       const avg = winT / winN; winT = 0; winN = 0;

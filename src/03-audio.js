@@ -653,6 +653,129 @@ const { AUDIO, sfx, music } = (() => {
     line_click: [0.5, (c, d, t) => { noise(c, d, t, 0.01, { v: 0.4, a: 0.0005, d: 0.004, bp: 1800, q: 1.5 }); tone(c, d, t + 0.02, 50, 0.4, { v: 0.03, a: 0.05, r: 0.05 }); noise(c, d, t + 0.02, 0.4, { v: 0.015, a: 0.05, r: 0.05, bp: 2500, q: 0.6 }); }],
     manager_motif: [6, (c, d, t) => motif(c, rev(c, d, 3.5, 0.45, 0.75), t, 0.12)],
 
+    // ---- mini-game one-shots (the builders' "missing sounds"): short, so they bake in a couple of small contexts.
+    // Pitch moves (a meter climbing, a slower click) are the caller's `rate`.
+    cloth_swish: [0.35, (c, d, t) => { // polish: a microfibre cloth wiping across glass (soft, airy)
+      noise(c, d, t, 0.2, { v: 0.22, a: 0.06, r: 0.1, bp: 1800, fto: 3200, fgl: 0.2, q: 0.7 });
+      noise(c, d, t + 0.02, 0.16, { v: 0.07, a: 0.05, r: 0.08, hp: 5000 });
+    }],
+    glass_squeak: [0.42, (c, d, t) => { // polish: a patch comes clean (stick-slip squeal, gliding up)
+      const am = gn(c, d, 0.6); lfo(c, am.gain, 38, 0.4, t, t + 0.4, 'square');
+      tone(c, am, t, 1700, 0.24, { type: 'sawtooth', to: 2500, gl: 0.2, v: 0.06, a: 0.02, r: 0.08, bp: 2300, q: 4 });
+      tone(c, am, t, 3400, 0.2, { to: 5000, gl: 0.2, v: 0.018, a: 0.02, r: 0.06 });
+    }],
+    glass_slap: [0.55, (c, d, t) => { // a hand slapping flat on the glass: skin, the pane flexing, a dull ring
+      noise(c, d, t, 0.03, { v: 0.6, a: 0.0005, d: 0.012, bp: 1400, q: 0.8 });
+      tone(c, d, t, 160, 0.12, { to: 90, v: 0.35, a: 0.001, d: 0.04 });
+      for (const [f, v, k] of [[1180, 0.04, 0.09], [2650, 0.022, 0.06], [4100, 0.012, 0.04]]) tone(c, d, t, f, 0.3, { v, a: 0.001, d: k, s: 0, r: 0.1 });
+    }],
+    spotless_chime: [1, (c, d, t) => { // SPOTLESS: bright and brief, four bell notes up and a glint
+      [84, 88, 91, 96].forEach((m, i) => { tone(c, d, t + i * 0.055, mtof(m), 0.4, { v: 0.09, a: 0.002, d: 0.16, s: 0, r: 0.2 }); tone(c, d, t + i * 0.055, mtof(m) * 3, 0.2, { v: 0.015, a: 0.002, d: 0.05, s: 0, r: 0.1 }); });
+      tone(c, d, t + 0.2, mtof(103), 0.4, { v: 0.025, a: 0.004, d: 0.14, s: 0, r: 0.2 });
+      glass(c, d, t + 0.12, 6, 0.4, 0.025);
+    }],
+    meter_tick: [0.09, (c, d, t) => { // a meter ticking up a notch (raise `rate` as it climbs)
+      tone(c, d, t, 1320, 0.035, { type: 'triangle', to: 1480, gl: 0.03, v: 0.09, a: 0.001, d: 0.02, s: 0.2, r: 0.02 });
+      noise(c, d, t, 0.004, { v: 0.08, a: 0.0005, d: 0.002, hp: 4000 });
+    }],
+    meter_fall: [0.32, (c, d, t) => tone(c, d, t, 990, 0.2, { type: 'triangle', to: 520, gl: 0.2, v: 0.08, a: 0.004, d: 0.1, s: 0.4, r: 0.06 })],
+    meter_full: [0.8, (c, d, t) => { // a meter hits 100: two hard buzzes over a thump
+      for (const s of [0, 0.22]) { tone(c, d, t + s, 220, 0.16, { type: 'square', v: 0.06, a: 0.003, r: 0.03, lp: 1800 }); tone(c, d, t + s, 233, 0.16, { type: 'square', v: 0.045, a: 0.003, r: 0.03, lp: 1800 }); }
+      tone(c, d, t, 55, 0.4, { v: 0.25, a: 0.004, d: 0.15, s: 0, r: 0.1 });
+    }],
+    plug_click: [0.16, (c, d, t) => { // wiring: a plug seating in its socket
+      noise(c, d, t, 0.012, { v: 0.55, a: 0.0005, d: 0.004, bp: 3200, q: 1.2 });
+      noise(c, d, t + 0.018, 0.01, { v: 0.35, a: 0.0005, d: 0.003, bp: 2200, q: 1.5 });
+      tone(c, d, t + 0.018, 210, 0.04, { to: 130, v: 0.22, a: 0.001, d: 0.018 });
+    }],
+    access_granted: [0.85, (c, d, t) => { // a terminal says yes: three blips up, then a held confirming tone
+      [76, 79, 83].forEach((m, i) => tone(c, d, t + i * 0.08, mtof(m), 0.06, { type: 'square', v: 0.05, a: 0.002, r: 0.02, lp: 3500 }));
+      tone(c, d, t + 0.26, mtof(88), 0.3, { type: 'triangle', v: 0.1, a: 0.004, d: 0.2, s: 0.5, r: 0.2 });
+      tone(c, d, t + 0.26, mtof(95), 0.2, { v: 0.02, a: 0.004, d: 0.1, s: 0, r: 0.1 });
+    }],
+    key_type: [0.07, (c, d, t) => { // one keystroke on an old terminal keyboard (vary `rate` per key)
+      noise(c, d, t, 0.008, { v: 0.4, a: 0.0005, d: 0.003, bp: 4200, q: 1.1 });
+      noise(c, d, t + 0.012, 0.012, { v: 0.25, a: 0.0005, d: 0.005, bp: 1600, q: 1.4 });
+      tone(c, d, t + 0.012, 300, 0.02, { to: 210, v: 0.08, a: 0.001, d: 0.008 });
+    }],
+    popup_clear: [0.2, (c, d, t) => { // a SafeSense pop-up dismissed: a small glassy flick up
+      tone(c, d, t, mtof(91), 0.05, { type: 'triangle', to: mtof(96), gl: 0.04, v: 0.06, a: 0.002, d: 0.03, s: 0.3, r: 0.05 });
+      noise(c, d, t, 0.05, { v: 0.04, a: 0.002, d: 0.02, hp: 5000 });
+    }],
+    crunch: [0.42, (c, d, t) => { // chip sale: a bite of a muesli bar (brittle cracks, then a little grit)
+      for (let k = 0; k < 14; k++) { const x = k / 14; noise(c, d, t + x * 0.16 + rnd() * 0.012, 0.012, { v: 0.35 * (1 - x * 0.6), a: 0.0005, d: 0.004, bp: 1400 + rnd() * 2800, q: 1.4 }); }
+      noise(c, d, t, 0.12, { v: 0.1, a: 0.003, d: 0.05, lp: 900 });
+      for (let k = 0; k < 6; k++) noise(c, d, t + 0.22 + k * 0.03, 0.01, { v: 0.08, a: 0.0005, d: 0.004, bp: 2500, q: 1 });
+    }],
+    tap_pay: [0.32, (c, d, t) => { // a chip tap-to-pay: a soft tap, the reader's two quick beeps
+      noise(c, d, t, 0.01, { v: 0.2, a: 0.0005, d: 0.004, bp: 1500, q: 1 });
+      for (const s of [0.07, 0.17]) tone(c, d, t + s, 2093, 0.06, { type: 'triangle', v: 0.08, a: 0.002, r: 0.02 });
+    }],
+    marker_squeak: [0.48, (c, d, t) => { // a marker writing on a card: three short squeaky strokes
+      for (const [s, f, l] of [[0, 2300, 0.11], [0.15, 2700, 0.08], [0.28, 2100, 0.14]]) {
+        tone(c, d, t + s, f, l, { type: 'sawtooth', to: f * 1.12, gl: l, v: 0.03, a: 0.01, r: 0.03, bp: f, q: 6, vib: [45, 60] });
+        noise(c, d, t + s, l, { v: 0.05, a: 0.01, r: 0.03, bp: 3800, q: 2 });
+      }
+    }],
+    card_slide: [0.32, (c, d, t) => noise(c, d, t, 0.2, { v: 0.25, a: 0.03, r: 0.1, bp: 2600, fto: 1500, fgl: 0.2, q: 0.9 })],   // a card slid across a desk
+    card_insert: [0.32, (c, d, t) => { // a card pushed into a reader: slide, latch
+      noise(c, d, t, 0.16, { v: 0.2, a: 0.02, r: 0.04, bp: 2000, fto: 3000, fgl: 0.16, q: 1 });
+      noise(c, d, t + 0.17, 0.01, { v: 0.5, a: 0.0005, d: 0.004, bp: 2600, q: 1.5 });
+      tone(c, d, t + 0.17, 170, 0.06, { to: 110, v: 0.25, a: 0.001, d: 0.025 });
+    }],
+    accepted: [0.62, (c, d, t) => { // a JARVIS-era reader approves: a dusty square major third
+      tone(c, d, t, mtof(72), 0.12, { type: 'square', v: 0.05, a: 0.003, r: 0.03, lp: 2200 });
+      tone(c, d, t + 0.13, mtof(76), 0.3, { type: 'square', v: 0.05, a: 0.003, d: 0.2, s: 0.5, r: 0.12, lp: 2200 });
+      tone(c, d, t + 0.13, mtof(79), 0.3, { type: 'triangle', v: 0.05, a: 0.003, d: 0.2, s: 0.5, r: 0.15 });
+    }],
+    button_press: [0.22, (c, d, t) => { // a big chunky plastic button (Teddy's NO): press, clack, spring back
+      tone(c, d, t, 140, 0.08, { to: 85, v: 0.4, a: 0.001, d: 0.03 }); noise(c, d, t, 0.02, { v: 0.4, a: 0.0005, d: 0.008, bp: 1200, q: 1.2 });
+      noise(c, d, t + 0.11, 0.012, { v: 0.2, a: 0.0005, d: 0.005, bp: 2200, q: 1.5 });
+    }],
+    tongs_click: [0.22, (c, d, t) => { // steel tongs clacking shut (a click and its bounce)
+      for (const [s, v] of [[0, 1], [0.035, 0.55]]) {
+        noise(c, d, t + s, 0.006, { v: 0.4 * v, a: 0.0003, d: 0.002, hp: 3000 });
+        for (const [f, k] of [[2950, 0.05], [4730, 0.035], [6890, 0.02]]) tone(c, d, t + s, f, 0.12, { v: 0.035 * v, a: 0.0005, d: k, s: 0, r: 0.05 });
+      }
+    }],
+    snag_turn: [0.55, (c, d, t) => { // a snag turned on the hotplate: the tongs, then the fresh side flaring
+      SFX.tongs_click[1](c, d, t);
+      noise(c, d, t + 0.05, 0.36, { v: 0.2, a: 0.01, d: 0.15, s: 0.3, r: 0.1, buf: CRACKLE, hp: 1800 });
+      noise(c, d, t + 0.05, 0.28, { v: 0.1, a: 0.01, d: 0.1, s: 0.3, r: 0.1, hp: 3000 });
+    }],
+    sauce_squirt: [0.5, (c, d, t) => { // a squeeze bottle: the squeeze, wet sputters, the last of the air
+      noise(c, d, t, 0.28, { v: 0.35, a: 0.02, d: 0.15, s: 0.5, r: 0.08, bp: 420, fto: 900, fgl: 0.28, q: 2.5 });
+      for (let k = 0; k < 7; k++) noise(c, d, t + 0.06 + k * 0.045 + rnd() * 0.02, 0.025, { v: 0.25, a: 0.002, d: 0.01, bp: 300 + rnd() * 500, q: 3 });
+      noise(c, d, t + 0.36, 0.06, { v: 0.12, a: 0.003, d: 0.03, bp: 2400, q: 0.8 });
+    }],
+    bin_scrape: [0.62, (c, d, t) => { // a burnt snag scraped into a steel bin
+      const am = gn(c, d, 0.5); lfo(c, am.gain, 29, 0.5, t, t + 0.5, 'sawtooth');
+      noise(c, am, t, 0.35, { v: 0.3, a: 0.03, r: 0.1, bp: 2200, fto: 1300, fgl: 0.35, q: 5 });
+      tone(c, d, t + 0.38, 520, 0.12, { v: 0.04, a: 0.001, d: 0.06, s: 0, r: 0.08 }); tone(c, d, t + 0.38, 1310, 0.1, { v: 0.02, a: 0.001, d: 0.04, s: 0, r: 0.06 });
+    }],
+    swap_whoosh: [0.36, (c, d, t) => { // a quick move between stations (a mini-game's own SWAP)
+      noise(c, d, t, 0.18, { v: 0.4, a: 0.08, r: 0.1, bp: 600, fto: 2600, fgl: 0.2, q: 1.1 });
+      tone(c, d, t + 0.14, mtof(84), 0.05, { type: 'triangle', v: 0.04, a: 0.002, r: 0.06 });
+    }],
+    metronome: [0.07, (c, d, t) => { // the 92 bpm click (a woodblock tick); metronome_hi is the accented downbeat
+      noise(c, d, t, 0.006, { v: 0.35, a: 0.0003, d: 0.002, bp: 2000, q: 2 });
+      tone(c, d, t, 1050, 0.03, { v: 0.12, a: 0.0005, d: 0.012, s: 0, r: 0.02 });
+    }],
+    metronome_hi: [0.08, (c, d, t) => {
+      noise(c, d, t, 0.006, { v: 0.5, a: 0.0003, d: 0.002, bp: 2800, q: 2 });
+      tone(c, d, t, 1580, 0.04, { v: 0.16, a: 0.0005, d: 0.015, s: 0, r: 0.025 });
+      tone(c, d, t, 3160, 0.02, { v: 0.03, a: 0.0005, d: 0.008 });
+    }],
+    desk_slap: [0.36, (c, d, t) => { // a hand flat on a desk
+      noise(c, d, t, 0.025, { v: 0.7, a: 0.0005, d: 0.01, bp: 1100, q: 0.7 });
+      tone(c, d, t, 120, 0.18, { to: 70, v: 0.45, a: 0.001, d: 0.06 }); noise(c, d, t, 0.12, { v: 0.2, a: 0.002, d: 0.05, lp: 500 });
+    }],
+    time_jump: [0.85, (c, d, t) => { // a jump in time: a tape spooling forward, a tick at the end
+      tone(c, d, t, 180, 0.6, { type: 'sawtooth', to: 1400, gl: 0.6, v: 0.04, a: 0.05, r: 0.08, lp: 2500, vib: [30, 40] });
+      noise(c, d, t, 0.6, { v: 0.15, a: 0.1, r: 0.08, bp: 800, fto: 4000, fgl: 0.6, q: 1.2 });
+      clockTick(c, d, t + 0.7, 2600);
+    }],
+
     // ---- samples (spec §13.6): each short, usable as a lure (the whole buffer) and as a sequencer hit (SMP below)
     smp_alarm: [1.3, (c, d, t) => siren(c, d, t, 1.2, 0.14)],
     smp_radio: [2.4, (c, d, t) => { // the store radio through its speaker, one bar
