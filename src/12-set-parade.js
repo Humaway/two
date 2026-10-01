@@ -594,7 +594,8 @@ SETS.parade = (() => {
     gnd(-480, -480, 480, -16, -0.02, M.vc, 4, 0xb8b088);                                // inland (crane only)
     gnd(-480, -16, -130, 18, -0.02, M.vc, 4, 0xa8b07a); gnd(130, -16, 480, 18, -0.02, M.vc, 4, 0xa8b07a);
     // kerbs (gaps at the zebras), lines, zebras, stop lines
-    for (const [z0, z1] of [[-3.3, -3.0], [5.0, 5.3]]) for (const [x0, x1] of [[-130, -16], [-12, 22], [26, 130]]) bb(x0, 0, z0, x1, 0.1, z1, 0xc9c3b6);
+    for (const [x0, x1] of [[-130, -16], [-12, 22], [26, 130]]) bb(x0, 0, -3.3, x1, 0.1, -3.0, 0xc9c3b6);
+    for (const [x0, x1] of [[-130, -50], [-44, -16], [-12, 22], [26, 130]]) bb(x0, 0, 5.0, x1, 0.1, 5.3, 0xc9c3b6);   // (the vehicle access x -50..-44 is flush)
     for (let x = -129; x < 130; x += 6) bb(x, 0, 0.94, x + 3, 0.012, 1.06, LINE);
     for (const [x0, x1] of [[-130, -16.5], [-11.5, 21.5], [26.5, 130]]) { bb(x0, 0, -2.78, x1, 0.012, -2.68, LINE); bb(x0, 0, 4.68, x1, 0.012, 4.78, LINE); }
     for (const [x0, x1] of [[-16, -12], [22, 26]]) {
@@ -665,9 +666,10 @@ SETS.parade = (() => {
     gnd(6, -35, 11, -7, 0, M.pave, 1.2, 0xc8906a); gnd(11, -35, 14, -31, 0, M.pave, 1.2, 0xc8906a);
     bb(0, 0, -37, 6, 7, -16, 0xd8c8b4); bb(11, 0, -31, 22, 7, -16, 0xd0c4b0); bb(0, 0, -37, 11, 7, -35, 0xd8c8b4); bb(11, 0, -40, 16, 7, -35, 0xd8c8b4); bb(14, 0, -31, 16, 7, -24, 0xd0c4b0);
     bb(5.6, 0, -16, 6, 7, -7.3, 0xe8e2d8); bb(11, 0, -16, 11.4, 7, -7.3, 0xe8e2d8);                         // café / boutique side walls
-    for (const [x, ry] of [[6.001, H], [10.999, -H]]) {
-      for (let k = 0; k < 4; k++) { const z = -8.0 - (k + 0.5) * 6.5; tq(6.5, 3.6, [0, (k % 2) * 128, 256, 128], x, 2.2, z, ry, 0, M.mural); }
-      bb(x - 0.06, 0, -34.9, x + 0.06, 0.4, -7.3, 0xb8a890); bb(x - 0.05, 4.0, -34.9, x + 0.05, 4.12, -7.3, 0xb8a890);
+    for (const [x, ry, zEnd] of [[6.001, H, -34.9], [10.999, -H, -31]]) {   // the east wall stops at the exit pocket
+      const tile = (-8.0 - zEnd + (zEnd < -34 ? 0.9 : 0)) / 4;
+      for (let k = 0; k < 4; k++) { const z = -8.0 - (k + 0.5) * tile; tq(tile, 3.6, [0, ((k + (x > 8 ? 1 : 0)) % 2) * 128, 256, 128], x, 2.2, z, ry, 0, M.mural); }
+      bb(x - 0.06, 0, zEnd, x + 0.06, 0.4, -7.3, 0xb8a890); bb(x - 0.05, 4.0, zEnd, x + 0.05, 4.12, -7.3, 0xb8a890);
     }
     bb(6, 0, -35.06, 11, 7, -35, 0xd0c0a8); bb(11, 0, -35.06, 14, 7, -35, 0xd0c0a8);
     // the back street through the pocket (painted backdrop, not walkable)
@@ -1252,7 +1254,7 @@ SETS.parade = (() => {
     COL.push([-322, 6.3, -278, 6.7], [-317, -10.4, -316, 6.7], [-284, -10.4, -283, 6.7], [-317, -10.4, -283, -10],
       [-301.0, -0.3, -299.0, 0.3], [-308.7, -9.95, -308.3, -9.65], [-295.8, -9.9, -295.2, -9.3], [-318.6, 3.4, -317.4, 4.6]);
     R.fars = [R.far_p, R.far_w];
-    R.scene = undefined; R.env = null; R.dressed = null; R.region = null; R.level = 0; R.levelTo = 0; R.levelDrawn = -1;
+    R.scene = typeof state !== 'undefined' && state ? state.scene : null; R.env = null;   // dressed below for this scene: update re-dresses on the next change R.dressed = null; R.region = null; R.level = 0; R.levelTo = 0; R.levelDrawn = -1;
     R.torchOwned = false; R.ambKey = null; R.chirpT = 0; R.bellT = 0; R.bellUp = false; R.lifeLit = '';
     dress(AUTO[typeof state !== 'undefined' && state ? state.scene : ''] || 'day17');
     return root;
@@ -1697,7 +1699,7 @@ SETS.parade = (() => {
       s17_crane_b:    { at: [-12, 0.5, 46], from: [-17, 7.0, 0.5], fov: 50 },
       s17_lifeguard:  { at: [15.0, 0.6, 31.5], from: [11.4, 2.2, 21.8], fov: 44 },
       s17_track:      { at: [-19.6, 1.2, 6.6], from: [-17.6, 1.5, 10.4], fov: 44 },
-      s17_car_turn:   { at: [-44.0, 0.8, 4.0], from: [-36.0, 1.4, 9.2], fov: 40 },
+      s17_car_turn:   { at: [-45.5, 0.6, 6.0], from: [-33.5, 2.6, 5.0], fov: 40 },
       s17_plaque:     { at: [-2.0, 0.8, 8.41], from: [-2.05, 1.12, 7.5], fov: 34 },
       s17_plaque_mid: { at: [-2.2, 0.95, 7.6], from: [-0.2, 1.45, 4.8], fov: 42 },
       s17_pov_chip:   { at: [-4.0, 6.5, -12.0], from: [-3.1, 1.62, 6.1], fov: 60 },
@@ -1706,7 +1708,7 @@ SETS.parade = (() => {
       bollard:        { at: [-10.4, 0.45, 5.15], from: [-9.6, 1.0, 6.7], fov: 36 },
       kiosk:          { at: [12.0, 1.35, 8.3], from: [12.0, 1.45, 6.9], fov: 38 },
       hover_parked:   { at: [-27.0, 0.6, 10.4], from: [-24.6, 1.3, 8.4], fov: 40 },
-      jetty_waves:    { at: [-11.6, -1.2, 21.4], from: [-9.2, 1.4, 25.0], fov: 44 },
+      jetty_waves:    { at: [-12.4, -1.4, 20.2], from: [-7.4, 0.3, 22.8], fov: 44 },
       pelican_pole:   { at: [-9.4, 1.4, 23.8], from: [-10.9, 1.5, 22.4], fov: 34 },
       jetty_man:      { at: [-12.0, 1.0, 59.2], from: [-13.6, 1.5, 56.4], fov: 40 },
       skate_kid:      { at: [23.2, 1.0, 14.0], from: [21.0, 1.4, 11.8], fov: 40 },
@@ -1726,7 +1728,7 @@ SETS.parade = (() => {
       s22_c40_close:  { at: [6.6, 1.6, -15.4], from: [7.8, 1.6, -14.2], fov: 36 },
       s22_lane_bay:   { at: [-30.0, 3.0, 380], from: [8.2, 1.62, -15.2], fov: 30 },
       s22_luka_hiss:  { at: [7.0, 1.0, -21.5], from: [7.6, 1.3, -23.2], fov: 40 },
-      s22_exit:       { at: [12.6, 1.1, -33.0], from: [8.0, 2.4, -27.0], fov: 44 },
+      s22_exit:       { at: [13.2, 0.9, -33.2], from: [7.0, 2.6, -28.8], fov: 46 },
       b1_2031_poster: { at: [-24.6, 1.6, 13.1], from: [-24.4, 1.75, 9.6], fov: 34 },
       crane_sky_p:    { at: [-12, 0, 120], from: [-6, 48, -30], fov: 50 },
       // Region W (world)
@@ -1735,7 +1737,7 @@ SETS.parade = (() => {
       s23_plaque:      { at: [-300.0, 0.84, -0.27], from: [-300.0, 0.95, -0.78], fov: 26 },
       s23_rail_a:      { at: [-300.7, 0.86, -0.24], from: [-301.2, 1.08, -0.82], fov: 30 },
       s23_rail_b:      { at: [-299.3, 0.86, -0.24], from: [-299.8, 1.08, -0.82], fov: 30 },
-      s23_seat:        { at: [-300.2, 0.47, 0.05], from: [-300.2, 1.1, -0.6], fov: 34 },
+      s23_seat:        { at: [-300.25, 0.47, 0.05], from: [-300.3, 1.5, -0.45], fov: 34 },
       s23_bench_front: { at: [-300.0, 0.95, 0.05], from: [-299.6, 1.25, 3.0], fov: 40 },
       s23_c40_close:   { at: [-300.64, 1.2, 0.08], from: [-301.6, 1.3, 1.4], fov: 34 },
       s23_storm:       { at: [-290.0, 40, 420], from: [-300.0, 1.4, -2.0], fov: 30 },
