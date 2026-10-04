@@ -48781,8 +48781,7 @@ try {
   const tick = (flag, quiet) => [{ flag }, ...(quiet ? [] : [{ sfx: 'pop', vol: 0.5 }]), { do: () => duties() }];
   const resumed = (s) => !!(s.flags.s11_polished || s.flags.s11_jordan_down || s.flags.s11_hold1 || s.flags.s11_door);
 
-  // the hold music: from the handset at Chase's ear, or from its base on the counter ("on speaker") after the first talk
-  const HOLD_EAR = { loop: 'hold', vol: 0.45, at: [6.78, 1.62, -7.95] }, HOLD_BASE = { loop: 'hold', vol: 0.5, at: [7.55, 1.1, -9.2] };
+  // the hold music is never heard in 1.1 (it doubled the store radio); HOLD_OFF still clears any left over
   const HOLD_OFF = { loop: 'hold', stop: true, fade: 0.25 };
 
   // the coil of tinsel Jordan holds ("a fistful"): the floor coil, shrunk into a hand while it's held
@@ -48848,11 +48847,8 @@ try {
     }
     if (l) { l.walkAnim = 'walk'; l.setExpr('neutral'); }
   }
-  // the hold music in the room while the roam lasts
-  function holdBed(c) {
-    const f = c.state.flags;
-    return c.runSteps([HOLD_OFF, ...(f.s11_offhold ? [] : [f.s11_hold1 ? HOLD_BASE : HOLD_EAR])]);
-  }
+  // the roam: only the store radio (no hold music under it)
+  function holdBed(c) { return c.runSteps([HOLD_OFF]); }
   // Luka steps behind the lens of an examine (so he is never in front of it) and turns to the thing
   // (world.anchor() gives Vector3s)
   const xyz = (v) => (Array.isArray(v) ? v : [v.x, v.y, v.z]);
@@ -49002,7 +48998,7 @@ try {
       if (l) { l.place([7.45, 0, -7.45, PI - 0.35]); l.play('idle'); }
       if (j && f.s11_jordan_down) { j.place(M11.jordanTill); j.play('idle'); j.face('chase', 0); }
     } },
-    HOLD_OFF, HOLD_BASE,
+    HOLD_OFF,
     { if: (s) => !!s.flags.s11_jordan_down, then: [CALC_THREE], else: [CALC_WIDE] },
     { wait: 1.4 },
     play('chase', 'give', { dur: 1.4, loop: false }),
@@ -49027,7 +49023,7 @@ try {
     { do: (c) => { const l = act(c, 'luka'), ch = act(c, 'chase'); if (l) { l.place(M11.lukaCounter); l.play('idle'); l.setExpr('neutral'); } if (ch) { ch.place(M11.chaseTill); ch.face([7.25, 0, -7.75], 0); ch.play('idle'); } } },
     // he picks the handset up off the counter, listens, and puts it back: click
     { hold: 'chase', prop: 'store_phone', hand: 'R' }, play('chase', 'phone_bare'), expr('chase', 'tired'),
-    HOLD_OFF, { loop: 'hold', vol: 0.4, at: [7.0, 1.6, -9.95] },
+    HOLD_OFF,
     CLOSE('chase', { dist: 1.05, fov: 38, push: 0.06, dur: 5, yaw: 0.45 }),
     { wait: 1.8 },
     { hold: 'chase', prop: null }, play('chase', 'idle'),
@@ -49324,7 +49320,6 @@ try {
       { place: 'chase', at: M11.chaseFront }, play('chase', 'phone_bare'), expr('chase', 'wince'),
       { music: null, fade: 0.9 },
       { loop: 'radio', vol: 0.28, fade: 0.9, at: [7.55, 1.1, -8.78] },
-      HOLD_EAR,
       COUNTER2,
       { wait: 1.8 },
       expr('chase', 'neutral'),
@@ -49337,7 +49332,7 @@ try {
       // [WIDE] The radio swings into a big chugging guitar chorus (instrumental).
       { loop: 'radio', stop: true, fade: 0.1 },
       { music: 'radio', cut: true },
-      HOLD_OFF, { loop: 'hold', vol: 0.3, at: [6.78, 1.62, -7.95] },
+      HOLD_OFF,
       WIDE,
       { wait: 1.8 },
       expr('chase', 'wince'),
