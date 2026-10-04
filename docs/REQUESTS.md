@@ -12,14 +12,14 @@ Source reports are in `docs/reports/`.
 - [x] **flat** — the `s21_*` anchors don't match `docs/sets/flat.md`; floor setup doesn't allow lying down on couch/bed (2.1 sleepers sit up). **Done:** code wins: `s21_dawn_wide` / `s21_box` (moved by the set builder to clear the couch and Luka) now use 2.1's tested `DAWN_WIDE` / `BOX` lenses and `docs/sets/flat.md` matches the code; lying: `SETS.flat.lie(true)` makes the couch seat (0.42) and the mattress (0.56) `floor(x, z)` (off by default and on every `dress()`), new marks `s21_couch_lie` / `s21_bed_lie` for `lie` / `sleep_back` (checked in setview: both lie on top).
 - [x] **sandgate** — `queue.bubble` returns head + 0.28 m, the doc says + 0.4 m (sizzle compensates). **Done (code wins):** kept + 0.28 m (47-mg-sizzle is tuned to it), added an optional `bubble(i, out, lift = 0.28)`; header + `docs/sets/sandgate.md` now say + 0.28.
 
-- [ ] **reddy26** — anchor `s12_heroic` (y 0.85) sits under the Hero Table glass (0.93–0.95): raise to ≈ y 1.02; from `s12_twoshot` the JARVIS monitor hides Chase at `s11_chase_phone` (content uses pos [6.95,1.45,−5.3] → [6.1,1.4,−8.4]); `floor_wreck_wide` puts the wreck under the dialogue box.
-- [ ] **reddy26** — `blast()` fells the tree at 0.25 s (inside the slow-motion close): add `blast({ tree: false })` or a delayed fall (1.2 calls `xmas_tree.userData.fall()` again at the real-time wide).
+- [x] **reddy26** — anchor `s12_heroic` (y 0.85) sits under the Hero Table glass (0.93–0.95): raise to ≈ y 1.02; from `s12_twoshot` the JARVIS monitor hides Chase at `s11_chase_phone` (content uses pos [6.95,1.45,−5.3] → [6.1,1.4,−8.4]); `floor_wreck_wide` puts the wreck under the dialogue box. **Done:** `s12_heroic` = 1.2/B1's `HEROIC` lens (from y 1.02, just over the glass); `s12_twoshot` = 1.2's `TWOSHOT` (from `[6.95, 1.45, -5.3]`); `floor_wreck_wide` re-aimed (at `[6.6, 0.05, -8.2]`, from y 2.45): the wreck sits above the dialogue box, Yes wall and office door still in frame. Doc updated.
+- [x] **reddy26** — `blast()` fells the tree at 0.25 s (inside the slow-motion close): add `blast({ tree: false })` or a delayed fall (1.2 calls `xmas_tree.userData.fall()` again at the real-time wide). **Done:** `blast({ tree: false })` leaves the tree up (instant too); default unchanged.
 
 - [ ] **reddy40** — 1.6 address marks: `s16_addr_luka [0.9,-6.4]` is inside display table 2 → luka `[1.6,-6.55]`, chase `[2.25,-6.2]`, c40 `[2.85,-6.95]`; `s16_addr_jordan [3.6,-7.6]` overlaps a stool → `[3.8,-7.3]`; `s16_jordan_close` → `[3.35,-7.35]`; `s16_speaker [7.55,-8.0]` is 0.1 m from a stool (content uses its own coordinates).
 
 - [ ] **hq_roof** — from the Remote's screen the `s37_st_*` marks put Future Luka behind Luka; the `s37_crane_a`→`b` glide passes through the Yes letters; `s37_sorry_two` looks at the lift house, not the city.
 
-- [ ] **reddy26** — a second fingerprint decal or `smudge1At(x, z, scale)` (1.1 moves/scales `hero_smudge1`); `pot_plant` anchor looks through the tree; `monitor2` sees the monitor's back; Wall/noticeboard anchors put the lens where the player stands; the backroom door has no collider when shut.
+- [x] **reddy26** — a second fingerprint decal or `smudge1At(x, z, scale)` (1.1 moves/scales `hero_smudge1`); `pot_plant` anchor looks through the tree; `monitor2` sees the monitor's back; Wall/noticeboard anchors put the lens where the player stands; the backroom door has no collider when shut. **Done:** `hero_table.userData.smudge1At(x, z, scale = 1)` / `smudge1At(null)` (placement only; `smudge1At(5.65, -5.46, 2.4)` = 1.1's `SMUDGE_L`); `pot_plant` = 1.1's `LENS.plant`; `monitor2` from the staff side (= 1.1's `LENS.monitor`); the Wall close-ups now 0.42–0.5 m off the wall (same framing, wider fov) and `noticeboard` looks down from over the reader's head (checked with actors at the hotspots: out of frame); `backroom_door.userData.solid(on)` keeps a doorway collider while shut (opt-in; off on every dress).
 - [ ] **hq_top** — docs §6 vs code for `glass_popup_ecu`/`glass_moon` (code wins: update doc); `glass_popup` is cropped by the letterbox (P uses [−3.0, 2.15, −14.7]); the ECU shows a title sliver (P uses [−3.04,1.935,−12.95]→[−3.04,1.915,−11.24], fov 31).
 
 - [ ] **bridge** — the `ch_shoulder` camera ([-5.8, 0.5, 214]) has the west barrier filling ~⅓ of the frame during the chase.
@@ -37,7 +37,7 @@ Source reports are in `docs/reports/`.
 - [ ] **reddy40** — an optional caption mode for the address canvas ("THE MANAGER" for the B1 2037 frame).
 - [ ] **sets (optional)** — a funeral frame for B1's 2035 (B1 builds a small hall at load, parked in reddy26 at (40, −60, −40)).
 
-- [ ] **reddy26** — `store_phone.ring()` is visual only (A1 plays the ring sfx itself); the `counter_phone` angle shows the showcase rail (A coda uses its own lens).
+- [x] **reddy26** — `store_phone.ring()` is visual only (A1 plays the ring sfx itself); the `counter_phone` angle shows the showcase rail (A coda uses its own lens). **Done:** `ring(true, { sfx: 'phone_ring', every: 2.5, vol: 0.32, max })` also plays the ring at the phone (opt-in; plain `ring(on)` unchanged); `counter_phone` = the A coda's steep lens.
 
 ## Engine
 

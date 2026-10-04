@@ -220,7 +220,7 @@ Named groups (`world.prop(name)`); every API is `userData.*` and must be allocat
 | `hero_wrap` | Shrink-wrap: inflated translucent box 1.7 × 1.0 × 1.0 over the new table (no phones yet), two brown tape strips, a red FRAGILE sticker | A1/B1 split | visible in `home` |
 | `plastic_heap` | Crumpled wrap on the floor at (6.7, 0, −4.3) | B1 `home_night` | visible in `home_night` |
 
-**`hero_table.userData.blast({ instant })`** (1.2 step 16), 1.2 s timeline: t 0 `blast_flash`; phones and glass top
+**`hero_table.userData.blast({ instant, tree = true })`** (1.2 step 16; `tree: false` leaves the tree up for content to fell), 1.2 s timeline: t 0 `blast_flash`; phones and glass top
 hidden, `hero_wreck` shown; shards fly; phone meshes 1–2 fly (one lands behind the counter at (4.9, 0, −10.3), one by
 the display table at (1.3, 0, −6.4)), 3–4 vanish; `hero_tethers.swing(0.9)` + `alarm(true)`; `alarm_beacon.on(true)`;
 t 0.25 `xmas_tree.fall()`; t 0.3 `tinsel_yes.set('fallen')`; t 0–1.0 `smoke_floor.amount` 0 → 1. Leaves the set
@@ -248,7 +248,7 @@ exactly in `wrecked`. With `instant` (skip / `fast=1`) jump to the end state.
 | --- | --- | --- |
 | `door_l`, `door_r`, `door_sign` | Rue's | `door_sign.userData.set(open)` / `flip()`; new **`door_l.userData.hold(true\|false\|null)`** forces both leaves open/shut (null = auto) — the crane passes through them |
 | `store_radio` | Silver boombox at the counter's right end (§2.1) with handle, antenna, two cones, LCD | `playing` (bool): cones pulse ×1.06 at the music beat (4 Hz); LCD lit. On in 1.1–1.2, off from the blast |
-| `store_phone` | Rue's handset on the base at (7.55, 1.05, −9.2) | content lifts/sets it; `ring(on)` jiggles it 12 Hz ±2 mm |
+| `store_phone` | Rue's handset on the base at (7.55, 1.05, −9.2) | content lifts/sets it; `ring(on)` jiggles it 12 Hz ±2 mm; `ring(true, { sfx: 'phone_ring', every: 2.5, vol: 0.32, max })` also rings it (positional, first at once, never while skipping) |
 | `cash_tray` | Till drawer open with a cash tray at (7.05, 1.0, −9.25) | `home` |
 | `monitor_screen` | Both counter monitors (Rue) | `show('xmas'\|'app'\|'off')` |
 | `ladder` | Aluminium A-frame stepladder: h 1.8, treads y 0.42 / 0.84 / 1.26, top cap 1.68, footprint 0.55 × 0.9 open. Collider when standing [3.8,−12.2,4.3,−11.4] | `set('yes_wall'\|'folded'\|'carried'\|'hidden')`: `yes_wall` = open at (4.05, 0, −11.75), ry π (climber faces the wall); `folded` = leaning on the counter's right end at (8.05, 0, −8.7); `carried` = content parents it to an actor; `wobble()` ±0.04 rad roll for 0.6 s |
@@ -266,7 +266,7 @@ exactly in `wrecked`. With `instant` (skip / `fast=1`) jump to the end state.
 | --- | --- | --- |
 | `the_wall` | One group (wallAtlas quads + frames, merged): **Polaroid** frame 0.20 × 0.24 at (5.415, 1.62, −19.55); **PUDDING cassette** box frame 0.30 × 0.22 × 0.05 at (5.43, 1.58, −20.05) with the cassette inside; **"Sorry for the wait. — R." note** 0.15 × 0.10 pinned at (5.415, 1.70, −20.45); **MISSING poster** A4 portrait in a black frame 0.30 × 0.42 at (5.415, 1.55, −20.95); **hold-music flyer** A5 0.21 × 0.30 at (5.415, 1.62, −21.5) | static |
 | `print4` | Framed four-men print 0.30 × 0.22 above the Polaroid/cassette pair at (5.415, 2.02, −19.8) | visible in `wall_print` only |
-| `backroom_door` | Rue's hinged door with window + spinner panel on the corridor side (the JARVIS door) | `userData.open` (Rue); new `request()` spins the panel 9 s then opens ("the door takes nine seconds") |
+| `backroom_door` | Rue's hinged door with window + spinner panel on the corridor side (the JARVIS door) | `userData.open` (Rue); new `request()` spins the panel 9 s then opens ("the door takes nine seconds"); `solid(on)`: a doorway collider while shut (off by default and on every dress) |
 | `tube` | Rue's flickering tube | `userData.off`; new `flicker(n)` forces n bursts (A1/B1 "smoke curling up to the flickering tube") |
 | `scorch` | Ceiling decals P1, P2, P3 (y 2.79, transparent `scorch` texture, random rotation) | `count(n)`: 2 (P1, P2) default; 3 (adds P3, "from Christmas") in `home`, `home_night`, `days_later`, `tinsel_down`, `wall_print`, `xmas27` |
 | `do_not_paint` | (static) laminated A4 taped to the ceiling, §2.1 | — |
@@ -386,8 +386,8 @@ Rue anchors **kept**: `monitor`, `monitor2`, `monitor_screen`, `display_wall`, `
 | `do_not_paint` | [5.95, 2.788, −26.45] | [5.95, 1.85, −25.6] | 28 | reading the sign |
 | `laptop` | [3.95, 1.05, −29.65] | [3.95, 1.3, −29.0] | 32 | "UNFINISHED — 213 items" |
 | `clock_floor` | [8.4, 2.62, −12.46] | [8.4, 2.4, −11.5] | 28 | INSERT wall clock 11:58 (1.1 end, 1.2 step 3), 12:04 (1.3 end) |
-| `s12_heroic` | [5.6, 1.5, −7.05] | [5.25, 0.85, −4.6] | 46 | LOW · heroic, up past the glittering table edge; **B1 match cut uses this exact frame** |
-| `s12_twoshot` | [6.6, 1.25, −8.9] | [4.4, 1.3, −6.0] | 44 | Luka foreground admiring the table, back to Chase at the counter |
+| `s12_heroic` | [5.6, 1.56, −7.05] | [5.3, 1.02, −4.48] | 43 | LOW · heroic, up past the glittering table edge; **B1 match cut uses this exact frame** |
+| `s12_twoshot` | [6.1, 1.4, −8.4] | [6.95, 1.45, −5.3] | 46 | Luka foreground admiring the table, back to Chase at the counter (from the table's right end: the JARVIS monitor clear of Chase at `s11_chase_phone`) |
 | `floor_locked` | [4.6, 0.9, −8.2] | [−8.6, 2.9, −0.6] | 55 | WIDE · locked, the whole floor (BAM) |
 | `s12_midair` | [5.6, 1.5, −8.6] | [3.9, 1.5, −8.3] | 38 | SLOW MOTION CLOSE, side-on, the display disintegrating behind |
 | `s12_pov_upside` | [5.55, 1.3, −5.3] | [5.6, 0.32, −10.0] | 48 | LOW · Luka's view upside down: **through the showcase glass** to the figure in the smoke. **Roll 180°** (if the camera has no roll, flip the canvas for the shot) |
@@ -397,8 +397,8 @@ Rue anchors **kept**: `monitor`, `monitor2`, `monitor_screen`, `display_wall`, `
 | `wall_phone` | [4.3, 1.45, −24.0] | [4.5, 1.5, −24.75] | 36 | the wall phone / dialling |
 | `split_a` | [4.4, 1.55, −24.3] | [8.4, 1.65, −29.3] | 50 | 1.3 split half, toward the wall phone (top edge catches P1). **Identical in reddy40** (shows the machine) |
 | `split_b` | [6.4, 1.3, −27.5] | [4.0, 1.6, −24.4] | 52 | 1.3 split half, reverse: faces of the trio / the empty 2040 room. **Identical in reddy40** |
-| `floor_wreck_wide` | [7.0, 1.0, −9.0] | [1.6, 2.2, −1.4] | 52 | WIDE · locked: wreck, smoke, tinsel, counter, Yes wall, **office door (open in PC) right of frame** — 1.3 end and PC step 1/12 (deliberately the same frame) |
-| `counter_phone` | [7.55, 1.05, −9.2] | [7.3, 1.45, −8.55] | 30 | PC INSERT: he presses HOLD |
+| `floor_wreck_wide` | [6.6, 0.05, −8.2] | [1.6, 2.45, −1.4] | 52 | WIDE · locked: wreck, smoke, tinsel, counter, Yes wall, **office door (open in PC) right of frame** — 1.3 end and PC step 1/12 (deliberately the same frame) |
+| `counter_phone` | [7.55, 1.05, −9.3] | [7.5, 1.64, −8.5] | 34 | PC INSERT: he presses HOLD |
 | `a1_split_store` | [6.6, 1.15, −9.2] | [9.4, 1.9, −3.0] | 50 | A1/B1 split right half: wrapped table foreground-left, Luke at the till |
 | `home_door` | [6.4, 1.35, −24.0] | [7.4, 1.25, −28.9] | 46 | "the corridor door bangs open" |
 | `b1_night_floor` | [6.0, 1.1, −8.0] | [2.0, 1.55, −2.4] | 46 | B1 step 43 WIDE: Luka at the table, Chase on the counter |

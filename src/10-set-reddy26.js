@@ -32,15 +32,16 @@
 //   accessories, shopfront, carpark. ZONES tile the walkable interior (first match wins).
 // PROPS (userData API; every call is instant while skipping and allocation-free):
 //   hero_table set('smudged'|'spotless'|'wrecked'|'new_wrapped'|'new'|'gone', {smudge1}) glint() handprint(on)
-//     smudge1(on) blast({instant}) · hero_smudge · hero_smudge1 · hero_handprint · hero_phone_1..4 · hero_wreck
+//     smudge1(on) smudge1At(x, z, scale = 1 | null) blast({instant, tree = true}) · hero_smudge · hero_smudge1 ·
+//     hero_handprint · hero_phone_1..4 · hero_wreck
 //   hero_tethers swing(amp) alarm(on) · tether_loose · alarm_beacon on(b) · glass_shards (instanced 80) · blast_flash
 //   hero_wrap · plastic_heap · tinsel_yes set('hidden'|'half'|'hung'|'fallen') · tinsel_floor · tinsel_coil
 //   tinsel_sign · tinsel_static · tinsel_strand · fairy_lights power(k) (instanced 160) · snow_spray
 //   xmas_tree set('up'|'fallen'|'gone') fall() · aframe_sign · door_l hold(true|false|null) · door_r · door_sign
-//     set(open) flip() · store_radio playing · store_phone ring(on) · cash_tray · monitor_screen show(mode)
+//     set(open) flip() · store_radio playing · store_phone ring(on, {sfx, every, vol, max}) · cash_tray · monitor_screen show(mode)
 //   ladder set('yes_wall'|'folded'|'carried'|'hidden') wobble() · clock_floor_hands · clock_hands set(h, m)
 //   calendar set(day, month, weekday, year) · office_door open · swivel_chair spin · cust26_a/b (ambient rigs)
-//   the_wall · print4 · backroom_door open request() bang() · tube off flicker(n) · scorch count(n) · do_not_paint
+//   the_wall · print4 · backroom_door open request() bang() solid(on) · tube off flicker(n) · scorch count(n) · do_not_paint
 //   kettle · rue_mug · tv_screen show('xmas'|'off') · laptop · wall_phone ring(on) · wall_phone_handset · jbox_lid open
 //   remote_plugged · roller_door set(gap) slam() gap · door_light_leak · smoke_floor / smoke_backroom amount(k, dur)
 //   yard_gate set('shut'|'ajar'|'open') · pelicans (instanced) · traffic · roof · sun · sky_horizon · shimmer
@@ -1133,7 +1134,7 @@ SETS.reddy26 = (() => {
     const geoOf = (fn) => part('', fn, null, 0, { floor: false }).children[0].geometry;   // a one-material shape for instancing
     // dynamic colliders (arrays mutated in place; parked far away when off)
     const C = { table: [PARK, PARK, PARK, PARK], posts: [[], [], [], []].map(() => [PARK, PARK, PARK, PARK]), tree: [PARK, PARK, PARK, PARK],
-      ladder: [PARK, PARK, PARK, PARK], roller: [PARK, PARK, PARK, PARK], gate: [PARK, PARK, PARK, PARK] };
+      ladder: [PARK, PARK, PARK, PARK], roller: [PARK, PARK, PARK, PARK], gate: [PARK, PARK, PARK, PARK], bdoor: [PARK, PARK, PARK, PARK] };
 
     function propsFloor() {
       tint = IN;
@@ -1159,8 +1160,13 @@ SETS.reddy26 = (() => {
         R.mon.userData.show = (mode) => { if (mode === R.monMode) return; R.monMode = mode; paintMonitor(T.mon.image.getContext('2d'), 256, 160, mode); T.mon.needsUpdate = true; };
         // the store phone's handset (content lifts it; ring(on) jiggles it)
         R.phoneH = P(part('store_phone', () => { box(0.06, 0.04, 0.2, 0x2a2c30, 0, 0, 0); box(0.07, 0.05, 0.05, 0x2a2c30, 0, -0.005, 0.08); box(0.07, 0.05, 0.05, 0x2a2c30, 0, -0.005, -0.08); }, [7.55, 1.05, -9.2], 0, { floor: false }));
-        R.phoneH.userData.ring = (on) => { R.phoneRing = !!on; };
-        R.phoneRing = false;
+        // ring(on, { sfx: 'phone_ring' | 'trill', every: 2.5, vol: 0.32, max }): with the options the set also plays the
+        // ring at the phone every `every` s (first at once; never while skipping); without them it only jiggles (as before)
+        R.phoneH.userData.ring = (on, o) => {
+          R.phoneRing = !!on; R.phoneSnd = null;
+          if (on && o && o.sfx) { R.phoneSnd = { name: o.sfx, every: o.every || 2.5, max: o.max ?? Infinity, o: { vol: o.vol ?? 0.32, at: [7.55, 1.05, -9.2] } }; R.phoneT = 0; R.phoneN = 0; }
+        };
+        R.phoneRing = false; R.phoneSnd = null; R.phoneT = 0; R.phoneN = 0;
         // the till's open cash drawer (A1/B1: Luke doing the count)
         R.cash = P(part('cash_tray', () => {
           bb(-0.2, -0.08, -0.5, 0.2, -0.01, -0.12, 0x3a3d42); bb(-0.19, -0.06, -0.49, 0.19, -0.015, -0.13, 0x22252a);
@@ -1210,6 +1216,9 @@ SETS.reddy26 = (() => {
       R.reqT = -1; R.bangT = -1;
       R.bdoor.userData.request = () => { if (skipping()) { R.bdoor.userData.open = true; R.bdoor.rotation.y = 1.5; R.reqT = -1; } else R.reqT = 0; };
       R.bdoor.userData.bang = () => { R.bdoor.userData.open = true; if (skipping()) { R.bdoor.rotation.y = 1.5; R.bangT = -1; } else R.bangT = 0; };
+      // solid(on = true): while the door is shut (not open, swung < 0.9 rad) a live collider fills the doorway; off by
+      // default and on every dress (as before: the shut door doesn't block)
+      R.bdoorSolid = false; R.bdoor.userData.solid = (on = true) => { R.bdoorSolid = !!on; };
       R.straightener = P(straightenerModel('straightener')); R.straightener.position.set(9.6, 0.42, -24.55); R.straightener.rotation.set(0.5, 0.6, 0);
     }
 
@@ -1343,6 +1352,12 @@ SETS.reddy26 = (() => {
       R.table.userData.glint = () => { if (skipping()) return; R.glintT = 0; R.glint.visible = true; R.glint.position.x = -0.8; };
       R.table.userData.handprint = (on) => { R.hand.visible = !!on; };
       R.table.userData.smudge1 = (on) => { R.smudge1.visible = !!on; };
+      // smudge1At(x, z, scale = 1): the one fingerprint's centre to world (x, z) at `scale` (1.1 uses ×2.4: a 7 cm print
+      // reads as a smudge from 1.5 m); smudge1At(null) puts it home. Placement only: show it with smudge1(true).
+      R.table.userData.smudge1At = (x, z, sc = 1) => {
+        if (x == null) { R.smudge1.position.set(0, 0, 0); R.smudge1.scale.set(1, 1, 1); return; }
+        R.smudge1.scale.set(sc, 1, sc); R.smudge1.position.set(x - R.table.position.x - 0.45 * sc, 0, z - R.table.position.z - 0.2 * sc);
+      };
       R.table.userData.blast = blast;
     }
     function setTable(st, o = {}) {
@@ -1377,12 +1392,12 @@ SETS.reddy26 = (() => {
       R.shards.instanceMatrix.needsUpdate = true;
     }
     // 1.2 step 16: the Hero Table blows apart (1.2 s); leaves the set in `wrecked` (the radio keeps playing: the music is content's)
-    function blast(o = {}) {
-      setTable('wrecked');
+    function blast(o = {}) {   // o.tree === false: the tree stays up (content fells it itself, e.g. at a real-time wide)
+      setTable('wrecked'); R.blastTree = o.tree !== false;
       R.tethers.userData.swing(0.9); R.tethers.userData.alarm(true); R.beacon.userData.on(true);
       if (o.instant || skipping()) {
         R.flash.visible = false; R.blastT = -1;
-        setTree('fallen'); setTinselYes('fallen'); R.tinselFloor.visible = true; smokeTo(R.smF, 1, 0);
+        if (R.blastTree) setTree('fallen'); setTinselYes('fallen'); R.tinselFloor.visible = true; smokeTo(R.smF, 1, 0);
         return;
       }
       R.blastT = 0; R.blastStage = 0;
@@ -1752,7 +1767,7 @@ SETS.reddy26 = (() => {
       buildOutside(root); buildFloor(); buildBack();
       propsFloor(); if (E26) { propsHero(); propsXmas(); }
       propsTree(); propsBack(); propsAmbient(); propsFairy();
-      COL.push(C.table, C.posts[0], C.posts[1], C.posts[2], C.posts[3], C.tree, C.ladder, C.roller, C.gate);
+      COL.push(C.table, C.posts[0], C.posts[1], C.posts[2], C.posts[3], C.tree, C.ladder, C.roller, C.gate, C.bdoor);
       XF = null; tint = IN;
       if (ext.build) ext.build(KIT);
       XF = null;
@@ -1800,7 +1815,7 @@ SETS.reddy26 = (() => {
     }
     function dressShared(o) {   // props both eras share, back to rest
       R.doorHold = null; R.flipT = 1;
-      R.bdoor.rotation.y = 0; R.bdoor.userData.open = undefined; R.reqT = -1; R.bangT = -1;
+      R.bdoor.rotation.y = 0; R.bdoor.userData.open = undefined; R.reqT = -1; R.bangT = -1; R.bdoorSolid = false; park(C.bdoor);
       R.chair.userData.seat.rotation.y = 0; R.chair.userData.spin = 0;
       R.tube.userData.off = false; R.flickN = 0;
       R.wallRing = false; R.wallHandset.position.y = R.wallHome;
@@ -1845,7 +1860,7 @@ SETS.reddy26 = (() => {
       const w = !!(d.wired && typeof state !== 'undefined' && state && state.flags && state.flags.s13_wired);
       if (R.remote) R.remote.visible = w;
       R.jbox.userData.open = w; R.jboxK = w ? 1 : 0;
-      R.phoneRing = false; R.phoneH.position.set(7.55, 1.05, -9.2); R.phoneH.rotation.set(0, 0, 0);
+      R.phoneRing = false; R.phoneSnd = null; R.phoneH.position.set(7.55, 1.05, -9.2); R.phoneH.rotation.set(0, 0, 0);
       R.gap = R.gapTo = 0; R.slamT = -1;
       R.cal.userData.set(d.cal[0], d.cal[1], d.cal[2], d.cal[3]);
       R.fairyPow = null; R.fairyClock = 1;
@@ -1909,6 +1924,8 @@ SETS.reddy26 = (() => {
         if (R.bangT > 0.65) { R.bangT = -1; R.bdoor.rotation.y = 1.5; }
       } else if (R.bdoor.userData.open !== undefined) R.bdoor.rotation.y += ((R.bdoor.userData.open ? 1.5 : 0) - R.bdoor.rotation.y) * Math.min(1, dt * 5);
       if (R.odoor.userData.open !== undefined) R.odoor.rotation.y += ((R.odoor.userData.open ? 1.5 : 0) - R.odoor.rotation.y) * Math.min(1, dt * 5);
+      if (R.bdoorSolid && !R.bdoor.userData.open && R.bdoor.rotation.y < 0.9) { if (C.bdoor[0] !== 5.95) setBox(C.bdoor, 5.95, -24.05, 6.85, -23.7); }
+      else if (C.bdoor[0] !== PARK) park(C.bdoor);
       { const s = R.chair.userData.spin; if (s) { R.chair.userData.seat.rotation.y += s * dt; R.chair.userData.spin = Math.abs(s) < 0.05 ? 0 : s * (1 - 0.55 * dt); } }
       R.jboxK = ease(R.jboxK, R.jbox.userData.open ? 1 : 0, Math.min(1, dt * 4)); R.jbox.rotation.y = 1.745 * R.jboxK;
       // the backroom tube: bursts of flicker (2026); flicker(n) forces n bursts; userData.off; 2040's LED tube is steady
@@ -1983,6 +2000,9 @@ SETS.reddy26 = (() => {
       const gust = Math.max(0, Math.sin(t * 0.37) * Math.sin(t * 0.91 + 1));
       R.tsEnds[0].rotation.x = -0.35 * gust * (0.6 + 0.4 * Math.sin(t * 7)); R.tsEnds[1].rotation.x = -0.3 * gust * (0.6 + 0.4 * Math.sin(t * 6 + 2));
       if (R.phoneRing) R.phoneH.position.y = 1.05 + 0.002 * Math.sin(t * TAU * 12);
+      if (R.phoneRing && R.phoneSnd && !skipping() && R.phoneN < R.phoneSnd.max && (R.phoneT -= dt) <= 0) {
+        R.phoneT = R.phoneSnd.every; R.phoneN++; if (typeof sfx === 'function') sfx(R.phoneSnd.name, R.phoneSnd.o);
+      }
       // the Hero Table: the SPOTLESS glint, the blast timeline, the tethers' pendulums, the alarm pucks and the beacon
       if (R.glintT >= 0) { R.glintT += dt; const u = R.glintT / 0.5; R.glint.position.x = -0.85 + 1.7 * u; if (u >= 1) { R.glintT = -1; R.glint.visible = false; } }
       if (R.blastT >= 0) blastTick(dt);
@@ -2028,7 +2048,7 @@ SETS.reddy26 = (() => {
         ph.rotation.set(l[3] * u + (1 - u) * bt * 14, l[4] * u + bt * 9 * (1 - u), (1 - u) * bt * 11);
       }
       shardsAt(u);
-      if (bt >= 0.25 && R.blastStage < 1) { R.blastStage = 1; R.tree.userData.fall(); }
+      if (bt >= 0.25 && R.blastStage < 1) { R.blastStage = 1; if (R.blastTree) R.tree.userData.fall(); }
       if (bt >= 0.3 && R.blastStage < 2) { R.blastStage = 2; setTinselYes('fallen'); R.tinselFloor.visible = true; }
       if (bt >= 1.2) { R.blastT = -1; R.flash.visible = false; shardsAt(1); }
     }
@@ -2090,17 +2110,17 @@ SETS.reddy26 = (() => {
     const ANCHORS = {
       // Rue's (kept)
       monitor:        { at: [6.4, 1.3, -9.03], from: [6.44, 1.36, -8.3], fov: 40 },
-      monitor2:       { at: [4.3, 1.3, -9.03], from: [4.34, 1.36, -8.3], fov: 40 },
+      monitor2:       { at: [4.3, 1.3, -9.03], from: [4.3, 1.33, -9.75], fov: 34 },   // from the staff side (the screen faces it)
       monitor_screen: { at: [6.4, 1.3, -9.03], from: [6.4, 1.32, -9.72], fov: 32 },
       display_wall:   { at: [-2.0, 1.3, -14.2], from: [-2.0, 1.62, -5.0], fov: 30 },
       door_sign:      { at: [-1.45, 1.5, -0.1], from: [-1.4, 1.56, -1.05], fov: 30 },
       doors:          { at: [-2.0, 1.3, 0], from: [-2.0, 1.6, -4.2], fov: 40 },
       keypad:         { at: [-4.4, 1.45, -0.4], from: [-4.4, 1.5, -0.95], fov: 30 },
       targets_board:  { at: [8.4, 1.65, -12.46], from: [8.4, 1.62, -11.1], fov: 42 },
-      noticeboard:    { at: [10.95, 1.52, -11.6], from: [9.6, 1.58, -11.6], fov: 44 },
+      noticeboard:    { at: [10.95, 1.52, -11.6], from: [9.85, 2.12, -11.6], fov: 46 },   // over the reader's head, down onto the board
       calendar:       { at: [10.96, 1.55, -10.35], from: [10.0, 1.55, -10.35], fov: 34 },
       queue_machine:  { at: [0.66, 1.24, -1.9], from: [-0.4, 1.4, -1.9], fov: 32 },
-      pot_plant:      { at: [10.3, 0.9, -0.85], from: [8.8, 1.4, -2.0], fov: 38 },
+      pot_plant:      { at: [10.3, 0.85, -0.85], from: [10.0, 1.35, -2.35], fov: 36 },   // past the tree's right, not through it
       accessories:    { at: [-8.9, 1.4, -7.8], from: [-5.9, 1.65, -7.8], fov: 48 },
       sim_rack:       { at: [10.9, 1.25, -5.9], from: [9.4, 1.45, -5.9], fov: 40 },
       office_door:    { at: [9.9, 1.35, -12.6], from: [9.7, 1.55, -10.4], fov: 42 },
@@ -2135,11 +2155,12 @@ SETS.reddy26 = (() => {
       s11_ladder_ots: { at: [4.05, 2.7, -12.3], from: [4.45, 1.0, -10.8], fov: 46 },
       xmas_tree:      { at: [9.25, 0.8, -1.0], from: [7.7, 1.45, -2.6], fov: 40 },
       office_door_sign: { at: [9.9, 1.55, -12.59], from: [9.9, 1.58, -11.85], fov: 32 },
-      wall_polaroid:  { at: [5.42, 1.62, -19.55], from: [6.05, 1.62, -19.55], fov: 28 },
-      wall_cassette:  { at: [5.43, 1.58, -20.05], from: [6.05, 1.6, -20.05], fov: 30 },
-      wall_note:      { at: [5.42, 1.70, -20.45], from: [5.95, 1.7, -20.45], fov: 24 },
-      wall_missing:   { at: [5.42, 1.55, -20.95], from: [6.25, 1.57, -20.95], fov: 34 },
-      wall_flyer:     { at: [5.42, 1.62, -21.5], from: [6.1, 1.62, -21.5], fov: 30 },
+      // the Wall's close-ups: lenses 0.42-0.5 m off the wall (the same framing, wider), between it and whoever reads it
+      wall_polaroid:  { at: [5.42, 1.62, -19.55], from: [5.84, 1.62, -19.55], fov: 41 },
+      wall_cassette:  { at: [5.43, 1.58, -20.05], from: [5.85, 1.6, -20.05], fov: 43 },
+      wall_note:      { at: [5.42, 1.70, -20.45], from: [5.84, 1.7, -20.45], fov: 30 },
+      wall_missing:   { at: [5.42, 1.55, -20.95], from: [5.92, 1.57, -20.95], fov: 54 },
+      wall_flyer:     { at: [5.42, 1.62, -21.5], from: [5.87, 1.62, -21.5], fov: 44 },
       wall_all:       { at: [5.42, 1.6, -20.5], from: [7.3, 1.62, -20.5], fov: 50 },
       rue_mug:        { at: [9.98, 0.97, -28.78], from: [9.35, 1.2, -28.7], fov: 26 },
       ceiling_scorch: { at: [5.9, 2.8, -26.6], from: [6.9, 1.2, -25.0], fov: 52 },
@@ -2147,8 +2168,8 @@ SETS.reddy26 = (() => {
       laptop:         { at: [3.95, 1.05, -29.65], from: [3.95, 1.3, -29.0], fov: 32 },
       clock_floor:    { at: [8.4, 2.62, -12.46], from: [8.4, 2.4, -11.5], fov: 28 },
       // 1.2
-      s12_heroic:     { at: [5.6, 1.5, -7.05], from: [5.25, 0.85, -4.6], fov: 46 },
-      s12_twoshot:    { at: [6.6, 1.25, -8.9], from: [4.4, 1.3, -6.0], fov: 44 },
+      s12_heroic:     { at: [5.6, 1.56, -7.05], from: [5.3, 1.02, -4.48], fov: 43 },   // just above the glass top (1.2 / B1's HEROIC)
+      s12_twoshot:    { at: [6.1, 1.4, -8.4], from: [6.95, 1.45, -5.3], fov: 46 },     // from the table's right end: the monitor clear of Chase
       floor_locked:   { at: [4.6, 0.9, -8.2], from: [-8.6, 2.9, -0.6], fov: 55 },
       s12_midair:     { at: [5.6, 1.45, -7.6], from: [3.5, 1.45, -10.5], fov: 40 },   // side-on from the staff side: Luka mid-air, the display blowing apart behind him
       s12_pov_upside: { at: [5.55, 1.3, -5.3], from: [5.6, 0.32, -10.0], fov: 48 },
@@ -2159,9 +2180,9 @@ SETS.reddy26 = (() => {
       wall_phone:     { at: [4.3, 1.45, -24.0], from: [4.5, 1.5, -24.75], fov: 36 },
       split_a:        { at: [4.4, 1.55, -24.3], from: [8.4, 1.65, -29.3], fov: 50 },
       split_b:        { at: [6.4, 1.3, -27.5], from: [4.0, 1.6, -24.4], fov: 52 },
-      floor_wreck_wide: { at: [7.0, 1.0, -9.0], from: [1.6, 2.2, -1.4], fov: 52 },
+      floor_wreck_wide: { at: [6.6, 0.05, -8.2], from: [1.6, 2.45, -1.4], fov: 52 },   // the wreck above the dialogue box
       // PC, endings
-      counter_phone:  { at: [7.55, 1.05, -9.2], from: [7.3, 1.45, -8.55], fov: 30 },
+      counter_phone:  { at: [7.55, 1.05, -9.3], from: [7.5, 1.64, -8.5], fov: 34 },    // over the counter, steep (the A coda's lens)
       a1_split_store: { at: [6.6, 1.15, -9.2], from: [9.4, 1.9, -3.0], fov: 50 },
       home_door:      { at: [6.4, 1.35, -24.0], from: [7.4, 1.25, -28.9], fov: 46 },
       b1_night_floor: { at: [6.0, 1.1, -8.0], from: [2.0, 1.55, -2.4], fov: 46 },
