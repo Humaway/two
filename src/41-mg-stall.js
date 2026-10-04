@@ -18,6 +18,8 @@
 //   cams       false = no per-line cuts (otherwise each line cuts to an OTS on whoever is speaking, CLOSE for beats;
 //              the door and trench-coat beats always cut)
 //   testDoor   autoplay only: pick the worst answers until the first door event (to exercise it)
+//   release    true | secs: ease back to the gameplay camera when the call returns. Default: NOT released, the camera
+//              holds the stall's last shot (a cutscene next keeps it); before a roam call cam.release() yourself or pass this
 // Expects actors 'luka' and 'luke' facing each other in the corridor (reddy26 marks s13_stall_luka / s13_stall_luke);
 // 'chase40' in the backroom (the trench coat at the door window and behind the door), 'jordan' anywhere (off).
 // Uses marks s13_luke_door, s13_c40_pass_a / _b and prop backroom_door (userData.open) when the set has them.
@@ -378,6 +380,7 @@ MINIGAMES.stall = (() => {
       luke = luka = null; faceC = fallC = null;
       if (ctx) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, ov.canvas.width, ov.canvas.height); ctx.globalAlpha = 1; }
       if (ov) ov.show(false);
+      if (P && P.release && api && !(r && r.aborted)) api.cam.release(typeof P.release === 'number' ? P.release : 0.8);
     },
     skipResult: () => (rounds ? { half, done: rounds.indexOf(5) >= 0, suspicion: 50, doors, round: rounds[rounds.length - 1] + 1 } : { half: 1, done: false }),
     // ?autoplay=1: the game plays itself (say/choose auto-advance; choose picks the best answer); &fast=1: the end state

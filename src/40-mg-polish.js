@@ -21,7 +21,9 @@
 //            false             no lean (Chase isn't there)
 //          Inside a custom lean, call MINIGAMES.polish.handprint() (or the handprint argument) the moment his hand
 //          lands; if nothing does, the print lands when the lean ends. The 3D prop gets hero_table.userData.handprint(true).
-//   flag   a flag set on success (e.g. 's11_polished'); anim: false = don't put actor 'luka' into the crouched polish loop.
+//   flag   a flag set on success (e.g. 's11_polished'); anim: false = don't put actor 'luka' into the crouched polish loop
+//          (else his hands land on the glass at glassH m, default 0.95). The default lean walks Chase round the counter
+//          ({ collide: true }; if he stalls short he is placed on the mark).
 // Result: { spotless: true, shine: 1, leaned, secs }   (+ skipped / auto). Events: emit('polish:lean'), emit('polish:spotless').
 // 3D props it drives when the set has them (reddy26 spec 5.1): hero_table.userData.handprint(on) / glint() / set('spotless');
 // hero_smudge fades with the shine (its material opacity), so the 3D glass matches the card during the lean.
@@ -404,7 +406,8 @@ MINIGAMES.polish = (() => {
     const hasLuka = !!api.world.actor('luka');
     return [
       { shot: 'WIDE', on: hasLuka ? ['luka', 'chase'] : ['chase'] },
-      { move: 'chase', to: spot },
+      { move: 'chase', to: spot, collide: true },   // round the counter, not through it (a move that stalls ends where it stalls)
+      { do: () => { const a = api.world.actor('chase'); if (a && Math.hypot(a.pos.x - spot[0], a.pos.z - spot[2]) > 0.15) a.place(spot); } },
       { act: [['chase', 'push', { dur: 2.4, loop: false }]] },
       { wait: 0.45 },
       { do: () => addHand() },
@@ -522,7 +525,7 @@ MINIGAMES.polish = (() => {
       baseShot = P.shot || (w.anchor('hero_top') ? TOP_SHOT : null);
       if (baseShot) a.cam.shot(baseShot);
       luka = P.anim === false ? null : w.actor('luka'); lukaAnim = false;
-      if (luka) { luka.play('polish'); luka.p.low = true; lukaAnim = true; }   // (world's play() drops anim params: set p.low by hand)
+      if (luka) { luka.play('polish', { low: true, h: P.glassH ?? 0.95 }); lukaAnim = true; }   // crouched, hands on the glass (glassH m, the Hero Table's 0.95)
       smudgeMat = null; smudgeK = -1;
       const hs = w.prop('hero_smudge');
       if (hs) hs.traverse((o) => { if (!smudgeMat && o.material && !Array.isArray(o.material) && o.material.transparent) smudgeMat = o.material; });
