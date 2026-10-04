@@ -231,11 +231,11 @@ All reddy26 shell marks exist here with the same coordinates (`counter_luka`, `c
 | `s15_jayden_counter` | [6.4, 0, −7.85, π] | 1.5 Jayden at the counter (= `counter_customer`) |
 | `s15_jordan_pass_a` / `_b` | [9.9, 0, −11.9, 0] / [9.0, 0, −6.2, 0.3] | 1.5 "Chase, you're on the floor till one." (passing) |
 | `s15_jordan_watch` | [9.85, 0, −12.25, −2.5] | 1.5 "He's good." (watching from the office door) |
-| `s16_addr_luka` | [0.9, 0, −6.4, −2.80] | 1.6 watching the big screen |
-| `s16_addr_chase` | [1.55, 0, −6.1, −2.85] | 1.6 |
-| `s16_addr_c40` | [2.3, 0, −6.9, −2.95] | 1.6 |
-| `s16_addr_jordan` | [3.6, 0, −7.6, −2.6] | 1.6 Jordan stops; doesn't clap |
-| `s16_jordan_close` | [2.8, 0, −7.35, −2.9] | 1.6 "Back door. ^ Go. ^ I didn't see you." (beside Chase (2040), not looking at him) |
+| `s16_addr_luka` | [1.6, 0, −6.55, −2.65] | 1.6 watching the big screen |
+| `s16_addr_chase` | [2.25, 0, −6.2, −2.7] | 1.6 |
+| `s16_addr_c40` | [2.85, 0, −6.95, −2.6] | 1.6 |
+| `s16_addr_jordan` | [3.8, 0, −7.3, −2.6] | 1.6 Jordan stops; doesn't clap |
+| `s16_jordan_close` | [3.35, 0, −7.35, −0.64] | 1.6 "Back door. ^ Go. ^ I didn't see you." (beside Chase (2040), not looking at him) |
 | `d_in_a` / `d_in_b` / `d_in_c` | [−2.6, 1.8, 5.0] / [−2.0, 1.9, 5.6] / [−1.4, 1.8, 5.0] | 1.6 drone entry starts (outside); through the doors (`door_l.hold(true)` for 2 s) to `d_in_mid` [−2.0, 1.8, −2.5], then to posts |
 | `s16_cp_floor` | [1.6, 0, −8.6, −2.8] | stealth checkpoint 1 (start) |
 | `s16_cp_alcove` | [1.95, 0, −13.1, π/2] | checkpoint 2: the alcove between the display wall and the aisle opening (out of every cone) |
@@ -243,7 +243,7 @@ All reddy26 shell marks exist here with the same coordinates (`counter_luka`, `c
 | `s16_cp_yard` | [7.75, 0, −31.4, π] | checkpoint 4 |
 | `s16_zap_luka` | [2.2, 0, −10.9, π/2] | 1.6 the zap: Luka at the aisle opening watching the cones, "Go left—" |
 | `s16_zap_chase_from` / `_to` | [2.9, 0, −10.5, π/2] / [3.3, 0, −11.45, 2.2] | 1.6 Chase steps "left" (−Z) into `drone_b`'s courtesy field (content places drone_b at [3.85, 1.7, −11.75] for the beat) |
-| `s16_speaker` | [7.55, 0, −8.0, π] | 1.6 Chase plays a sample through the old counter speaker (customer side) |
+| `s16_speaker` | [7.85, 0, −8.05, π] | 1.6 Chase plays a sample through the old counter speaker (customer side) |
 | `s16_wait_luka` / `s16_wait_c40` | [1.95, 0, −13.1, π/2] / [1.6, 0, −13.6, π/2] | 1.6 the others wait in the alcove while Chase sets the lure |
 | `s16_roller_luka` | [7.75, 0, −29.55, π] | 1.6 Luka lifts the roller door (strain) |
 | `s16_roller_under_1` / `_2` | [7.2, 0, −30.9, π] / [8.3, 0, −30.9, π] | 1.6 Chase, Chase (2040) through under the door |

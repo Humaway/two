@@ -34,7 +34,8 @@
 // CAMS: the shell's roam cams (staff, corridor, office, backroom, backroom_rev, entrance, counter, aisle, accessories,
 //   shopfront, carpark) + the stealth fixed cams st_floor, st_back, st_staff, st_corridor, cp_dock, cp_lot, cp_gate.
 // PROPS (userData API; every call is instant while skipping and allocation-free):
-//   big_screen show('ad'|'address'|'safe'|'off') glance(k 0..1) mode · screens_all show(mode) (big screen, terminals,
+//   big_screen show('ad'|'address'|'safe'|'off') glance(k 0..1) mode caption(text|null) · screens_all show(mode)
+//   caption(text|null) (a lower-third strip on the shared address canvas; reset by dress) (big screen, terminals,
 //   kiosk, TV share one 'address'/'safe' canvas) · terminal_l / terminal_r show('idle'|'address'|'safe'|'off') ·
 //   chip_kiosk chime() show('kiosk'|'address'|'safe'|'off') · chips_wall / chips_tables / chips_showcase on(bool) ·
 //   hover_trolley settle(bool) at (live [x, y, z]: pass it as a hotspot's `at`) · led_string · front_doors lock(bool)
@@ -214,6 +215,10 @@ SETS.reddy40 = (() => {
     c.fillStyle = '#0e0c12'; c.fillRect(0, 96, w, 32); c.fillStyle = '#3c3646'; c.fillRect(0, 96, w, 2);
     c.fillStyle = '#07060b'; c.beginPath(); c.moveTo(92, 98); c.quadraticCurveTo(96, 70, 116, 66); c.lineTo(140, 66); c.quadraticCurveTo(160, 70, 164, 98); c.closePath(); c.fill();
     c.strokeStyle = 'rgba(160,116,180,0.5)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(94, 93); c.quadraticCurveTo(98, 72, 116, 67); c.stroke();
+  }
+  function paintCaption(c, s) {   // a lower-third strip over the desk, inside every screen's crop (kiosk cols 74..182, big screen rows ..105)
+    c.fillStyle = 'rgba(178,24,34,0.94)'; c.fillRect(72, 92, 112, 13); c.fillStyle = 'rgba(255,255,255,0.85)'; c.fillRect(72, 92, 112, 1);
+    text(c, s, 128, 98.8, 10, '#ffffff', 'center', 'bold', 106);
   }
   function paintHead(c, k) {   // the hood, turned k (0..1) a few degrees to his own left (screen-right)
     const hx = 128 + 2.5 * k, fx = 128.5 + 6 * k;
@@ -671,6 +676,9 @@ SETS.reddy40 = (() => {
     // ---- screens_all: one switch for every screen (they share the address canvas)
     const all = P(new THREE.Object3D()); all.name = 'screens_all';
     all.userData.show = (m) => { screenShow(m); for (const t of R40.terms) termShow(t, m === 'ad' ? 'idle' : m); kioskShow(m === 'ad' ? 'kiosk' : m); tvShow(K, m === 'ad' ? 'off' : m); };
+    // caption(text | null): a lower-third name strip on the shared address canvas (every screen showing 'address');
+    // none by default and after every dress (B1's 2037 frame: caption('THE MANAGER'))
+    all.userData.caption = R40.screen.userData.caption = (txt) => { S.caption = txt ? String(txt) : null; if (S.addrMode === 'address') addrPaint('address'); };
     // ---- the TV: an address/safe face over the shell's (the shell's quad shows 'off')
     R40.tvAddr = part('', () => quadUV(0.32, 0.24, X.addr, -0.002, 0, 0, -H, 0, 0xffffff, 0.66, 1, 0.17, 0), null, 0, FL);
     R.tv.add(R40.tvAddr); R40.tvAddr.visible = false;
@@ -969,7 +977,7 @@ SETS.reddy40 = (() => {
     const T = S.T; if (!T) return;
     const c = T.addr.image.getContext('2d');
     if (m === 'safe') { if (S.addrMode === 'safe') return; c.drawImage(S.addrSafe, 0, 0); }
-    else { c.drawImage(S.addrBg, 0, 0); paintHead(c, S.glP = S.glK); }
+    else { c.drawImage(S.addrBg, 0, 0); paintHead(c, S.glP = S.glK); if (S.caption) paintCaption(c, S.caption); }
     S.addrMode = m; T.addr.needsUpdate = true;
   }
   function desScreen(st) {
@@ -1017,7 +1025,7 @@ SETS.reddy40 = (() => {
   }
   function resetState(K) {
     S.T = K.T; S.env = null; S.dress = null; S.zoneKey = '';
-    S.glK = 0; S.glP = 0; S.glT = 0; S.addrMode = '';
+    S.glK = 0; S.glP = 0; S.glT = 0; S.addrMode = ''; S.caption = null;
     S.chimeT = -1; S.chimeNext = 6; S.chipClock = 1; S.ledClock = 1; S.palmClock = 1;
     S.trTh = 0.6; S.trY = 0.04; S.trSettle = false; S.trBob = 0;
     S.locMode = 'idle'; S.locLook = false; S.locPulse = false; S.locClap = false;
@@ -1048,7 +1056,7 @@ SETS.reddy40 = (() => {
   function dress40(st, K, o = {}) {
     if (!R40.screen) return;
     const R = K.R, key = DR[st] ? st : 'store40', d = DR[key];
-    S.dress = key; R.dressState = key;
+    S.dress = key; R.dressState = key; S.caption = null;
     // screens
     screenShow(d.scr);
     for (const t of R40.terms) termShow(t, d.scr === 'ad' ? 'idle' : d.scr);
@@ -1277,12 +1285,13 @@ SETS.reddy40 = (() => {
     s15_jayden_counter: [6.4, 0, -7.85, PI], s15_jordan_pass_a: [9.9, 0, -11.9, 0], s15_jordan_pass_b: [9.0, 0, -6.2, 0.3],
     s15_jordan_watch: [9.85, 0, -12.25, -2.5],
     // 1.6
-    s16_addr_luka: [0.9, 0, -6.4, -2.80], s16_addr_chase: [1.55, 0, -6.1, -2.85], s16_addr_c40: [2.3, 0, -6.9, -2.95],
-    s16_addr_jordan: [3.6, 0, -7.6, -2.6], s16_jordan_close: [2.8, 0, -7.35, -2.9],
+    // (clear of display table 2 and the counter stool at (3.45, -7.95): 1.6's own blocking, A16)
+    s16_addr_luka: [1.6, 0, -6.55, -2.65], s16_addr_chase: [2.25, 0, -6.2, -2.7], s16_addr_c40: [2.85, 0, -6.95, -2.6],
+    s16_addr_jordan: [3.8, 0, -7.3, -2.6], s16_jordan_close: [3.35, 0, -7.35, -0.64],
     d_in_a: [-2.6, 1.8, 5.0, PI], d_in_b: [-2.0, 1.9, 5.6, PI], d_in_c: [-1.4, 1.8, 5.0, PI], d_in_mid: [-2.0, 1.8, -2.5, PI],
     s16_cp_floor: [1.6, 0, -8.6, -2.8], s16_cp_alcove: [1.95, 0, -13.1, H], s16_cp_backroom: [6.4, 0, -25.2, PI], s16_cp_yard: [7.75, 0, -31.4, PI],
     s16_zap_luka: [2.2, 0, -10.9, H], s16_zap_chase_from: [2.9, 0, -10.5, H], s16_zap_chase_to: [3.3, 0, -11.45, 2.2],
-    s16_speaker: [7.55, 0, -8.0, PI], s16_wait_luka: [1.95, 0, -13.1, H], s16_wait_c40: [1.6, 0, -13.6, H],
+    s16_speaker: [7.85, 0, -8.05, PI],   // beside the stool at (7.25, -7.95), facing the counter speaker s16_wait_luka: [1.95, 0, -13.1, H], s16_wait_c40: [1.6, 0, -13.6, H],
     s16_roller_luka: [7.75, 0, -29.55, PI], s16_roller_under_1: [7.2, 0, -30.9, PI], s16_roller_under_2: [8.3, 0, -30.9, PI],
     s16_roller_luka_out: [7.75, 0, -31.4, PI], s16_chip_prompt: [7.0, 0, -31.6, PI],
     s16_bonk_from: [7.4, 0, -31.6, 2.47], s16_bonk_at: [8.0, 0, -32.35, 2.47], s16_gate: [12.8, 0, -45.6, PI],
