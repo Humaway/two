@@ -110,16 +110,22 @@ async function boot() {
     if (rig.face && rig.face.set) rig.face.set('neutral');
     rig.root.updateMatrixWorld(true);
     if (typeof rig.eye === 'number') v.set(0, rig.eye - 0.04, 0); else { rig.parts.head.getWorldPosition(v); v.y += 0.08; }
+    // the portrait is the centre square of the canvas: open the lens so that square always spans 30° (a portrait
+    // screen's square is narrower than its height: a fixed 30° there zoomed in to just the face)
+    const side = Math.min(gl.width, gl.height), R = Math.PI / 180;
+    c.fov = 2 * Math.atan(Math.tan(15 * R) * gl.height / Math.max(1, side)) / R;
     c.aspect = gl.width / gl.height; c.updateProjectionMatrix();
     c.position.set(v.x + 0.12, v.y + 0.05, v.z + 0.8); c.lookAt(v.x, v.y + 0.01, v.z);
     renderer.compile(w.sc, c);
     renderer.render(w.sc, c);
+    c.fov = 30; c.updateProjectionMatrix();
     if (bake) {
-      const pc = document.createElement('canvas'), side = Math.min(gl.width, gl.height);
+      const pc = document.createElement('canvas');
       pc.width = pc.height = 128;
       pc.getContext('2d').drawImage(gl, (gl.width - side) / 2, (gl.height - side) / 2, side, side, 0, 0, 128, 128); // same task as the render
       portraitURL.bake(id, pc);
     }
+    if (LOOKS[id] && LOOKS[id].fade && rig.fade) { rig.fade(0.5, 0.3); renderer.compile(w.sc, c); rig.fade(1, 0); }   // rig.fade's transparent copies
     w.sc.remove(rig.root);
     if (typeof world !== 'undefined' && world.adopt) world.adopt(id, rig);
   };

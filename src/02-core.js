@@ -31,20 +31,27 @@ const clock = {
     let j = 0;
     for (let i = 0; i < w.length; i++) {
       const x = w[i];
-      if (skip || (x.fn ? x.fn() : clock.t >= x.t)) x.res(); else w[j++] = x;
+      if ((skip && !x.keep) || (x.fn ? x.fn() || (x.t > 0 && clock.t >= x.t) : clock.t >= x.t)) x.res(); else w[j++] = x;
     }
     w.length = j;
   },
 };
 function addUpdate(fn) { if (!clock.fns.includes(fn)) clock.fns.push(fn); }
 function removeUpdate(fn) { const i = clock.fns.indexOf(fn); if (i >= 0) { clock.fns[i] = null; clock.dirty = true; } }
-function wait(sec) {
-  if ((typeof flow !== 'undefined' && flow.skipping) || !(sec > 0)) return Promise.resolve();
-  return new Promise((res) => clock.waits.push({ t: clock.t + sec, fn: null, res }));
+// wait(sec) and waitUntil(fn) resolve AT ONCE while flow.skipping (and when a skip starts), waitUntil even with fn()
+// still false: right for presentation, a trap for autoplay/roam code that must really wait for something (the next
+// line would run before the condition holds). o.skip === false keeps them going through a skip: wait(sec, { skip:
+// false }) lasts sec of game time, waitUntil(fn, { skip: false, max }) checks fn every tick until it holds (or max s
+// pass). Put the scene check in fn yourself (`|| c.flow.sceneId !== sid`): nothing cancels it.
+function wait(sec, o) {
+  const keep = !!o && o.skip === false;
+  if ((!keep && typeof flow !== 'undefined' && flow.skipping) || !(sec > 0)) return Promise.resolve();
+  return new Promise((res) => clock.waits.push({ t: clock.t + sec, fn: null, res, keep }));
 }
-function waitUntil(fn) {
-  if (typeof flow !== 'undefined' && flow.skipping) return Promise.resolve();
-  return new Promise((res) => clock.waits.push({ t: 0, fn, res })); // checked from the next tick on
+function waitUntil(fn, o) {
+  const keep = !!o && o.skip === false, max = o && o.max > 0 ? clock.t + o.max : 0;
+  if (!keep && typeof flow !== 'undefined' && flow.skipping) return Promise.resolve();
+  return new Promise((res) => clock.waits.push({ t: max, fn, res, keep })); // checked from the next tick on
 }
 
 // ------------------------------------------------------------ input

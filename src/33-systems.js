@@ -21,7 +21,8 @@
 //   chip.signal, chip.full, chip.rate, chip.drainRate, chip.hot (all reset per scene).
 //   chip.forceOff(on = true, msg)  scenes that need the chip off: CHIP only shows a toast; his light goes dark
 //   chip.lightOn(on | null)        his chip-light attachment (null: back to the story default, dark once flags.chip_off)
-//   chip.show(on)                  cosmetic Chip View for cutscenes / POV shots / mini-games (no Signal); skip-safe
+//   chip.show(on, { ads = true })  cosmetic Chip View for cutscenes / POV shots / mini-games (no Signal); skip-safe;
+//                                  ads: false places no Cloud+ ads (a scripted Chip View POV)
 //   chip.peek(sec = 1.5) -> Promise  scripted Chip View for sec (fills the Signal like a hold): autoplay's CHIP
 //   chip.reset()                   Signal back to 0
 // ---- AR: world-anchored labels, visible only in Chip View (pooled DOM layer #ar over the tint, projected per frame) ---
@@ -42,13 +43,16 @@
 //     to them; the hug -> stealth.capture). Out of the cone for stealth.forgetAfter (2 s) while amber: back to patrol.
 //     Escort needs stealth.active. Cones are clipped by the set's colliders and DRONES.cover boxes (cover blocks sight).
 //   DRONES.get(id) · remove(id) · clear() · all (live list) · reset() (spawn state; retry) · pause(on) · calm()
-//   DRONES.lure(at, sampleId, { r, dur, line, over, y, disc = 0.6 }) -> thenable { n, ids, done }: drones within
+//   DRONES.lure(at, sampleId, { r, dur, line, over, y, disc = 0.6, transfixed }) -> thenable { n, ids, done }: drones within
 //     SAMPLES[id].lure.r go and investigate for lure.dur, then return ('laugh' gets DRONES.lines.laugh). They hover a
 //     metre short of it (over: right above it; y: at that height while investigating) and, transfixed, their cone
-//     collapses to a disc of radius `disc` (false keeps the cone) lying on the lure's surface when `at` is [x, y, z].
+//     collapses to a disc of radius `disc` (false keeps the cone) lying on the lure's surface when `at` is [x, y, z]
+//     (it pulls in, then opens: never a wide fan; nobody is spotted while it changes). transfixed: true = a lured drone
+//     spots nobody at all until it leaves the lure.
 //     DRONES.lureMenu(at, { fallback, test, ...lure options }) -> Promise<sampleId | null>: Chase picks from
 //     state.samples (fallback ['radio']) and plays it there.
-//   DRONES.alert(who) (curious at him) · turn(who) (red, facing him) · goTo(id, at, { speed, then }) -> Promise ·
+//   DRONES.alert(who) (curious at him) · turn(who) (red, facing him) · goTo(id, at, { speed, then, y }) -> Promise (y: the
+//     hover height it arrives at, eased over the flight; it keeps it) ·
 //     face(id, where) · release(id) (back to its patrol) · light(id, state) · inCone(id, actorId) -> bool ·
 //     cover(id, [x0, z0, x1, z1] | null) (a live array: move it and the cones follow) · walls (false: colliders don't
 //     block cones) · zap(droneId, actorId, { line }) -> Promise (1.6's static discharge: sparks, smoke, white flash) ·
@@ -58,7 +62,7 @@
 // ---- stealth: capture -> Safe Room -> retry at the last checkpoint with drones reset ----------------------------
 //   stealth.begin({ checkpoints: [{ id, box: [x0, z0, x1, z1] | zone: camName, at: where | { luka: where, ... } }],
 //     onCapture(who), onRetry(key), variant: 'room' | 'quiet', safeRoom: false (just fade and retry), targets: [ids],
-//     escortAfter = 1.4, forgetAfter = 2, escortSpeed = 3.6, zoneR = 16, autoCapture }) · stealth.end()
+//     escortAfter = 1.4, forgetAfter = 2, escortSpeed = 3.6, zoneR = 16, autoCapture }) · stealth.end({ calm = true })
 //   Without checkpoints the party's positions are saved whenever the player enters a new set zone (its camera): retry
 //   puts them back where they came into it. stealth.capture(who, o) -> Promise · stealth.softFail(who) -> Promise
 //   (every drone in the zone turns red to him first) · stealth.checkpoint() (save here now) · active, busy, captures.
@@ -339,7 +343,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
       if (!chip.on) chipLight(lightBase());
     },
     lightOn(on) { chip.light = on == null ? null : !!on; if (!chip.on) chipLight(lightBase()); },
-    show(on) { chipShow = !!on && !skipping(); if (chipShow !== chip.on && !(peekT > 0)) setView(chipShow); },
+    show(on, o) { chipShow = !!on && !skipping(); if (chipShow !== chip.on && !(peekT > 0)) setView(chipShow, !(o && o.ads === false)); },   // o.ads: false = no Cloud+ ads placed (a scripted POV)
     peek(sec = 1.5) {
       if (chip.forced || chip.allowed === false) return Promise.resolve(false);
       peekT = sec;
@@ -363,11 +367,11 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
       AR.add({ id: ad.id, kind: ad.kind, text: ad.text, title: ad.title, at: t1, auto: true, maxD: 60, size: ad.size });
     }
   }
-  function setView(on) {
+  function setView(on, ads = true) {
     chip.on = on;
     if (typeof ui.chipView === 'function') ui.chipView(on);
     chipLight(on || lightBase());
-    if (on) { placeAds(); if (!skipping()) ui.sfx('chip_on', { vol: 0.6 }); }
+    if (on) { if (ads) placeAds(); if (!skipping()) ui.sfx('chip_on', { vol: 0.6 }); }
     log('chip view ' + (on ? 'on' : 'off'));
     emit('chip:view', on);
   }
@@ -443,18 +447,19 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
   }
   function modelPut(kind, o) { if (o.parent) o.parent.remove(o); if (o.userData.setLight) o.userData.setLight('patrol'); (models[kind] ||= []).push(o); }
 
-  // ---- the floor cone: a fan of NR + 1 rays, each cut short by walls / cover; soft centre, bright rim (vertex alpha)
+  // ---- the floor cone: a fan of NR + 1 rays, each cut short by walls / cover; soft centre, bright rim (vertex alpha),
+  // and a thin dark edge outside the rim so it still reads on a bright floor (the 2026 store's)
   const coneMats = {}, coneList = [];   // (the list: ticked without for-in)
   function coneMat(l) {
     return coneMats[l] || (coneList.push(l), coneMats[l] = new THREE.MeshBasicMaterial({ color: CONE_COL[l] ?? CONE_COL.patrol, vertexColors: true, transparent: true, depthWrite: false,
       fog: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
   }
   function coneMake() {
-    const nv = 1 + 2 * (NR + 1), R = 2 + NR, g = new THREE.BufferGeometry(), col = new Float32Array(nv * 4), idx = [];
-    const rgba = (v, a) => { col[v * 4] = col[v * 4 + 1] = col[v * 4 + 2] = 1; col[v * 4 + 3] = a; };
+    const nv = 1 + 4 * (NR + 1), R = 2 + NR, E0 = R + NR + 1, E1 = E0 + NR + 1, g = new THREE.BufferGeometry(), col = new Float32Array(nv * 4), idx = [];
+    const rgba = (v, a, c = 1) => { col[v * 4] = col[v * 4 + 1] = col[v * 4 + 2] = c; col[v * 4 + 3] = a; };
     rgba(0, 0.5);
-    for (let i = 0; i <= NR; i++) { rgba(1 + i, 0.14); rgba(R + i, 0.62); }
-    for (let i = 0; i < NR; i++) { idx.push(0, 1 + i, 2 + i, 1 + i, R + i, 2 + i, 2 + i, R + i, R + i + 1); }
+    for (let i = 0; i <= NR; i++) { rgba(1 + i, 0.14); rgba(R + i, 0.62); rgba(E0 + i, 0.78, 0.1); rgba(E1 + i, 0.4, 0.1); }
+    for (let i = 0; i < NR; i++) { idx.push(0, 1 + i, 2 + i, 1 + i, R + i, 2 + i, 2 + i, R + i, R + i + 1, E0 + i, E1 + i, E0 + i + 1, E0 + i + 1, E1 + i, E1 + i + 1); }
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nv * 3), 3).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('color', new THREE.BufferAttribute(col, 4));
     g.setIndex(idx);
@@ -477,11 +482,13 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     return m;
   }
   function coneFill(d) {
-    const P = d.cone.geometry.attributes.position.array, R = 2 + NR;
+    const P = d.cone.geometry.attributes.position.array, R = 2 + NR, E0 = R + NR + 1, E1 = E0 + NR + 1;
     for (let i = 0; i <= NR; i++) {
-      const a = -d.half + (2 * d.half * i) / NR, s = Math.sin(a), c = Math.cos(a), r = d.rays[i];
+      const a = -d.half + (2 * d.half * i) / NR, s = Math.sin(a), c = Math.cos(a), r = d.rays[i], re = r + Math.min(0.11, r * 0.15);
       P[(1 + i) * 3] = s * r * 0.84; P[(1 + i) * 3 + 1] = 0; P[(1 + i) * 3 + 2] = c * r * 0.84;
       P[(R + i) * 3] = s * r; P[(R + i) * 3 + 1] = 0; P[(R + i) * 3 + 2] = c * r;
+      P[(E0 + i) * 3] = s * r; P[(E0 + i) * 3 + 1] = 0; P[(E0 + i) * 3 + 2] = c * r;
+      P[(E1 + i) * 3] = s * re; P[(E1 + i) * 3 + 1] = 0; P[(E1 + i) * 3 + 2] = c * re;
     }
     d.cone.geometry.attributes.position.needsUpdate = true;
   }
@@ -550,7 +557,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
       x: 0, y: 0, z: 0, px: 0, py: 0, pz: 0, yaw: 0, pyaw: 0, vx: 0, vz: 0, tilt: 0, hx: 0, hz: 0, hyaw: 0, hover: 1.55, phase: 0, t: 0,
       path: new Float32Array(128), pn: 0, loop: true, seg: 0, s: 0, dir: 1, speed: 1, pause: 0.5, pauseT: 0,
       len: 3.2, half: 0.42, len0: 3.2, half0: 0.42, hasCone: true, ai: true, sweep: 0, sweepP: 5, showPath: true,
-      coneK: 0, disc: 0.6, discY: NaN, yOff: 0, lureY: NaN, clawK: 0.3, clawTo: 0.3, clawV: 2.5,
+      coneK: 0, disc: 0.6, discY: NaN, yOff: 0, lureY: NaN, clawK: 0.3, clawTo: 0.3, clawV: 2.5, lureFix: false, gy0: 0, gy1: NaN, gL: 1,
       st: 'patrol', stT: 0, tgt: null, sus: 0, lost: 0, lx: 0, lz: 0, light: '',
       gx: 0, gz: 0, gs: 1.4, gRes: null, gCut: false, after: 'idle', faceX: 0, faceZ: 0, faceOn: false, lureTok: 0, lureT: 0, lureDur: 0, arrived: false };
   }
@@ -623,7 +630,8 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     d.x = ax + (bx - ax) * k; d.z = az + (bz - az) * k; d.vx = ((bx - ax) / L) * d.speed; d.vz = ((bz - az) / L) * d.speed;
     turnYaw(d, want, 3, dt);
   }
-  function spot(d) {   // the first target in the cone (the player first)
+  function spot(d) {   // the first target in the cone (the player first); none while a lure's cone collapses / reopens
+    if (d.coneK > 0 && d.coneK < 1) return null;
     let best = null;
     for (let i = 0; i < TG.length; i++) { const a = TG[i]; if (inCone(d, a)) { if (a === player.actor) return a; if (!best) best = a; } }
     return best;
@@ -632,7 +640,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     d.px = d.x; d.pz = d.z; d.py = d.y; d.pyaw = d.yaw; d.t += dt; d.stT += dt;
     // a skipped cutscene: a scripted flight lands at once, so an awaited goTo never holds the skip up (lured drones keep
     // investigating on their own clock, a roam after the cutscene may count on that; lureTick settles lure.done instead)
-    if (d.st === 'goto' && d.gCut && skipping()) { d.x = d.px = d.gx; d.z = d.pz = d.gz; const r = d.gRes; d.gRes = null; setSt(d, d.after); if (r) r(); }
+    if (d.st === 'goto' && d.gCut && skipping()) { d.x = d.px = d.gx; d.z = d.pz = d.gz; if (d.gy1 === d.gy1) d.hover = d.gy1; const r = d.gRes; d.gRes = null; setSt(d, d.after); if (r) r(); }
     const look = watch && d.hasCone && d.ai;
     if (!paused) switch (d.st) {
       case 'patrol': {
@@ -668,7 +676,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
           turnYaw(d, Math.atan2(d.faceX - d.x, d.faceZ - d.z) + Math.sin(d.lureT * 1.7) * 0.4, 2, dt);
           if (d.lureT >= d.lureDur) setSt(d, 'return');
         }
-        if (look) { const a = spot(d); if (a) setSt(d, 'curious', a); }
+        if (look && !d.lureFix) { const a = spot(d); if (a) setSt(d, 'curious', a); }
         break;
       }
       case 'return': {
@@ -679,6 +687,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
       }
       case 'goto': {      // scripted: DRONES.goTo
         const there = glide(d, d.gx, d.gz, d.gs, dt);
+        if (d.gy1 === d.gy1) { const k = there ? 1 : clamp(1 - Math.hypot(d.gx - d.x, d.gz - d.z) / d.gL, 0, 1); d.hover = d.gy0 + (d.gy1 - d.gy0) * smooth(k); }   // o.y: the height eases with the flight
         if (!there) turnTo(d, d.gx, d.gz, 4, dt);
         else { const r = d.gRes; d.gRes = null; setSt(d, d.after); if (r) r(); }
         break;
@@ -692,8 +701,9 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     const ck = tr && d.disc > 0 ? 1 : 0;
     if (d.coneK !== ck) {
       d.coneK = skipping() ? ck : ck > d.coneK ? Math.min(1, d.coneK + dt * 2.5) : Math.max(0, d.coneK - dt * 2.5);
-      const k = smooth(d.coneK);
-      d.len = d.len0 + (d.disc - d.len0) * k; d.half = d.half0 + (PI - d.half0) * k;
+      // two phases, so it never sweeps a wide fan: the cone pulls in to the disc's length first, then opens into the disc
+      const kl = smooth(Math.min(1, d.coneK * 2)), kh = smooth(Math.max(0, d.coneK * 2 - 1));
+      d.len = d.len0 + (d.disc - d.len0) * kl; d.half = d.half0 + (PI - d.half0) * kh;
     }
     if (d.hasCone) rays(d);
     const u = d.obj.userData;
@@ -838,6 +848,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
         d.gx = d.x + (t1.x - d.x) * k; d.gz = d.z + (t1.z - d.z) * k; d.faceX = t1.x + (o.over ? t1.x - d.x : 0) * 0.01; d.faceZ = t1.z + (o.over ? t1.z - d.z : 0) * 0.01;
         d.arrived = false; d.lureT = 0; d.lureDur = dur; d.lureTok = tok;
         d.disc = o.disc === false ? 0 : o.disc ?? 0.6; d.discY = lureAt3 ? t1.y : NaN; d.lureY = typeof o.y === 'number' ? o.y : NaN;
+        d.lureFix = !!o.transfixed;   // transfixed: it sees nothing else until the lure is over
         if (skipping()) { d.x = d.px = d.gx; d.z = d.pz = d.gz; }
         setSt(d, 'lured');
         out.n++; out.ids.push(d.id);
@@ -866,8 +877,9 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
       if (d.gRes) { const r = d.gRes; d.gRes = null; r(); }
       leave(d);
       d.gx = t1.x; d.gz = t1.z; d.gs = o.speed ?? 1.4; d.after = o.then === 'patrol' ? 'return' : o.then || 'idle';
+      d.gy0 = d.hover; d.gy1 = typeof o.y === 'number' ? o.y : NaN; d.gL = Math.max(0.01, Math.hypot(d.gx - d.x, d.gz - d.z));   // o.y: arrive at this hover height
       d.gCut = flow.cutscene;   // sent from a cutscene: a skip of it lands the flight at once
-      if (skipping()) { d.x = d.px = d.gx; d.z = d.pz = d.gz; setSt(d, d.after); return Promise.resolve(); }
+      if (skipping()) { d.x = d.px = d.gx; d.z = d.pz = d.gz; if (d.gy1 === d.gy1) d.hover = d.gy1; setSt(d, d.after); return Promise.resolve(); }
       setSt(d, 'goto');
       return new Promise((r) => { d.gRes = r; });
     },
@@ -1286,7 +1298,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
       const a = player.actor; if (here(a)) cpKey = cpKeyAt(a.pos.x, a.pos.z);
       log('stealth begin');
     },
-    end() { stealth.active = false; stealth.opts = null; cpKey = undefined; DRONES.calm(); log('stealth end'); },
+    end(o) { stealth.active = false; stealth.opts = null; cpKey = undefined; if (!o || o.calm !== false) DRONES.calm(); log('stealth end'); },   // { calm: false }: lured / curious drones carry on
     checkpoint() { snapNow(null); },
     get key() { return cpKey; },
     async capture(who, o = {}) {

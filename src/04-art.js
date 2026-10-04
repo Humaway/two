@@ -222,6 +222,7 @@ function makeRain({ box = [-10, -10, 10, 10], top = 10, count = 2500, bottom = 0
 const buildCharacter = (() => {
   const TAU = Math.PI * 2;
   const PART = ['hips', 'torso', 'neck', 'head', 'armL', 'foreL', 'handL', 'armR', 'foreR', 'handR', 'legL', 'shinL', 'footL', 'legR', 'shinR', 'footR', 'coat'];
+  const FADE_WASH = new THREE.Color(0xfff0d6);   // rig.fade's wash (sun-bleached)
   const [HIPS, TORSO, NECK, HEAD, ARML, FOREL, HANDL, ARMR, FORER, HANDR, LEGL, SHINL, FOOTL, LEGR, SHINR, FOOTR, COAT] = PART.map((_, i) => i);
   const cols = new Map();
   const lin = (c) => cols.get(c) || (cols.set(c, new THREE.Color(c)), cols.get(c));
@@ -412,6 +413,7 @@ const buildCharacter = (() => {
       for (let i = 0; i < n; i++) { si[i * 4] = G.S[i]; si[i * 4 + 1] = G.B[i * 2]; sw[i * 4] = 1 - G.B[i * 2 + 1]; sw[i * 4 + 1] = G.B[i * 2 + 1]; }
       g.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4));
       g.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
+      g.setAttribute('ghost', new THREE.BufferAttribute(new Float32Array(n).fill(1), 1));   // per-vertex opacity (rig.ghost)
     }
     g.computeVertexNormals();
     G = prev; return g;
@@ -429,6 +431,7 @@ const buildCharacter = (() => {
     tired: ['half', 'neutral', 'closed'], sheepish: ['open', 'worried', 'smirk'], scared: ['wide', 'worried', 'frown'],
     tearful: ['half', 'worried', 'frown', 1], fond: ['happy', 'neutral', 'grin'], still: ['half', 'neutral', 'closed'],
     hum: ['half', 'raised', 'closed'], wince: ['closed', 'angry', 'grimace'],
+    laugh_cry: ['happy', 'worried', 'smile', 1],   // laughing and crying at once (2.5's laugh)
   };
   const EX = 21, EY = 55, BY = 44, MY = 98, hwOf = (L) => (L.headW ?? 1) * 1.08;
   function headGeo(L, hs) {
@@ -1006,8 +1009,18 @@ const buildCharacter = (() => {
       hair(L, hs);
     }, PART.map((n) => parts[n].matrixWorld));
 
-    if (!skinMat) { skinMat = atlasMat.clone(); skinMat.defaultAttributeValues = atlasMat.defaultAttributeValues; }
-    const mesh = new THREE.SkinnedMesh(geo, skinMat);
+    if (!skinMat) {
+      skinMat = atlasMat.clone(); skinMat.defaultAttributeValues = atlasMat.defaultAttributeValues;
+      // rig.ghost: a per-vertex opacity drawn as an ordered 4x4 dither (screen-door: stays opaque, no sorting)
+      skinMat.onBeforeCompile = (sh) => {
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float ghost;\nvarying float vGhost;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGhost = ghost;');
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vGhost;\nfloat ghB2(vec2 a) { a = floor(a); return fract(a.x / 2.0 + a.y * a.y * 0.75); }')
+          .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (vGhost < 0.999 && vGhost <= ghB2(0.5 * gl_FragCoord.xy) * 0.25 + ghB2(gl_FragCoord.xy)) discard;');
+      };
+      skinMat.customProgramCacheKey = () => 'two_ghost';
+    }
+    const mesh = new THREE.SkinnedMesh(geo, skinMat), skinned = [mesh];
     mesh.frustumCulled = false; mesh.name = 'body';
     body.add(mesh);
     body.updateMatrixWorld(true);
@@ -1019,7 +1032,7 @@ const buildCharacter = (() => {
     const skinAtt = (name, fn, vis = true) => {
       const m = new THREE.SkinnedMesh(geoOf(fn, PART.map((n) => parts[n].matrixWorld)), skinMat);
       m.name = name; m.frustumCulled = false; m.visible = vis; body.add(m); m.bind(mesh.skeleton, mesh.bindMatrix);
-      attach[name] = m; return m;
+      attach[name] = m; skinned.push(m); return m;
     };
     if (L.coatAtt) skinAtt('coat', () => coat(L.coatAtt));
     if (L.glovesAtt) skinAtt('gloves', () => {
@@ -1177,9 +1190,9 @@ const buildCharacter = (() => {
     if (has('chip') || L.chip) {                        // the Neural Chip light: a tiny emissive dot behind the RIGHT ear (-X); keyed material per look
       const m = mat(0xffffff, { emissive: 0x6fc8ff, emissiveIntensity: 1.5, key: 'chip_' + id });
       const CHR = { long: 1.24, big: 1.5, bob: 1.22, curly: 1.24, set: 1.22, mullet: 1.2, shaggy: 1.22, messy: 1.1 }[L.hairStyle] || 1.07;   // sit on the hair, not under it
-      const c = att('chip_light', 'head', () => {
-        box(0, 0, 0, 0, 0.017, 0.017, 0.01, '#bfe6ff');
-        box(0, 0, 0, -0.004, 0.026, 0.026, 0.004, '#4a86aa');
+      const c = att('chip_light', 'head', () => {   // a small round-ish dot (a plus of two bars), not a lit square plate
+        box(0, 0, 0, 0, 0.012, 0.007, 0.006, '#bfe6ff');
+        box(0, 0, 0, 0, 0.007, 0.012, 0.006, '#bfe6ff');
       }, true, [-(0.083 * hs * hw * CHR), 0.112 * hs, -0.052 * hs * CHR], [0, -2.3, 0], m);
       const CH = { on: [0x6fc8ff, 1.5], off: [0x000000, 0], ping: [0xd8f2ff, 3], amber: [0xffb020, 1.6], red: [0xff3b30, 1.6], dim: [0x6fc8ff, 0.5] };
       c.userData.set = (st) => { const v = CH[st] || CH.on; m.emissive.setHex(v[0]); m.emissiveIntensity = v[1]; c.userData.state = st; };
@@ -1213,8 +1226,7 @@ const buildCharacter = (() => {
         box(0, 0, 0.18 * hs, 0.145 * hs, 0.15 * hs, 0.01, 0.1 * hs, shade(cc, 0.85), -0.12);
       }
     }, true);
-    if (has('santa')) {                       // a cheap Santa hat, and a fake white beard on elastic worn OVER the real one
-      att('santa', 'head', () => {
+    const santaHat = () => {
         const fur = ['#f3efe6', 'fur'], red = '#c41f2a', fr = (y, g, zc = -0.008) => ring(12, y * hs, (hr(y)[0] + g) * hs * hw, (hr(y)[1] + g) * hs, zc * hs);
         loft(0, [fr(0.162, 0.024), fr(0.19, 0.03), fr(0.218, 0.022)], fur, { capB: false, capT: false });
         loft(0, [fr(0.162, 0.018), fr(0.218, 0.016)], shade('#f3efe6', 0.7), { capB: false, capT: false, down: true });
@@ -1222,7 +1234,10 @@ const buildCharacter = (() => {
           .map(([y, rx, rz, zc, xc]) => ring(8, y * hs, rx * hs * hw, rz * hs, zc * hs, xc * hs));
         loft(0, cone, (sg) => (sg % 2 ? shade(red, 0.86) : red), { capB: false });
         loft(0, [[-0.016, 0.01], [-0.008, 0.02], [0.006, 0.021], [0.016, 0.009]].map(([y, r]) => ring(6, (0.322 + y) * hs, r * hs, r * hs, -0.13 * hs, 0.064 * hs)), fur);
-      }, false);
+    };
+    if (has('santa_hat')) att('santa_hat', 'head', santaHat, false);   // the hat alone, fitted to his head (Luke, A1 / B1: rig.show('santa_hat'))
+    if (has('santa')) {                       // a cheap Santa hat, and a fake white beard on elastic worn OVER the real one
+      att('santa', 'head', santaHat, false);
       const bd = att('santa_beard', 'head', () => {
         const wh = '#f5f3ee', fur = (sg, i) => [(sg + i) % 3 ? wh : '#e6e3dc', 'fur'], A = 1.95;
         // the curtain: from the mouth line down past the chin, rising at the sides to the ears where the elastic hooks
@@ -1376,13 +1391,76 @@ const buildCharacter = (() => {
       return g;
     };
     if (L.lanyard) lanyard('lanyard', L.badge || { name: L.lanyard }, { col: L.lanyardCol, scorch: L.lanyardScorch, on: L.lanyardOn });
+    // his own lanyard off his neck, in his right hand: the strap looped over the fingers, the badge hanging (the worn
+    // badge's own geometry + material, so the same card). hold_lanyard shows it; hand it over with b.hold(it).
+    if (attach.lanyard && has('lanyard_held')) {
+      const lc = L.lanyardCol || CONFIG.colors.lanyard, hb = attach.lanyard.userData.badge;
+      const g = att('lanyard_held', attach.gripR, () => {
+        for (const sx of [-1, 1]) bar(0, [sx * 0.012, 0.01, 0], [sx * 0.004, -0.15, 0.004], 0.0045, lc);
+        bar(0, [-0.014, 0.012, 0], [0.014, 0.012, 0], 0.005, lc);
+      }, false);
+      const b = new THREE.Mesh(hb.geometry, hb.material); b.name = 'badge'; b.position.set(0, -0.146, 0.004); g.add(b); g.userData.badge = b;
+    }
     if (L.lanyard2) lanyard('lanyard2', L.lanyard2.badge, { col: L.lanyard2.col, drop: 0.05, grow: 0.012, on: false });
 
     for (const n of L.hide || []) if (attach[n]) attach[n].visible = false;
+    // a card in the right hand (hold_card shows it): 9 x 5.6 cm, its face a 128 x 80 canvas the content paints:
+    // attach.card.userData.paint((ctx, w, h) => { ... }) (null: back to plain white). Built here, so nothing compiles mid-game.
+    if (has('card')) {
+      const cv = document.createElement('canvas'); cv.width = 128; cv.height = 80;
+      const cx = cv.getContext('2d'), tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.magFilter = THREE.NearestFilter;
+      const plain = (c, w, h) => { c.fillStyle = '#f4f2ec'; c.fillRect(0, 0, w, h); c.strokeStyle = '#c8c4bc'; c.lineWidth = 3; c.strokeRect(1.5, 1.5, w - 3, h - 3); };
+      plain(cx, 128, 80);
+      const g = new THREE.BoxGeometry(0.088, 0.0025, 0.056), n = g.attributes.position.count;
+      g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(1), 3));
+      const m = new THREE.Mesh(g, mat(0xffffff, { map: tex })); m.name = 'card'; m.visible = false; m.scale.setScalar(1 / s);
+      m.position.set(0, -0.012, 0.03); m.rotation.set(0.25, 0, 0); attach.gripR.add(m); attach.card = m;
+      m.userData.paint = (fn) => { cx.setTransform(1, 0, 0, 1, 0, 0); if (fn) fn(cx, 128, 80); else plain(cx, 128, 80); tex.needsUpdate = true; return m; };
+    }
+    // hair on end (1.6's zap: static): spikes of his own hair colour standing up off the scalp, hidden until shown
+    if (has('hair_static')) att('hair_static', 'head', () => {
+      const hw = hwOf(L), CR = { long: 1.2, big: 1.4, bob: 1.18, curly: 1.22, set: 1.18, mullet: 1.16, shaggy: 1.2, messy: 1.1, bald: 0.98 }[L.hairStyle] || 1.06;
+      const col = L.hair || '#3a2a20', cy = 0.15 * hs, rx = 0.098 * hs * hw * CR, ry = 0.112 * hs * CR, rz = 0.108 * hs * CR;
+      for (let i = 0; i < 17; i++) {
+        const el = 0.35 + 1.1 * ((i * 0.618) % 1), az = i * 2.4, cx = Math.cos(el) * Math.sin(az), cyy = Math.sin(el), cz = Math.cos(el) * Math.cos(az) - 0.15;
+        const a = [cx * rx * 0.92, cy + cyy * ry * 0.92, cz * rz * 0.92 - 0.01 * hs], l = (0.05 + 0.03 * ((i * 0.37) % 1)) * hs;
+        bar(0, a, [a[0] + cx * l, a[1] + (cyy + 0.35) * l, a[2] + cz * l], 0.007 * hs, i % 3 ? col : shade(col, 1.25));
+      }
+    }, false);
     const DEF = [];                           // the look's default visibility of every attachment (dress() restores it)
     for (const n in attach) if (attach[n] && attach[n].isObject3D && n !== 'gripL' && n !== 'gripR') DEF.push([attach[n], attach[n].visible]);
     if (attach.headphones_head || attach.headphones_neck) attach.headphones = attach.headphones_head || attach.headphones_neck;   // Rue's name (TWO: use the explicit two)
 
+    // ---- rig.fade: per-rig transparent copies of every material on the rig (built once, kept on the rig)
+    const FDM = [], FDO = [], FDC = [], FDU = [];   // meshes, their own materials, the copies in use, the unique copies
+    const fdMap = new Map();
+    let fdOn = false;
+    function fdCopy(m) {
+      let f = fdMap.get(m);
+      if (!f) {
+        f = m.clone();
+        if (m.defaultAttributeValues) f.defaultAttributeValues = m.defaultAttributeValues;
+        if (m.onBeforeCompile) { f.onBeforeCompile = m.onBeforeCompile; if (Object.prototype.hasOwnProperty.call(m, 'customProgramCacheKey')) f.customProgramCacheKey = () => m.customProgramCacheKey() + '|fade'; }
+        f.transparent = true; f.depthWrite = true; f.forceSinglePass = true;
+        f.userData = { fade: { op: m.opacity, em: f.emissive ? m.emissive.clone() : null } };
+        fdMap.set(m, f);
+      }
+      return f;
+    }
+    function fadeSwap(on) {
+      if (on === fdOn) return;
+      if (!on) { for (let i = 0; i < FDM.length; i++) if (FDM[i].material === FDC[i]) FDM[i].material = FDO[i]; fdOn = false; return; }
+      FDM.length = FDO.length = FDC.length = FDU.length = 0;
+      root.traverse((o) => {
+        const m = o.material;
+        if (!o.isMesh || !m || Array.isArray(m)) return;
+        const f = fdCopy(m);
+        FDM.push(o); FDO.push(m); FDC.push(f);
+        if (!FDU.includes(f)) { FDU.push(f); f.userData.fade.op = m.opacity; f.color.copy(m.color); if (f.userData.fade.em) f.userData.fade.em.copy(m.emissive); }
+        o.material = f;
+      });
+      fdOn = true;
+    }
     // ---- the rig object
     const P = PART.map((n) => parts[n]), NB = PART.length * 3;
     const rest = { hips: parts.hips.position.clone(), armL: parts.armL.position.clone(), armR: parts.armR.position.clone() };
@@ -1390,7 +1468,7 @@ const buildCharacter = (() => {
     const d = { T, shX, upper, fore, thigh, shin, footH, hipY, neckL, hs, hipX, s, nr, chestZ: fz(0.28 * k), bellyZ: fz(0.13 * k),
       headC: T + neckL + 0.12 * hs, armY, armOut: L.armOut ?? (0.06 + belly * 0.1) };
     const shownO = [null, null, null, null], shownW = [false, false, false, false]; let nShown = 0;
-    let cur = null, lastT = 0, savedExpr = null, blinkT = 1 + Math.random() * 3, blink = false, flapT = 0, fi = 0, talked = false;
+    let cur = null, lastT = 0, savedExpr = null, animExpr = null, blinkT = 1 + Math.random() * 3, blink = false, flapT = 0, fi = 0, talked = false;
     const FLAP = ['A', 'closed', 'O', 'A', 'closed', 'A', 'O', 'closed'];
     const lerpPos = (q, j, kk) => q.set(snap[j] + (q.x - snap[j]) * kk, snap[j + 1] + (q.y - snap[j + 1]) * kk, snap[j + 2] + (q.z - snap[j + 2]) * kk);
     const face = {
@@ -1428,20 +1506,21 @@ const buildCharacter = (() => {
           cs.vz += ((tz - cs.z) * 55 - cs.vz * 6.5) * dt; cs.z += cs.vz * dt;
         }
       },
-      // pose(name, t, p): t = seconds since this animation started. Blends from the previous pose over 0.2 s.
-      pose(name, t, p = EMPTY) {
+      // pose(name, t, p, cut): t = seconds since this animation started. Blends from the previous pose over 0.2 s
+      // (cut: no blend, as after a place(); the next pose() of the same anim carries on unblended).
+      pose(name, t, p = EMPTY, cut = false) {
         const A = ANIMS[(name === 'idle' && L.idle) || name] || ANIMS.idle;
         if (name !== cur || t < lastT - 1e-4) {
           for (let i = 0; i < P.length; i++) { const r = P[i].rotation; snap[i * 3] = r.x; snap[i * 3 + 1] = r.y; snap[i * 3 + 2] = r.z; }
           parts.hips.position.toArray(snap, NB); parts.armL.position.toArray(snap, NB + 3); parts.armR.position.toArray(snap, NB + 6);
           for (let i = 0; i < nShown; i++) { shownO[i].visible = shownW[i]; shownO[i] = null; } nShown = 0;
-          if (savedExpr) { face.set(savedExpr); savedExpr = null; }
+          if (savedExpr) { if (face.expr === animExpr && !rig.exprPin) face.set(savedExpr); savedExpr = null; }   // (changed since by hand: that stays)
           if (face.over && !rig.talking) { face.over = null; face.redraw(); }
           const sh = typeof A.shows === 'function' ? A.shows(rig) : A.shows;   // a name, or a list of names (TWO)
           if (sh) for (let i = 0, n = Array.isArray(sh) ? sh.length : 1; i < n && nShown < 4; i++) {
             const a = attach[Array.isArray(sh) ? sh[i] : sh]; if (a) { shownO[nShown] = a; shownW[nShown++] = a.visible; a.visible = true; }
           }
-          if (A.expr) { savedExpr = face.expr; face.set(A.expr); }
+          if (A.expr && !rig.exprPin) { savedExpr = face.expr; face.set(A.expr); animExpr = A.expr; }   // (exprPin: an explicit setExpr this tick wins)
           cur = rig.anim = name;
         }
         lastT = t;
@@ -1450,14 +1529,20 @@ const buildCharacter = (() => {
         if (attach.lanyard2) { const b = attach.lanyard2.userData.badge; b.rotation.set(0, b.userData.flip ? Math.PI : 0, 0); }
         rig.lying = false;
         parts.hips.position.copy(rest.hips); parts.armL.position.copy(rest.armL); parts.armR.position.copy(rest.armR);
-        if (A.upper) { if (p.sit || rig.seated) ANIMS.sit(rig, t, p); else if (p.walk) ANIMS.walk(rig, t, p); }
+        if (A.upper) {   // the lower body under an upper anim: walking, the base pose a one-shot plays over (p.base), or seated
+          const B = !p.walk && p.base ? ANIMS[p.base] : null;
+          if (B && !B.upper) B(rig, t, p); else if (p.sit || rig.seated) ANIMS.sit(rig, t, p); else if (p.walk) ANIMS.walk(rig, t, p);
+        }
         A(rig, t, p);
         if (L.stoop && !rig.lying) { parts.torso.rotation.x += L.stoop; parts.neck.rotation.x -= L.stoop * 0.45; parts.head.rotation.x -= L.stoop * 0.35; }
         if (cs.on && !rig.seated && !rig.lying) { parts.coat.rotation.x += cs.x; parts.coat.rotation.z += cs.z; }
-        if (t < 0.2) {
+        if (t < 0.2 && !cut) {
           const kk = ease(t / 0.2);
           for (let i = 0; i < P.length; i++) { const r = P[i].rotation; r.set(snap[i * 3] + (r.x - snap[i * 3]) * kk, snap[i * 3 + 1] + (r.y - snap[i * 3 + 1]) * kk, snap[i * 3 + 2] + (r.z - snap[i * 3 + 2]) * kk); }
           lerpPos(parts.hips.position, NB, kk); lerpPos(parts.armL.position, NB + 3, kk); lerpPos(parts.armR.position, NB + 6, kk);
+        } else if (cut) {   // the blend that is still due starts from here
+          for (let i = 0; i < P.length; i++) { const r = P[i].rotation; snap[i * 3] = r.x; snap[i * 3 + 1] = r.y; snap[i * 3 + 2] = r.z; }
+          parts.hips.position.toArray(snap, NB); parts.armL.position.toArray(snap, NB + 3); parts.armR.position.toArray(snap, NB + 6);
         }
       },
       // ---- TWO wardrobe API
@@ -1476,11 +1561,41 @@ const buildCharacter = (() => {
         return rig;
       },
       badgeFlip(on, which = 'lanyard') { const l = attach[which]; if (l) l.userData.badge.userData.flip = !!on; return rig; },
+      // ghost(part | [parts] | null, alpha 0..1): fade a body part (skinned body + coat / gloves) out, as a dither; 3.5's
+      // erased hand: rig.ghost(['handR', 'foreR'], 0.3). null = every part. dress() puts it back to 1.
+      ghost(part, a = 1) {
+        const one = part == null ? null : Array.isArray(part) ? part : [part];
+        let mask = 0; if (one) for (const n of one) { const i = typeof n === 'number' ? n : PART.indexOf(n); if (i >= 0) mask |= 1 << i; }
+        for (const m of skinned) {
+          const g = m.geometry, gh = g.attributes.ghost, si = g.attributes.skinIndex.array;
+          if (!gh) continue;
+          for (let i = 0; i < gh.count; i++) if (!one || (mask >> si[i * 4]) & 1) gh.array[i] = a;
+          gh.needsUpdate = true;
+        }
+        rig.ghosted = !!(one || a < 1); return rig;
+      },
+      // fade(k = 1, wash = 0): the whole rig's opacity (0..1) and a warm wash toward a sun-bleached white (0..1), "like a
+      // photo left in the sun". Every mesh on the rig swaps to its own transparent copy of its material while k < 1 or
+      // wash > 0 (k = 1 and wash = 0 put the originals back); for looks with `fade: true` (the four heroes) boot builds
+      // the copies and compiles their programs, so nothing compiles mid-game (other looks: their first fade compiles).
+      // dress() (every spawn) puts the originals back.
+      fade(k = 1, wash = 0) {
+        if (k >= 0.999 && wash <= 0.001) { fadeSwap(false); return rig; }
+        fadeSwap(true);
+        for (let i = 0; i < FDU.length; i++) {
+          const f = FDU[i], b = f.userData.fade;
+          f.opacity = b.op * Math.max(0, Math.min(1, k));
+          if (b.em) f.emissive.copy(b.em).lerp(FADE_WASH, Math.max(0, Math.min(1, wash)));
+        }
+        return rig;
+      },
       chip(st) { if (attach.chip_light) attach.chip_light.userData.set(st); return rig; },   // 'on' | 'off' | 'ping' | 'amber' | 'red' | 'dim'
       // dress(state): back to the look's defaults, then the story so far (L.dress(rig, flags, inventory)). Runs by itself
       // whenever the rig is added to a scene (every world.spawn into a set), so pooled rigs never carry a scene's toggles.
       dress(st) {
         for (let i = 0; i < DEF.length; i++) DEF[i][0].visible = DEF[i][1];
+        if (rig.ghosted) rig.ghost(null, 1);
+        fadeSwap(false);
         if (attach.santa_beard) attach.santa_beard.userData.state('on');
         if (attach.goggles) attach.goggles.userData.up(L.goggles === 'up');
         if (attach.chip_light) attach.chip_light.userData.set('on');
@@ -1534,7 +1649,7 @@ const buildCharacter = (() => {
   const blue = { top: CONFIG.colors.chaseBlue, sleeve: 'short', collar: 'polo', logo: 'yes_blue' };
   const HQ = '#2a4f8f';                                  // Optus HQ lanyards
   const hq = (name, sub) => ({ lanyard: name, lanyardCol: HQ, badge: { name, sub, style: 'hq' } });
-  const crew = ['phone', 'goggles', 'food', 'cracker'];  // what every hero may need in a hand (hidden until shown)
+  const crew = ['phone', 'goggles', 'food', 'cracker', 'card', 'hair_static', 'lanyard_held'];  // what every hero may need in a hand (hidden until shown)
   // Luka's fake-eyes props etc. are hidden until content shows them; story flags re-dress pooled rigs at every spawn:
   // santa (Luka's disguise), headphones (Chase, from L12), chip_off (Chase (2040)), hurt / bandaged / lanyard_snapped
   // (Luka in 3.5 / 3.7), and the inventory (the tether in Chase's back pocket, Nadia's lanyard round Luka's neck).
@@ -1545,7 +1660,7 @@ const buildCharacter = (() => {
       lanyard: 'LUKA', lanyardCol: '#82aac4', badge: { name: 'LUKA', fade: 0.55, back: '1158' },   // 39 years in Rue's box: faded; biro on the back
       lanyard2: { col: HQ, badge: { name: 'NADIA', sub: 'NETWORK SAFETY', style: 'hq' } },
       attach: [...crew, 'santa', 'brick', 'remote', 'coaster', 'notepad', 'box', 'hurt', 'bandage'],
-      dress: (r, f, inv) => { if (f.santa) r.show('santa'); if (f.hurt) r.show('hurt'); if (f.bandaged) r.show('bandage'); if (f.lanyard_snapped) r.show('lanyard', false); if (inv.includes('nadia_lanyard')) r.show('lanyard2'); } },
+      dress: (r, f, inv) => { if (f.santa) r.show('santa'); if (f.hurt) r.show('hurt'); if (f.bandaged) r.show('bandage'); if (f.lanyard_snapped) r.show('lanyard', false); if (inv.includes('nadia_lanyard') && !f.lanyard_snapped) r.show('lanyard2'); } },   // the strike snaps both
     chase: { ...blue, h: 1.8, w: 0.88, sh: 1, head: 1, headW: 0.95, jaw: 0.92, untuck: 0.05, thighs: 1.04, skin: '#ebba95', hair: '#5d3c22', hairStyle: 'messy', beard: 'stubble', beardCol: '#6a4a30',
       eyes: '#5d4a31', brow: '#4a301c', blush: 0.08, bottom: 'jeans', pants: '#46679d', fade: '#6282b4', shoes: 'sneaker', shoeCol: '#f3f3f1', soleCol: '#dcdcd8',
       lanyard: 'CHASE', lanyardCol: CONFIG.colors.lanyard, badge: { name: 'CHASE' },   // finally: bright and new
@@ -1567,14 +1682,14 @@ const buildCharacter = (() => {
       coatAtt: { col: '#26272d', len: 0.72, collar: 'funnel', lapels: false, gap: 0.36, lining: '#141519', sleeveW: 1.26 }, glovesAtt: '#141417', hoodCol: '#26272d',
       lanyard: 'LUKA', lanyardCol: '#a9c4d3', badge: { name: 'LUKA', fade: 0.85, back: '1158', flip: true },   // fourteen years paler, flipped
       phonesCol: '#ecebe7', phonesBand: '#9a9ea6', earbudOff: true,             // Chase's L12 pair (3.6) / Chase (2040)'s earbud (A1)
-      attach: ['hood', 'headphones_head', 'earbud', 'phone'] },
+      attach: ['hood', 'headphones_head', 'headphones_held', 'earbud', 'phone', 'lanyard_held'] },
     jordan: { expr: 'talk', ...blue, h: 1.72, w: 0.92, skin: '#8d5b3c', hair: '#1d1512', hairStyle: 'curly', eyes: '#3a2618', brow: '#1d1512', blush: 0.1,
       pants: '#c8b58f', shoes: 'sneaker', shoeCol: '#f3f3f1', soleCol: '#dcdcd8', lanyard: 'JORDAN', badge: { name: 'JORDAN' }, attach: ['phone'] },
     jordan40: { ...blue, h: 1.72, w: 0.98, belly: 0.35, skin: '#8a5a3c', hair: '#221915', hairGrey: 0.5, hairStyle: 'curly', beard: 'stubble', beardCol: '#2a1f18', beardGrey: 0.5, eyes: '#3a2618', brow: '#2a1d16', age: 0.35, lids: 0.12, blush: 0.08,
       pants: '#b8a680', shoes: 'sneaker', shoeCol: '#2a2c33', soleCol: '#dcdcd8', chip: true,
       lanyard: 'JORDAN', lanyardCol: CONFIG.colors.navy, badge: { name: 'JORDAN', sub: 'STORE MANAGER' }, attach: ['phone'] },
     luke: { ...polo, h: 1.83, w: 1.02, skin: '#e9bb9b', hair: '#8a6440', hairStyle: 'short', eyes: '#5a6f8a', brow: '#6a4a30', tired: true, lids: 0.2,
-      pants: '#2b2d33', shoes: 'shoe', shoeCol: '#1a1a1a', lanyard: 'LUKE', badge: { name: 'LUKE', sub: 'STORE MANAGER' }, mug: 'mug', mugCol: '#f2efe8', idle: 'carry_mug', attach: ['phone'] },
+      pants: '#2b2d33', shoes: 'shoe', shoeCol: '#1a1a1a', lanyard: 'LUKE', badge: { name: 'LUKE', sub: 'STORE MANAGER' }, mug: 'mug', mugCol: '#f2efe8', idle: 'carry_mug', attach: ['phone', 'santa_hat'] },
     luke40: { h: 1.82, w: 1.08, belly: 0.45, skin: '#e89c7a', blush: 0.45, age: 0.6, hair: '#b5a693', hairStyle: 'short', eyes: '#5a6f8a', brow: '#9a8a76', lids: 0.1, expr: 'happy',
       top: '#7a2033', sleeve: 'short', apron: '#f2eee4', apronText: 'KISS THE COOK|(SAFELY)', apronInk: '#9a2230', bottom: 'shorts', pants: '#3e4450', socks: '#e4e0d6',
       shoes: 'sneaker', shoeCol: '#e8e8e4', soleCol: '#c8c8c4', tongs: true, attach: ['food'], food: 'snag' },
@@ -1641,13 +1756,18 @@ const buildCharacter = (() => {
     sizzle_e: { fem: true, h: 1.74, w: 0.94, skin: '#8a5a3e', hair: '#1a1210', hairStyle: 'bun', lips: '#7a3a3a', top: '#1e3a8a', sleeve: 'none', bottom: 'skirt', pants: '#1e3a8a', skirtLen: 0.36, socks: '#f0f0f0', shoes: 'sneaker', shoeCol: '#f0f0f0', soleCol: '#ddd', chip: true },
     kid40: { h: 1.24, w: 0.82, head: 1.16, leg: 0.92, skin: '#e8bc98', freckles: true, blush: 0.2, hair: '#8a5a2a', hairStyle: 'messy', top: '#e8402a', sleeve: 'short', bottom: 'shorts', pants: '#2a4a8a', shoes: 'sneaker', shoeCol: '#3a8ae8', soleCol: '#f0f0f0' },
   });
+  // Chase (2040) at dawn (2.1): a washed-out T-shirt, no coat, no lanyard, nothing round his neck (spawn with
+  // { look: 'chase40_tee' }; speaker and portrait stay chase40's)
+  for (const k of ['luka', 'chase', 'chase40', 'luka40']) LOOKS[k].fade = true;   // rig.fade's copies built + compiled at boot
+  LOOKS.chase40_tee = { ...LOOKS.chase40, top: '#5d6670', collar: null, logo: null, coatAtt: null, lanyard: null, badge: null,
+    attach: LOOKS.chase40.attach.filter((n) => n !== 'headphones_neck') };
 })();
 
 // ------------------------------------------------------------ ANIMS
 // RIGKIT: the IK + pose helpers (arm, leg, ik, toTorso, blend2, towards, ...) for content anims written outside this file.
 // ANIM_ONE: default durations of the one-shot anims (TWO's; the world's ONE table has Rue's).
 let RIGKIT = null;
-const ANIM_ONE = { tether_throw: 0.7, chip_ping: 0.9, coat_throw: 0.9, put_headphones_on: 2.2, get_up_hurt: 3.2, brush_shoulder: 1, pull_cracker: 1.6, stumble: 0.35, bow: 1.8, hands_halt: 2.8 };
+const ANIM_ONE = { tether_throw: 0.7, chip_ping: 0.9, coat_throw: 0.9, put_headphones_on: 2.2, get_up_hurt: 3.2, brush_shoulder: 1, pull_cracker: 1.6, stumble: 0.35, bow: 1.8, hands_halt: 2.8, phones_off: 2.2 };
 // ANIMS[name](rig, t, p): writes rotations (and hips/shoulder offsets) into rig.parts; no allocation.
 // rig.pose() resets to rest first, then blends. Flags: .upper (arms/head only: keeps a seated lower body when
 // rig.seated or p.sit, walking legs with p.walk), .shows (attachment made visible while playing), .expr.
@@ -1683,7 +1803,7 @@ Object.assign(ANIMS, (() => {
     P.armL.rotation.set(sw, 0, o); P.armR.rotation.set(-sw, 0, -o); P.foreL.rotation.x = -0.14; P.foreR.rotation.x = -0.14;
   }
   const breathe = (r, t, a = 1) => { r.parts.torso.rotation.x += 0.018 * S(t * 1.6) * a; r.parts.head.rotation.x -= 0.012 * S(t * 1.6) * a; };
-  const base = (r, t) => { if (!r.seated) hang(r, t); breathe(r, t); };
+  const base = (r, t) => { if (!r.seated && !r.lying) hang(r, t); breathe(r, t); };   // (lying: a glance keeps his arms)
   const once = (t, p, def) => cl(t / (p.dur || def), 0, 1);
   const hipsY = (r, m) => m / r.d.s;              // world metres -> body units
   const gait = (r, t, sp, legA, knee, armA, fore, bob, lean) => {
@@ -2037,9 +2157,14 @@ Object.assign(ANIMS, (() => {
       const P = r.parts, d = r.d, w = t * 5.5, c = C(w), s2 = S(w); breathe(r, t);
       if (p.low) { const hy = d.hipY * 0.7; r.seated = false; P.hips.position.y = hy; leg(r, 1, d.hipX * 1.15, d.footH - hy, 0.16); leg(r, -1, d.hipX * 1.15, d.footH - hy, 0.0); flat(r); P.torso.rotation.x = 0.55; }
       else P.torso.rotation.x += 0.32;
-      const y = p.low ? 0.02 : -0.02, z = 0.42;
+      let y = p.low ? 0.02 : -0.02, z = 0.42;
+      if (p.h != null) {   // calibrated: the hands on a surface p.h m above his feet, p.z m in front of his hips (0.45)
+        if (p.low) P.torso.rotation.x = 0.3;
+        toTorso(r, wy(r, p.h), hipsY(r, p.z ?? 0.45)); y = TY; z = TZ;
+      }
       arm(r, 1, 0.14 + 0.05 * c, y + 0.008 * s2, z + 0.05 * s2, 1, -0.6, -0.4); arm(r, -1, 0.14 - 0.05 * c, y - 0.008 * s2, z - 0.05 * s2, 1, -0.6, -0.4);
-      P.handL.rotation.x = 0.9; P.handR.rotation.x = 0.9; P.head.rotation.x = 0.22; P.neck.rotation.x = 0.08;
+      const hr = p.h != null && p.low ? -0.4 : 0.9;
+      P.handL.rotation.x = hr; P.handR.rotation.x = hr; P.head.rotation.x = p.low && p.h != null ? 0.35 : 0.22; P.neck.rotation.x = 0.08;
     },
     // lift_strain: squat, grip a low edge (p.h0 m), heave it up to p.h1 m over p.dur (or ~2 s and hold, trembling)
     lift_strain(r, t, p) {
@@ -2284,15 +2409,114 @@ Object.assign(ANIMS, (() => {
     lift_head(r, t, p) { A.idle(r, t, p); const u = min(1, t / (p.dur || 2.8)), k = 1 - u * u * (3 - 2 * u), P = r.parts; P.torso.rotation.x += 0.3 * k; P.neck.rotation.x += 0.2 * k; P.head.rotation.x += 0.4 * k; },
     back_hand(r, t, p) { A.idle(r, t, p); const P = r.parts; P.armL.rotation.set(0.45, 0, 1.0); P.foreL.rotation.set(-0.5, 0, 0); P.handL.rotation.set(0, 0, 0.3); P.torso.rotation.z -= 0.06; P.head.rotation.y = 0.35; },
     mouth_bare(r, t, p) { A.drink(r, min(t, 0.9), p); },
+    // ---- promoted from 3.7 (its s37_* stay content-side; same poses, the heights as options)
+    // kneel_work: kneeling, both hands busy at a low surface p.h m (0.7) up, p.z m (0.42) ahead (wiring, untangling)
+    kneel_work(r, t, p) {
+      kneel(r, t); const P = r.parts, w = t * 3.1, h = p.h ?? 0.7, z = p.z ?? 0.42;
+      P.torso.rotation.x = 0.3 + 0.02 * S(t * 1.3);
+      toTorso(r, wy(r, h + 0.02 * S(w * 1.7)), hipsY(r, z)); arm(r, 1, 0.1 + 0.03 * S(w), TY, TZ, 0.5, -1, -0.4);
+      toTorso(r, wy(r, h - 0.01), hipsY(r, z + 0.02 + 0.02 * S(w * 1.3))); arm(r, -1, 0.06 + 0.02 * C(w * 0.8), TY, TZ, 0.5, -1, -0.4);
+      P.handL.rotation.x = 0.5; P.handR.rotation.x = 0.5; P.head.rotation.x = 0.4; P.neck.rotation.x = 0.1;
+    },
+    // lean_rail: at a parapet / rail, forearms on its cap (hands at p.h m, 1.24; p.z m ahead, 0.52); p.hand: his left
+    // hand on the right shoulder of whoever stands 0.7 m to his left; p.look: head yaw
+    lean_rail(r, t, p) {
+      const P = r.parts, h = p.h ?? 1.24, z = p.z ?? 0.52;
+      P.hips.position.z = -0.05;
+      P.torso.rotation.x = (p.hand ? 0.14 : 0.32) + 0.012 * S(t * 1.4);
+      toTorso(r, wy(r, h), hipsY(r, z)); arm(r, -1, 0.1, TY, TZ, 0.6, -0.6, -0.2);
+      if (p.hand) { toTorso(r, wy(r, h + 0.12), hipsY(r, 0.2)); arm(r, 1, 0.55, TY, TZ, 0.3, -1, -0.5); P.handL.rotation.set(0.2, 0, -0.5); }
+      else { toTorso(r, wy(r, h), hipsY(r, z)); arm(r, 1, 0.1, TY, TZ, 0.6, -0.6, -0.2); }
+      P.head.rotation.x = p.hand ? 0.12 : -0.08; P.neck.rotation.x = 0.02;
+      if (p.look) P.head.rotation.y = p.look;
+    },
+    // wipe_face: the back of his right hand across his eyes, head down; p.rail: the left forearm on a rail at that height
+    wipe_face(r, t, p) {
+      base(r, t); const P = r.parts, d = r.d, u = min(1, t / 0.5), s = S(t * 4.2);
+      P.torso.rotation.x += 0.12;
+      arm(r, -1, 0.02 + 0.03 * s * u, (d.headC - 0.08) * u - 0.05 * (1 - u), 0.15 + 0.1 * (1 - u), 1, -1, -0.3);
+      P.handR.rotation.set(-0.7, 0.3, 0.5);
+      if (p.rail) { toTorso(r, wy(r, p.rail), hipsY(r, 0.5)); arm(r, 1, 0.1, TY, TZ, 0.6, -0.6, -0.2); }
+      P.head.rotation.x = 0.22; P.neck.rotation.x = 0.08;
+    },
+    // hand_rest: standing, leaning in, one hand (p.sd: 1 left, -1 right) resting on a surface p.h m up (0.72), p.x out
+    // (0.16) and p.z m ahead (0.4); the other hangs
+    hand_rest(r, t, p) {
+      base(r, t); const P = r.parts, sd = p.sd || 1;
+      P.torso.rotation.x = 0.36 + 0.01 * S(t * 1.3);
+      toTorso(r, wy(r, p.h ?? 0.72), hipsY(r, p.z ?? 0.4)); arm(r, sd, p.x ?? 0.16, TY, TZ, 0.5, -1, -0.4);
+      if (sd > 0) P.handL.rotation.set(0.9, 0, -0.2); else P.handR.rotation.set(0.9, 0, 0.2);
+      P.head.rotation.x = 0.3; P.neck.rotation.x = 0.1;
+    },
+    // peer: leaning in to read something small (eases in over 0.8 s), hands behind his back
+    peer(r, t, p) {
+      base(r, t); const P = r.parts, d = r.d, e = ez(min(1, t / 0.8));
+      P.torso.rotation.x += 0.36 * e; P.neck.rotation.x = 0.1 * e; P.head.rotation.x = 0.28 * e;
+      arm(r, 1, 0.12, 0.02, -(d.chestZ + 0.06), 0.5, -1, 0.6); arm(r, -1, 0.12, 0.02, -(d.chestZ + 0.06), 0.5, -1, 0.6);
+    },
+    // limp: walking hurt, a short careful gait hunched over his ribs (a walkAnim / loco)
+    limp(r, t, p) { gait(r, t, 5.4 * (p.speed || 1), 0.3, 0.55, 0.08, -0.3, 0.022, 0.06); hurtStand(r, t, LIMP_P); },
+    // lean_back: leaning back on a parapet / rail, both hands back on its cap (p.h m, 1.12), watching
+    lean_back(r, t, p) {
+      base(r, t); const P = r.parts;
+      P.hips.position.z = -0.06; P.torso.rotation.x = -0.1 + 0.012 * S(t * 1.2);
+      toTorso(r, wy(r, p.h ?? 1.12), hipsY(r, -0.36)); arm(r, 1, 0.24, TY, TZ, 0.6, -1, 0.4); arm(r, -1, 0.24, TY, TZ, 0.6, -1, 0.4);
+      P.head.rotation.x = 0.08;
+    },
+    // ---- rails (2.4: Rue on his stairs): walk_rail / walk_rail_l = a slow careful walk, the right / left hand sliding
+    // along a rail p.h m up (0.92), p.x m out to that side (0.34) (walkAnims: a.walkAnim = 'walk_rail'); hand_rail: standing, one hand on it
+    walk_rail(r, t, p) { railWalk(r, t, p, -1); },
+    walk_rail_l(r, t, p) { railWalk(r, t, p, 1); },
+    hand_rail(r, t, p) {
+      if (!r.seated) hang(r, t); breathe(r, t); const sd = p.sd || -1;
+      toTorso(r, wy(r, p.h ?? 0.92), hipsY(r, 0.06)); arm(r, sd, hipsY(r, p.x ?? 0.34), TY, TZ, 1, -0.6, -0.2);
+      if (sd < 0) r.parts.handR.rotation.set(0.2, 0, 0.6); else r.parts.handL.rotation.set(0.2, 0, -0.6);
+    },
+    // phones_off: both hands to the ears, the headphones lift up and away and come down in his hands; headphones_head
+    // hides as they lift (and stays hidden), headphones_held shows in the hands (one-shot ~2.2 s; looks with both)
+    phones_off(r, t, p) {
+      const P = r.parts, d = r.d, u = once(t, p, 2.2), ex = 0.12 * d.hs, ey = d.headC - 0.01; breathe(r, t);
+      let x, y, z;
+      if (u < 0.3) { const k = ez(u / 0.3); x = d.shX + (ex - d.shX) * k; y = -0.2 + (ey + 0.2) * k; z = 0.06 * (1 - k); }
+      else if (u < 0.55) { const k = ez((u - 0.3) / 0.25); x = ex + 0.03 * k; y = ey + 0.1 * k; z = 0.08 * k; }
+      else { const k = ez((u - 0.55) / 0.45); x = ex + 0.03 - 0.02 * k; y = ey + 0.1 - (ey + 0.08) * k; z = 0.08 + 0.2 * k; }
+      arm(r, 1, x, y, z, 1, -0.4, -0.2); arm(r, -1, x, y, z, 1, -0.4, -0.2);
+      P.handL.rotation.set(-0.3 * (u > 0.3 ? 1 : 0), 0, 1.0); P.handR.rotation.set(-0.3 * (u > 0.3 ? 1 : 0), 0, -1.0);
+      const on = u < 0.3, at = r.attach;
+      if (at.headphones_head && !on) at.headphones_head.visible = false;
+      if (at.headphones_held) { at.headphones_held.visible = !on || !at.headphones_head; held(r, 0, y + 0.07, z + 0.05, -0.2); }
+      P.head.rotation.x = 0.06;
+    },
+    // hold_lanyard: his lanyard (attach 'lanyard_held') dangling from his right hand in front of him, offered out (p.out)
+    hold_lanyard(r, t, p) {
+      base(r, t); const P = r.parts, d = r.d, o = p.out ? 1 : 0;
+      arm(r, -1, 0.08 + 0.04 * o, 0.06 + 0.06 * o + 0.004 * S(t * 1.4), d.chestZ + 0.2 + 0.16 * o, 1, -1, -0.3);
+      P.handR.rotation.set(1.35, 0, 0.1); P.head.rotation.x = p.out ? 0.1 : 0.25;   // the wrist turned down: the strap hangs
+    },
+    // hold_card: a card (attach 'card', on the right grip) held up in front of his chest, reading it; p.show: turned
+    // out to show it to someone in front of him
+    hold_card(r, t, p) {
+      base(r, t); const P = r.parts, d = r.d;
+      arm(r, -1, 0.06, d.headC - 0.24 + 0.005 * S(t * 1.5), d.chestZ + 0.24, 1, -1, -0.3);
+      P.handR.rotation.set(p.show ? -1.2 : -0.2, p.show ? 0 : 0.5, p.show ? 0 : 0.3);
+      P.head.rotation.x = p.show ? 0 : 0.28;
+    },
   });
+  function railWalk(r, t, p, sd) {
+    gait(r, t, 5.0 * (p.speed || 1), 0.3, 0.55, 0.12, -0.25, 0.012, 0.08);
+    toTorso(r, wy(r, p.h ?? 0.92), hipsY(r, 0.1)); arm(r, sd, hipsY(r, p.x ?? 0.34), TY, TZ, 1, -0.6, -0.2);
+    if (sd < 0) r.parts.handR.rotation.set(0.2, 0, 0.6); else r.parts.handL.rotation.set(0.2, 0, -0.6);
+    r.parts.head.rotation.x += 0.18;   // watching his feet
+  }
+  const LIMP_P = { walk: true };
   for (const n of ['reading', 'drink', 'phone', 'pour']) A[n + '_bare'] = (r, t, p) => A[n](r, t, p);   // the pose without its prop
   RIGKIT = { ik, arm, leg, flat, hang, breathe, base, once, hipsY, gait, sit, toTorso, torso: () => [TY, TZ], blend2, towards, kneel, floorSit, cl, ez };
   for (const n of ('idle phone type point hands_head head_hands lanyard nod shake shrug laugh cry wave pour drink carry_mug look_up look_down write give lanyard_on hug knock fake_call chew tap clap wipe umbrella reading glance whistle'
-    + ' polish hands_rise hands_halt head_in_hands tether_throw chip_ping coat_throw type_phone hold_headphones_up put_headphones_on laugh_big hurt_stand wave_arm swat sizzle_flip hum pull_cracker brush_shoulder piano_play uke carry_box write_note eat still push reach_up shush think arms_crossed hands_hips gesture brick_call bop fold bow lift_head back_hand mouth_bare reading_bare drink_bare phone_bare pour_bare').split(' ')) A[n].upper = true;
+    + ' polish hands_rise hands_halt head_in_hands tether_throw chip_ping coat_throw type_phone hold_headphones_up put_headphones_on laugh_big hurt_stand wave_arm swat sizzle_flip hum pull_cracker brush_shoulder piano_play uke carry_box write_note eat still push reach_up shush think arms_crossed hands_hips gesture brick_call bop fold bow lift_head back_hand mouth_bare reading_bare drink_bare phone_bare pour_bare peer wipe_face hand_rest hand_rail phones_off hold_card hold_lanyard').split(' ')) A[n].upper = true;
   A.phone.shows = 'phone'; A.brick_call.shows = A.fake_call.shows = 'brick';
   A.pour.shows = A.drink.shows = A.carry_mug.shows = 'mug'; A.reading.shows = 'textbook'; A.umbrella.shows = 'umbrella';
   A.type_phone.shows = 'phone'; A.tether_throw.shows = 'tether'; A.sizzle_flip.shows = 'tongs'; A.pull_cracker.shows = 'cracker'; A.carry_box.shows = 'box';
-  A.write_note.shows = ['notepad', 'biro']; A.eat.shows = 'food'; A.hold_headphones_up.shows = A.put_headphones_on.shows = 'headphones_held'; A.uke.shows = 'ukulele';
+  A.write_note.shows = ['notepad', 'biro']; A.eat.shows = 'food'; A.hold_headphones_up.shows = A.put_headphones_on.shows = A.phones_off.shows = 'headphones_held'; A.uke.shows = 'ukulele'; A.hold_card.shows = 'card'; A.hold_lanyard.shows = 'lanyard_held';
   A.laugh.expr = 'laugh'; A.cry.expr = 'crying'; A.sleep.expr = 'sleep';
   A.laugh_big.expr = A.scooter_laugh.expr = 'laugh'; A.lift_strain.expr = 'wince'; A.get_up_hurt.expr = A.hurt_stand.expr = 'hurt'; A.hum.expr = 'hum'; A.sleep_back.expr = 'sleep';
   A.chip_ping.expr = 'wince'; A.still.expr = 'still';

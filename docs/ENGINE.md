@@ -148,6 +148,29 @@ How to read it:
        AUDIO.ambience({ rain, loops: [] }); AUDIO.setRoom('room' | 'wet' | 'none'); AUDIO.song(pattern, { samples, bars, ending, onEnd }).stop()
 ```
 
+**Added since (ARCHITECTURE §5 has the details):**
+
+```js
+// mini-game host
+MINIGAMES.x = { start(params, api), update(dt), draw(), end(r), autoplay(api), skipResult: {…} | (api) => ({…}), noSkip, opaque };
+api.fail(); api.fails; api.opaque(true); api.isOpaque; flow.minigameId; flow.skipMinigame();   // a mini-game's last shot stays: release it
+// waits that survive a skip (autoplay code), the pointer
+await waitUntil(() => cond || c.flow.sceneId !== sid, { skip: false, max: 10 }); await wait(0.5, { skip: false });
+input.pointer.downX / downY / upX / upY
+// flow, dialogue
+{ face: 'chase', to: 'luka', dur: 0.4, wait: true }; { say: 'passenger', actor: 'passenger_c', text }; choose(labels, { prompt, who })
+{ id, kettle: [steps] | { steps, q, boil(c) } }        // the kettle line gets its own shot, before the ask
+// world, art
+world.anchor('n') -> { at: Vector3, from: Vector3, fov }; SETS.x.render = (alpha) => {};   // per-set render hook
+a.play('lean_rail', { h: 1.24, hand: true }); a.walkAnim = 'walk_rail'; a.play('phones_off'); a.play('hold_card');
+a.rig.attach.card.userData.paint((ctx, w, h) => {}); a.rig.show('hair_static'); a.rig.ghost(['handR', 'foreR'], 0.3); a.setExpr('laugh_cry');
+world.spawn('chase40', where, { look: 'chase40_tee' }); a.play('polish', { low: true, h: 0.95 })
+a.rig.fade(0.4, 0.5); a.rig.fade(1); a.rig.show('santa_hat'); a.play('hold_lanyard', { out: true }); b.hold(a.rig.attach.lanyard_held); world.rigsOf('luka'); world.pool
+// systems, audio
+DRONES.goTo(id, at, { y: 2.4 }); DRONES.lure(at, 'laugh', { transfixed: true }); stealth.end({ calm: false }); chip.show(true, { ads: false });
+AUDIO.pause(on); AUDIO.bakeSong(pattern, { samples }); pattern.bridge = null /* no sample on the bridge */;
+```
+
 `c`, passed to every `do`, roam `auto`, hotspot `do` and `use` function, is `{ world, cam, flow, state, ui, say, ask,
 choose, popup, hud, wait, sfx, music, AUDIO, player, inventory, hotspots, runSteps, playCutscene }`. `objective`,
 `input`, `clock` and `TEST` are plain globals. To hold a shot into a mini-game or a roam, use
@@ -193,7 +216,8 @@ A move holds its end frame until the next shot. Since `cam.shot` is not awaited,
    run, so each `do` must check `c.flow.skipping`: snap cosmetics to their end and apply state either way. Test every
    scene with `&fast=1` **and** without it (06 §5.6, 09 §7.5).
 2. **Poll loops hang the page.** `while (x) await c.wait(t)` never yields while skipping, and `wait(0)` never yields
-   at all. Use one `waitUntil(() => cond || c.flow.skipping)` with a time cap (01 §7.3.4).
+   at all. Use one `waitUntil(() => cond || c.flow.skipping)` with a time cap (01 §7.3.4), or, in autoplay code that
+   must really wait through a skip, `waitUntil(() => cond || gone(), { skip: false, max })`.
 3. **Two kinds of promise.** `wait`/`waitUntil` resolve when a skip starts, `waitUntil` **even if its condition is
    false**. World promises (`moveTo`, `play`, `face`, `env`, `release`) resolve when superseded, without reaching
    their target. A skip does not release them, and on an actor or set that isn't shown they hang forever. Prefer

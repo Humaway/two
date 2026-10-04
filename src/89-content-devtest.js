@@ -160,6 +160,79 @@
         c.state.flags.dev_cam = true;
       } }],
       ['swap', false], ['follow', null],
+      // ---- 6c. the maintenance pass (docs/REQUESTS.md Engine): every new path once, each with a check
+      ['do', async (c) => {
+        const W = c.world, L = W.actor('luka'), C = W.actor('chase'), F = W.actor('luka40'), V = new THREE.Vector3(), V2 = new THREE.Vector3();
+        c.cam.shot({ shot: 'WIDE', on: ['luka', 'chase', 'luka40'] }); c.cam.cutscene = false;
+        // eyePos right after place() + play(): the pose it will have (not last frame's)
+        C.play('sit_floor_wall'); await c.wait(0.3);
+        C.place([3.0, 0, -6.0, 0]); C.play('idle'); C.eyePos(V); await c.wait(0.4); C.eyePos(V2);
+        log('eye after place ' + V.distanceTo(V2).toFixed(3) + ' m, seated ' + C.rig.seated);
+        if (V.distanceTo(V2) > 0.06 || C.rig.seated) console.error('TWO dev: eyePos stale after place / idle kept the floor-sit');
+        // a skipped walk stands a sitter up
+        C.play('sit', { h: 0.45 }); flow.skipping = true; await C.moveTo([3.4, 0, -6.4]); flow.skipping = false;
+        if (C.rig.seated || C.anim !== 'idle') console.error('TWO dev: a skipped walk left him seated (' + C.anim + ')');
+        // { face, wait: true }
+        await c.runSteps([{ face: 'chase', to: 'luka', dur: 0.6, wait: true }]);
+        const want = Math.atan2(L.pos.x - C.pos.x, L.pos.z - C.pos.z), dy = Math.abs(Math.atan2(Math.sin(C.rotY - want), Math.cos(C.rotY - want)));
+        log('face wait ' + dy.toFixed(3)); if (dy > 0.05) console.error('TWO dev: face wait returned before the turn');
+        // an explicit expr beats the anim's own (same tick, either order)
+        await c.runSteps([{ expr: [['luka40', 'tearful']] }, { act: [['luka40', 'still']] }]); await c.wait(0.2);
+        log('expr pin ' + F.rig.face.expr); if (F.rig.face.expr !== 'tearful') console.error('TWO dev: anim expr overwrote an explicit one');
+        // wait / waitUntil that keep going through a skip
+        const t0 = clock.t; flow.skipping = true; await waitUntil(() => clock.t - t0 >= 0.3, { skip: false }); await wait(0.2, { skip: false }); flow.skipping = false;
+        log('waits through skip ' + (clock.t - t0).toFixed(2)); if (clock.t - t0 < 0.49) console.error('TWO dev: waitUntil { skip: false } resolved early');
+        // hold: an object that never had a parent, dropped and despawned
+        const loose = new THREE.Object3D(); L.hold(loose); L.hold(null); L.hold(new THREE.Object3D());
+        W.spawn('dev_tmp', [0.5, 0, -4.5, 0], { look: 'chase40_tee' }); W.actor('dev_tmp').hold(new THREE.Object3D()); W.despawn('dev_tmp');
+        // the {quiet} step repaints; say / bark with a generic speaker wearing an actor's face
+        c.hud.set({ quiet: '00:10:00' }); await c.runSteps([{ quiet: '00:09:59' }]);
+        if (c.state.quiet !== '00:09:59' || !/00:09:59/.test(document.getElementById('hud').textContent)) console.error('TWO dev: quiet step did not repaint');
+        c.hud.set(null);
+        await c.runSteps([{ say: 'passenger', actor: 'chase', text: 'Is that your son?' }, { bark: 'jettyman', text: 'Morning.', wait: 0.5 }]);
+        // new anims and wardrobe: polish calibrated, the 3.7 set promoted, rails, phones_off, a painted card, hair on end, ghost
+        const play = async (a, n, o, t = 0.5) => { a.play(n, o || {}); if (!sk(c)) c.cam.shot({ shot: 'MID', on: a.id, angle: 'side' }); await c.wait(t); };
+        await play(L, 'polish', { h: 0.95 }); await play(L, 'polish', { low: true, h: 0.95 }); await play(L, 'kneel_work'); await play(L, 'lean_rail', { hand: true });
+        await play(C, 'wipe_face', { rail: 1.2 }); await play(C, 'hand_rest', { sd: -1 }); await play(C, 'peer'); await play(C, 'lean_back'); await play(C, 'hand_rail');
+        F.rig.show('headphones_head', true); await play(F, 'phones_off', null, 2.4);
+        if (F.rig.attach.headphones_head.visible) console.error('TWO dev: phones_off left the headphones on');
+        C.rig.attach.card.userData.paint((x, w, h) => { x.fillStyle = '#8ee9ff'; x.fillRect(0, 0, w, h); x.fillStyle = '#123'; x.font = 'bold 22px sans-serif'; x.fillText('BONUS', 14, 48); });
+        await play(C, 'hold_card', null, 0.6); await play(C, 'hold_card', { show: true }, 0.4); C.rig.attach.card.userData.paint(null);
+        C.rig.show('hair_static', true); C.setExpr('laugh_cry'); C.rig.ghost(['handR', 'foreR'], 0.3); c.cam.shot({ shot: 'CLOSE', on: 'chase' }); await c.wait(0.8);
+        C.rig.ghost(null, 1); C.rig.show('hair_static', false); C.setExpr('neutral'); C.play('idle');
+        // batch 2: a glance over a lying pose keeps him lying; rig.fade; the held lanyard; Luke's hat; the rig pool
+        await play(C, 'sleep_back', null, 0.3); await play(C, 'glance', { yaw: 0.6 }, 0.4);
+        log('glance lying ' + C.rig.lying); if (!C.rig.lying) console.error('TWO dev: a glance stood a lying rig up');
+        C.play('idle'); L.rig.fade(0.4, 0.5); await c.wait(0.3); L.rig.fade(1, 0);
+        await play(L, 'hold_lanyard', { out: true }, 0.4);
+        W.spawn('luke', [-0.5, 0, -4.5, 0]); W.actor('luke').rig.show('santa_hat'); c.cam.shot({ shot: 'CLOSE', on: 'luke' }); await c.wait(0.6); W.despawn('luke');
+        log('rigs luka ' + W.rigsOf('luka').length + ', pooled looks ' + Object.keys(W.pool).length);
+        C.walkAnim = 'walk_rail'; await C.moveTo([2.4, 0, -6.0]); C.walkAnim = 'limp'; await C.moveTo([3.2, 0, -6.4]); C.walkAnim = 'walk';
+        if (C.anim !== 'idle') console.error('TWO dev: a walkAnim move did not end in idle (' + C.anim + ')');
+        // drones: goTo with a hover height, a transfixed lure, stealth.end({ calm: false }) keeps the lure; chip view without ads
+        DRONES.spawn('dev_m', { at: [-1.0, 0, -11.0], face: [-1.0, 0, -5.0] });
+        await DRONES.goTo('dev_m', [-1.0, 0, -9.0], { speed: 3, y: 2.4 });
+        log('goTo y ' + DRONES.get('dev_m').hover.toFixed(2)); if (Math.abs(DRONES.get('dev_m').hover - 2.4) > 0.01) console.error('TWO dev: goTo y');
+        DRONES.release('dev_m'); stealth.begin({});
+        const lu = DRONES.lure([-1.0, 0, -7.0], 'laugh', { transfixed: true });
+        stealth.end({ calm: false }); await c.wait(0.2);
+        log('lure ' + lu.n + ' after end: ' + DRONES.state('dev_m')); if (lu.n && DRONES.state('dev_m') !== 'lured') console.error('TWO dev: stealth.end({ calm: false }) sent the lured drone home');
+        chip.show(true, { ads: false }); await c.wait(0.3); chip.show(false); DRONES.clear();
+        // a TWO in a split's narrow left half: a dirty two-shot, not the set's own wide camera (screenshot)
+        L.place([1.6, 0, -6.0, PI2(-0.5)]); C.place([0.4, 0, -6.0, PI2(0.5)]);
+        await W.split({ left: { shot: { shot: 'TWO', on: ['luka', 'chase'] } }, right: { set: RIGHT, shot: { shot: 'WIDE' } } });
+        await c.wait(1.2); log('split TWO ' + c.cam.name); await W.split(null);
+        // audio: a song holds its place while paused (the pause menu calls AUDIO.pause)
+        const A = c.AUDIO;
+        if (A && A.pause && !c.flow.skipping) {
+          const h = A.song({ pattern: null, from: 'VERSE', to: 'VERSE' }); await h.ready; await c.wait(0.4);
+          A.pause(true); const t1 = h.t; await new Promise((r) => setTimeout(r, 400)); const t2 = h.t; A.pause(false); await new Promise((r) => setTimeout(r, 300));
+          log('song paused ' + t1.toFixed(2) + ' -> ' + t2.toFixed(2) + ', then ' + h.t.toFixed(2));
+          if (Math.abs(t2 - t1) > 0.01 || !(h.t > t2)) console.error('TWO dev: AUDIO.pause did not hold the song');
+          h.stop(0.1);
+        }
+        await c.cam.release(0);
+      }],
       // ---- 7. audio: every set bed and room (docs/sets ambience), "two" muffled (first verse), the laugh, the voicemail
       ['do', async (c) => {
         const A = c.AUDIO;
@@ -189,6 +262,62 @@
         { timelapse: { from: 'day', to: 'night', dur: 1.6, cycles: 1, keys: [{ t: 0.6, steps: [{ do: () => log('timelapse key') }] }] } },
         { fade: 'out', dur: 0.6 },
       ]],
+    ],
+  };
+
+  // ---- DEV_MG: every MINIGAMES entry present at run time, one after another under autoplay, each on the set (env,
+  // spawn) of the scene that uses it (HOME), else the store; a summary line per mini-game ('dev_mg <id> ...') and a
+  // total. A mini-game that throws, hangs (MG_CAP s of game time) or reports { error } is a console.error.
+  // ?autoplay=1&fast=1&speed=8&scene=DEV_MG&stop=DEV_MG   (&mg=polish,stall: only those)
+  const HOME = { polish: '1.1', stall: '1.3', wiring: '1.3', chip_sale: '1.5', piano: '2.2', keypad: '2.2', roleplay: '2.5', reason_cards: '2.5',
+    scooter: '2.5', sizzle: '2.6', safebox_keypad: '2.8', sequencer: '2.10', blend_in: '3.1', secret_santa: '3.1', hack: '3.2', boss: '3.4',
+    hold_no: '3.6', choice: '3.7', credits: 'C' };
+  const PARAMS = { polish: { anim: true }, stall: { rounds: [1, 2, 3, 4, 5] }, wiring: { half: 1 }, chip_sale: { time: '12:20' }, keypad: { digits: 4, code: '2032', test: '2032' },
+    safebox_keypad: { digits: 4, code: '1987', test: '1987' }, sizzle: { intro: false }, blend_in: { need: 3 }, secret_santa: { intro: true }, credits: { autoLen: 8 } };
+  const FALLBACK = { credits: { set: 'parade', env: 'wp_washed' } };
+  const MG_CAP = 300;
+  SCENES.DEV_MG = {
+    title: 'Mini-game regression', set: SET, env: 'day', playable: [], swap: false, hud: null, music: null, timeCard: false,
+    steps: [
+      ['do', async (c) => {
+        const only = new URLSearchParams(location.search).get('mg'), want = only ? only.split(',') : null;
+        const ids = Object.keys(MINIGAMES).filter((k) => MINIGAMES[k] && (!want || want.includes(k)));
+        for (const k of ['alarm', 'radio', 'kettle', 'chip', 'hover', 'bay', 'piano', 'brick', 'boom', 'whir', 'laugh', 'sizzle', 'uke']) if (SAMPLES[k] && !c.state.samples.includes(k)) c.state.samples.push(k);
+        const sid = c.flow.sceneId, rows = [];
+        let bad = 0;
+        log('mg list ' + ids.join(' '));
+        for (const id of ids) {
+          if (c.flow.sceneId !== sid) return;
+          const sc = SCENES[HOME[id]] || null, fb = FALLBACK[id] || {};
+          const set = (sc && sc.set && SETS[sc.set] && sc.set) || (fb.set && SETS[fb.set] && fb.set) || SET;
+          const env = (sc && sc.set === set && sc.env) || (fb.set === set && fb.env) || undefined;
+          // a clean slate: systems clear on flow:stop (drones, AR, Chip View, barks, switches), no actors, no shot
+          emit('flow:stop'); popup.clear(); c.ui.card(null); c.ui.letterbox(false); c.hud.set(null);
+          (c.world.actors instanceof Map ? [...c.world.actors.keys()] : []).forEach((a) => c.world.despawn(a));
+          await c.cam.release(0);
+          try { await c.runSteps([{ set, env, spawn: (sc && sc.set === set && sc.spawn) || null }]); } catch (e) { console.error('TWO dev_mg: ' + id + ' set ' + set, e); bad++; continue; }
+          const lead = sc && sc.set === set && sc.playable && sc.playable.find((p) => c.world.actor(p));
+          if (lead) { c.state.active = lead; player.control(lead); }
+          const t0 = clock.t;
+          let r = null, threw = null, done = false;
+          const p = Promise.resolve().then(() => c.flow.minigame(id, Object.assign({}, PARAMS[id] || {}))).then((x) => { r = x; }, (e) => { threw = e; }).finally(() => { done = true; });
+          await waitUntil(() => done || clock.t - t0 > MG_CAP || c.flow.sceneId !== sid, { skip: false });
+          if (c.flow.sceneId !== sid) return;
+          if (!done) {   // hung: finish it as skipped so the run goes on
+            console.error('TWO dev_mg: ' + id + ' did not finish in ' + MG_CAP + ' s');
+            c.flow.skipOffer = true; if (!c.flow.skipMinigame()) return;
+            await p;
+          }
+          const secs = (clock.t - t0).toFixed(1);
+          const keys = r && typeof r === 'object' ? Object.keys(r).filter((k) => typeof r[k] !== 'object').map((k) => k + '=' + r[k]).join(' ') : String(r);
+          const fail = !!threw || !r || r.error || r.missing;
+          if (fail) { bad++; console.error('TWO dev_mg: ' + id + ' failed ' + (threw ? threw.message : keys)); }
+          rows.push(id);
+          log('mg ' + id + ' on ' + set + (env ? '/' + env : '') + ' ' + secs + ' s: ' + (fail ? 'FAILED ' : 'ok ') + keys);
+          await c.cam.release(0);
+        }
+        log('mg total ' + rows.length + ' run, ' + bad + ' failed');
+      }],
     ],
   };
 

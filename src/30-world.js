@@ -311,10 +311,10 @@ const { world, cam, frame, player } = (() => {
   }
 
   // ------------------------------------------------------------ actors
-  const actors = new Map(), A = [], pool = {};
+  const actors = new Map(), A = [], pool = {}, rigs = {};   // pool: look -> idle rigs; rigs: look -> every rig built for it
   // one-shots: Rue's defaults + TWO's (04-art ANIM_ONE: tether_throw, chip_ping, coat_throw, get_up_hurt, ...)
   const ONE = { nod: 0.9, shake: 1, shrug: 1.2, give: 1.4, lanyard_on: 2, knock: 1.2, glance: 1.3, stand: 1, ...(typeof ANIM_ONE !== 'undefined' ? ANIM_ONE : {}) };
-  const LOCO = { walk: 1, run: 1, carry: 1, swagger: 1, turn: 1 };
+  const LOCO = { walk: 1, run: 1, carry: 1, swagger: 1, turn: 1, limp: 1, walk_rail: 1, walk_rail_l: 1 };   // (walkAnims: a move ends in idle)
   let kind = '';                    // what resolveWhere last found: mark | actor | anchor | point
 
   function resolveWhere(w, out, e = cur) {   // -> rotY (NaN when the place has none)
@@ -363,7 +363,7 @@ const { world, cam, frame, player } = (() => {
       if (!PKEEP[k]) { a.pX.push(k); a.pXV.push(o[k]); }
     }
   }
-  const NOOPT = {};
+  const NOOPT = {}, NONE_R = [];
   function pBack(a) { for (const k in a.pS) { a.p[k] = a.pS[k]; delete a.pS[k]; } }   // a one-shot returned: its options go
 
   function newActor(id, look, rig) {
@@ -374,7 +374,7 @@ const { world, cam, frame, player } = (() => {
       id, look, rig, root: rig.root, pos: rig.root.position, rotY: 0, anim: 'idle', expr: 'neutral', carry: null, follow: null,
       mood: null, habit: null, glanceAt: 'chase', walkAnim: look === 'rue19' ? 'swagger' : 'walk', set: null, shadow,
       waiting: false, fw: 0,          // TWO: a follower told to wait holds its spot; fw = the next trail crumb it walks to
-      p: { dur: 0, speed: 1, walk: false, still: false, yaw: 0.9, h: undefined, sit: undefined },
+      p: { dur: 0, speed: 1, walk: false, still: false, yaw: 0.9, h: undefined, sit: undefined, base: undefined },
       pX: [], pXV: [], pS: {},         // play()'s anim options: the base anim's keys + values, a one-shot's saved values
       poseName: '', poseT: 0, ret: 'idle', back: false, playT: -1, playRes: null, glanceT: 2 + Math.random() * 4,
       mv: { on: false, to: V(), speed: 0, face: NaN, loco: 'walk', y0: 0, d0: 1, res: null, collide: false, stuck: 0 },
@@ -382,14 +382,19 @@ const { world, cam, frame, player } = (() => {
       held: null, heldBig: false, prev: V(), prevRot: 0, keep: V(),
     };
     Object.defineProperty(a, 'visible', { get: () => a.root.visible, set: (v) => { a.root.visible = !!v; } });
-    a.eyePos = (v) => { a.root.updateMatrixWorld(true); return a.rig.parts.head.localToWorld(v.set(0, 0.134 * hs, 0.118 * hs)); };
-    a.headPos = (v) => { a.root.updateMatrixWorld(true); return a.rig.parts.head.localToWorld(v.set(0, 0.13 * hs, 0.03)); };
-    a.setExpr = (name) => { a.expr = name; a.rig.face.set(name); };
+    // eyePos / headPos read the posed rig. Placed this tick (a cut): pose it now, unblended, at its current anim, so a
+    // lens computed right after place() (+ play()) sees where his eyes will be, not the last frame's pose.
+    const fresh = () => { if (a.placed) a.rig.pose(a.poseName || 'idle', a.poseT, a.p, true); a.root.updateMatrixWorld(true); };
+    a.eyePos = (v) => { fresh(); return a.rig.parts.head.localToWorld(v.set(0, 0.134 * hs, 0.118 * hs)); };
+    a.headPos = (v) => { fresh(); return a.rig.parts.head.localToWorld(v.set(0, 0.13 * hs, 0.03)); };
+    // an explicit expression wins over an anim's own .expr (still, hurt_stand, laugh ...) started in the same tick, either
+    // order; a play() in a later tick hands the face back to the anim
+    a.setExpr = (name) => { a.expr = name; a.rig.face.set(name); a.rig.exprPin = true; a.exprF = clock.frame; };
     a.place = (where) => {
       stopMove(a);
       const r = resolveWhere(where, a.pos, a.set);
       if (!isNaN(r)) a.rotY = r;
-      a.prev.copy(a.pos); a.prevRot = a.rotY; a.root.rotation.y = a.rotY;
+      a.prev.copy(a.pos); a.prevRot = a.rotY; a.root.rotation.y = a.rotY; a.placed = true;
       if (P.actor === a) trailReset(); else if (FOL.indexOf(a) >= 0) a.fw = crumbW;   // a placed follower picks up the trail from here
     };
     a.moveTo = (where, o = {}) => {
@@ -409,6 +414,11 @@ const { world, cam, frame, player } = (() => {
       m.y0 = a.pos.y; m.d0 = Math.max(0.001, Math.hypot(m.to.x - a.pos.x, m.to.z - a.pos.z));
       m.collide = !!o.collide; m.stuck = 0;   // TWO: { collide: true } = pushed out of colliders/actors (AI), ends where it stalls
       if (skipping() || m.d0 < 0.02) {
+        if (m.d0 >= 0.02) {   // a skipped walk ends as a played one would: up off any seat, a base anim back to idle
+          if (a.rig.seated || a.p.sit) { a.rig.seated = false; a.rig.floorSit = false; a.p.sit = false; }
+          if (!isUpper(a.anim) && !ONE[a.anim] && a.anim !== 'idle') setAnim(a, 'idle', true);
+          a.p.walk = false;
+        }
         a.pos.set(m.to.x, floorAt(a.set, m.to.x, m.to.z, m.to.y), m.to.z);
         if (!isNaN(m.face)) a.rotY = m.face;
         a.prev.copy(a.pos); a.prevRot = a.rotY;
@@ -433,6 +443,7 @@ const { world, cam, frame, player } = (() => {
     // directly, o.sit: false stands the rig up for it. Walking (moveTo) always stands a seated rig up.
     a.play = (anim, o = {}) => {
       settle(a, 'playRes');
+      if (a.exprF !== clock.frame) a.rig.exprPin = false;
       const one = ONE[anim], back = !!one || o.loop === false, dur = o.dur ?? one ?? 0;
       if (a.back) pBack(a);            // a one-shot cut short: its options go before anything else is decided
       if (back) a.ret = anim === 'stand' ? 'idle' : ONE[a.anim] || LOCO[a.anim] ? (a.back ? a.ret : 'idle') : a.anim;
@@ -440,12 +451,17 @@ const { world, cam, frame, player } = (() => {
       const r = a.rig;
       if (SEAT[anim]) { r.seated = true; r.floorSit = false; }
       else if (anim === 'sit_floor_wall') { r.seated = true; r.floorSit = true; }
+      else if (anim === 'idle' || anim === 'stand') { r.seated = false; r.floorSit = false; a.p.sit = undefined; }   // up on his feet (even while skipping)
       if (o.sit === true) r.seated = true;
       else if (o.sit === false) { r.seated = false; r.floorSit = false; }
       a.back = back;
+      // an upper-body one-shot (glance, nod, ...) over a base pose the seated pre-pass can't rebuild (lying, kneeling, a
+      // content seat or crouch): the rig poses that base under it, so he stays where he is (rig: p.base)
+      const rb = back && ANIMS[anim] && ANIMS[anim].upper ? a.ret : null;
+      a.p.base = rb && rb !== 'idle' && !LOCO[rb] && !SEAT[rb] && ANIMS[rb] && !ANIMS[rb].upper ? rb : undefined;
       if (skipping()) {
         if (!back) pSet(a, o, false); else { if (o.h != null) a.p.h = o.h; if (o.yaw != null) a.p.yaw = o.yaw; }   // (Rue: h / yaw always land)
-        a.back = false; a.playT = -1; setAnim(a, back ? a.ret : anim, true); return Promise.resolve();
+        a.back = false; a.playT = -1; a.p.base = undefined; setAnim(a, back ? a.ret : anim, true); return Promise.resolve();
       }
       pSet(a, o, back);
       setAnim(a, anim, true);
@@ -456,7 +472,8 @@ const { world, cam, frame, player } = (() => {
     a.hold = (obj, hand = 'R') => {
       if (a.held) {   // put the current one back where it came from
         const o = a.held, h = o.userData.home;
-        h.parent.add(o); o.position.copy(h.pos); o.quaternion.copy(h.quat);
+        if (h && h.parent) { h.parent.add(o); o.position.copy(h.pos); o.quaternion.copy(h.quat); }
+        else if (o.parent) o.parent.remove(o);   // it had no home (built content-side, never added): just let go of it
         a.held = null; a.carry = null;
         if (a.heldBig && P.actor === a) P.speedMul = 1;
         a.heldBig = false;
@@ -505,6 +522,7 @@ const { world, cam, frame, player } = (() => {
       if (isUpper(a.anim)) {
         a.p.walk = true; a.p.speed = m.speed / CONFIG.walk;
         if (a.rig.seated || a.p.sit) { a.rig.seated = false; a.rig.floorSit = false; a.p.sit = false; }   // walking: up off the seat
+        a.p.base = undefined;
       }
       else { setAnim(a, m.loco); a.p.speed = m.speed / (m.loco === 'run' ? CONFIG.run : m.loco === 'carry' ? CONFIG.carry : CONFIG.walk); }
       if (d <= step) {
@@ -537,7 +555,7 @@ const { world, cam, frame, player } = (() => {
       if (f.t >= f.dur) { f.on = false; settle(f, 'res'); }
     }
     if (a.playT > 0 && (a.playT -= dt) <= 0) {
-      if (a.back) { a.back = false; pBack(a); setAnim(a, a.ret || 'idle'); }
+      if (a.back) { a.back = false; pBack(a); a.p.base = undefined; setAnim(a, a.ret || 'idle'); }
       a.p.dur = 0; a.playT = -1; settle(a, 'playRes');
     }
     if (a.habit === 'glance' && a.anim === 'idle' && !m.on && !a.playRes && (a.glanceT -= dt) <= 0) glance(a);
@@ -554,7 +572,7 @@ const { world, cam, frame, player } = (() => {
     if (P.actor === a) P.actor = null;
     const fi = FOL.indexOf(a);
     if (fi >= 0) { FOL.splice(fi, 1); a.follow = null; }
-    a.set = null; a.root.visible = true; a.rig.seated = false; a.waiting = false;
+    a.set = null; a.root.visible = true; a.rig.seated = false; a.rig.floorSit = false; a.waiting = false; a.placed = false;
     (pool[a.look] ||= []).push(a.rig);
   }
   function spawn(id, where, o = {}) {
@@ -564,10 +582,11 @@ const { world, cam, frame, player } = (() => {
     let a = actors.get(id);
     if (a && a.look !== look) { despawnA(a); a = null; }
     if (!a) {
-      const rig = (pool[look] && pool[look].pop()) || buildCharacter(look);
+      let rig = pool[look] && pool[look].pop();
+      if (!rig) { rig = buildCharacter(look); (rigs[look] ||= []).push(rig); }
       a = newActor(id, look, rig);
       actors.set(id, a); A.push(a);
-      a.setExpr((LOOKS[look] && LOOKS[look].expr) || 'neutral');
+      a.setExpr((LOOKS[look] && LOOKS[look].expr) || 'neutral'); a.rig.exprPin = false;
     }
     if (a.set !== e) { e.scene.add(a.root); a.set = e; }
     a.visible = true;
@@ -591,6 +610,7 @@ const { world, cam, frame, player } = (() => {
   function trailReset() { crumbW = 0; for (let i = 0; i < FOL.length; i++) FOL[i].fw = 0; }
   const P = {
     actor: null, enabled: false, speedMul: 1, running: false, frozenT: 0, ctrlYaw: 0,
+    trail: false,                   // TWO: followers also trail a scripted leader (moveTo) while the player is disabled, outside cutscenes (flow sets it for a roam's autoplay)
     followers: FOL,                 // read-only: the follower actors, in order
     get fol() { return FOL[0] || null; },   // Rue's single follower (the first)
     control(id) {
@@ -691,7 +711,8 @@ const { world, cam, frame, player } = (() => {
   }
   function followerTick(dt) {
     const L = P.actor;
-    if (!L || !FOL.length || !P.enabled) return;
+    if (!L || !FOL.length) return;
+    if (!P.enabled && !(P.trail && L.mv.on && !(typeof flow !== 'undefined' && (flow.cutscene || flow.busy)))) return;
     const e = L.set;
     // breadcrumbs: every 0.35 m the leader moves
     const last = crumbAt(crumbW + CRN - 1);
@@ -1042,6 +1063,13 @@ const { world, cam, frame, player } = (() => {
     else if (o.angle === 'side') { d.set(f.z, 0, -f.x); if (d.x * (fc.pos.x - L.x) + d.z * (fc.pos.z - L.z) < 0) d.negate(); }   // profile on the camera's side
     else d.copy(f);
     const fv = o.fov ?? (size === 'ECU' ? CONFIG.ecuFov : CONFIG.fov), fit = o.dist == null && (size === 'TWO' || size === 'THREE' || (size === 'WIDE' && nS > 1));
+    if (fit && size !== 'WIDE' && nS > 1 && !side && !o.angle && fitAspect() < 1.25) {
+      // a narrow frame (a split's half): square across the line they would need a lens far back (the set's own wide
+      // camera, in a room); come round 45° behind the last one instead, the first seen past his shoulder (a dirty two-shot)
+      const q = SP[nS - 1], c = Math.cos(0.8), sn = Math.sin(0.8), qx = q.x - L.x, qz = q.z - L.z;
+      const ax = d.x * c + d.z * sn, az = -d.x * sn + d.z * c, bx = d.x * c - d.z * sn, bz = d.x * sn + d.z * c;
+      if (ax * qx + az * qz >= bx * qx + bz * qz) d.set(ax, 0, az); else d.set(bx, 0, bz);
+    }
     const top = o.angle === 'top' || size === 'TOP';
     let D = distFor(d, L, size, o.dist, fv, fit);
     let pull = 1;
@@ -1416,7 +1444,10 @@ const { world, cam, frame, player } = (() => {
         const len = L.distanceTo(tl), c = clearTo(L, tl, e);
         if (c < len + 0.15) k = Math.min(k, Math.max(0.2, (c - 0.15) / len));
       }
-      if (k < 1) { s.off.multiplyScalar(k); s.len = Math.max(0.5, s.off.length()); }
+      if (k < 1) {   // a tight room: a smaller circle, and a wider lens so the subject keeps (about) its size in frame
+        s.off.multiplyScalar(k); s.len = Math.max(0.5, s.off.length());
+        s.fov0 = Math.min(Math.max(s.fov0, 75), 2 * Math.atan(Math.tan(s.fov0 * DEG / 2) / k) / DEG);
+      }
     }
   }
   function shotTick(rg, dt) {
@@ -1717,6 +1748,10 @@ const { world, cam, frame, player } = (() => {
     const e = cur;
     if (!e) return;
     if (pbQ.length) pbStep();             // a staged prebuild: one stage per rendered frame
+    // a set's own render hook: def.render(alpha) moves its tick-driven props between the last two ticks (scooters, cars)
+    const sp0 = splitE && splitE !== e ? splitE : null;
+    if (e.def.render) try { e.def.render(alpha); } catch (err) { console.error('TWO: ' + e.id + '.render', err); e.def.render = null; }
+    if (sp0 && sp0.def.render) try { sp0.def.render(alpha); } catch (err) { console.error('TWO: ' + sp0.id + '.render', err); sp0.def.render = null; }
     renderer.getSize(size2);
     const w = size2.x, h = size2.y, dtA = alpha * CONFIG.step;
     for (let i = 0; i < A.length; i++) {   // interpolate between the last two ticks, pose once per frame
@@ -1725,6 +1760,7 @@ const { world, cam, frame, player } = (() => {
       a.keep.copy(a.pos); a.pos.lerpVectors(a.prev, a.keep, alpha);
       a.root.rotation.y = a.prevRot + angTo(a.prevRot, a.rotY) * alpha;
       if (a.root.visible) a.rig.pose(a.poseName || 'idle', a.poseT + dtA, a.p);
+      a.placed = false;
     }
     const sp = splitE, lw = leftWidth(w), lv = sp ? Math.max(0, lw - 2) : w;   // a thin black divide between the halves
     if (snap) copyCam(cp, cs);           // a cut since the last tick: never draw a frame in between the two shots
@@ -1815,7 +1851,9 @@ const { world, cam, frame, player } = (() => {
       pending.set(id, n); pbQ.push(n);
       return n.p;
     },
-    adopt(look, rig) { (pool[look] ||= []).push(rig); },   // boot's warmed rigs: the first spawn of each look builds nothing
+    adopt(look, rig) { (pool[look] ||= []).push(rig); (rigs[look] ||= []).push(rig); },   // boot's warmed rigs: the first spawn of each look builds nothing
+    pool,                              // read-only: look -> the rigs waiting in the pool (not on any actor now)
+    rigsOf: (look) => rigs[look] || NONE_R,   // every rig built for a look (boot's and any built since), pooled or in use
     show(id) { showE(ensure(id)); trim(); },
     warm(id) {
       const had = live.get(id), e = had || build(id), hidden = [];

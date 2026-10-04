@@ -98,6 +98,10 @@ const CHARACTERS = {
   hovercar:  { name: 'HOVER-CAR',     voice: { wave: 'triangle', f: 440, len: 0.03, mono: true } },
   door_drone: { name: 'DOOR DRONE',   voice: { wave: 'square', f: 400, len: 0.04, mono: true, filter: 2400 } },
   train:     { name: 'TRAIN ANNOUNCEMENT', voice: { wave: 'square', f: 290, len: 0.05, mono: true, filter: 1600 } },
+  // 1.7's people of the Parade (MAN, KID, WOMAN): speaker ids aliasing pooled extras' actors (63-content used to define them)
+  jettyman:   { name: 'MAN',   actor: 'sizzle_c',  voice: { wave: 'square', f: 132, len: 0.06, soft: true, filter: 1600 } },
+  skatekid:   { name: 'KID',   actor: 'local40_d', voice: { wave: 'triangle', f: 310, len: 0.032 } },
+  chipswoman: { name: 'WOMAN', actor: 'sizzle_e',  voice: { wave: 'triangle', f: 236, len: 0.045, soft: true } },
   voice1:    { name: 'VOICE 1',       silhouette: true, voice: { wave: 'square', f: 102, len: 0.05, soft: true } },   // A2 coda: we never see faces
   voice2:    { name: 'VOICE 2',       silhouette: true, voice: { wave: 'triangle', f: 215, len: 0.045, soft: true } },
   // together (2.2): "—not right."

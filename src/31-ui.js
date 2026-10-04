@@ -345,8 +345,9 @@ const { say, choose, ask } = (() => {
     nameEl.textContent = opts.name || (ch && ch.name) || String(id).toUpperCase();
     tagEl.textContent = opts.tag || '';
     box.classList.remove('noname', 'notext');
+    const fid = opts.actor || id;   // opts.actor: a generic speaker ('passenger') with this actor's face (and mouth)
     if (opts.portrait === false) box.classList.add('noface');
-    else { box.classList.remove('noface'); if (D.faceId !== id) { face.src = portraitURL(id); D.faceId = id; } }
+    else { box.classList.remove('noface'); if (D.faceId !== fid) { face.src = portraitURL(fid); D.faceId = fid; } }
   }
   function opts(labels, askMode, dis) {
     optsEl.classList.toggle('ask', askMode);
@@ -387,7 +388,7 @@ const { say, choose, ask } = (() => {
         q: /\?[\s…—"')]*$/.test(out), censor: o.censor || false, auto: o.auto || 0 });
       // censor: true | 'pop-up text'. A line already written up to the cut (ends in —) is typed in full.
       D.len = D.censor && !/—$/.test(out) ? Math.max(1, Math.floor(out.length * 0.75)) : out.length;
-      D.talk = speakerActors(id);   // 'manager' moves luka40's mouth; duets move both
+      D.talk = o.actor ? [o.actor] : speakerActors(id);   // 'manager' moves luka40's mouth; duets move both
       node.data = ''; optsEl.classList.add('off'); more.classList.add('off');
       talk(true);
     });
@@ -531,8 +532,9 @@ const bark = (() => {
     const o = r.o, ch = CHARACTERS[r.id];
     nameEl.textContent = o.name || (ch && ch.name) || String(r.id).toUpperCase();
     tagEl.textContent = o.tag || '';
+    const fid = o.actor || r.id;
     if (o.portrait === false) box.classList.add('noface');
-    else { box.classList.remove('noface'); if (faceId !== r.id) { face.src = portraitURL(r.id); faceId = r.id; } }
+    else { box.classList.remove('noface'); if (faceId !== fid) { face.src = portraitURL(fid); faceId = fid; } }
     let out = ''; const beats = [];   // '^' = a beat, as in say()
     for (let k = 0; k < r.text.length; k++) {
       const c = r.text[k];
@@ -545,7 +547,7 @@ const bark = (() => {
     B.q = /\?[\s…—"')]*$/.test(out);
     B.hold = o.hold ?? Math.min(4, 1.2 + out.length * 0.03);
     if (TEST.auto) B.hold = Math.min(B.hold, 0.5);
-    B.talk = speakerActors(r.id);
+    B.talk = o.actor ? [o.actor] : speakerActors(r.id);
     node.data = '';
     if (!shown) { shown = true; box.classList.add('on'); }
     talk(true);
@@ -1295,7 +1297,7 @@ const menus = (() => {
     on('reddy40:lightning', () => { if (onTitle) ui.sfx('thunder', { vol: 0.45 }); });   // the storm over the bay, on the title
   };
   M.title = async () => {
-    M.paused = false; clock.paused = false; clock.scale = 1;
+    M.paused = false; clock.paused = false; clock.scale = 1; auPause(false);
     ui.reset();
     if (!profile.seenPrologue) { profile.seenPrologue = true; saveOptions(); }
     if (TEST.auto) { // autoplay never stops at the title: P runs into 1.1; anything else means we're done
@@ -1314,8 +1316,9 @@ const menus = (() => {
     M.mode = 'press';
     ui.fade(0, 1.2);
   };
-  M.pause = () => { M.paused = true; clock.paused = true; pauseMenu(); };
-  M.resume = () => { M.paused = false; clock.paused = false; M.mode = null; root.classList.add('off'); uiEl.classList.remove('menuon'); };
+  const auPause = (on) => { const A = AU(); if (A && A.pause) A.pause(on); };   // songs + AUDIO.seq hold their place while paused
+  M.pause = () => { M.paused = true; clock.paused = true; auPause(true); pauseMenu(); };
+  M.resume = () => { M.paused = false; clock.paused = false; auPause(false); M.mode = null; root.classList.add('off'); uiEl.classList.remove('menuon'); };
   M.update = () => {
     if (onTitle && (orbitT += CONFIG.step) > 240) { orbitT = 0; orbit(); }
     if (M.mode === null) {

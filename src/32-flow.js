@@ -177,7 +177,7 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
     }
     if ('say' in s) {
       if (sk) return;
-      const a = actorFor(s.say); // optional cues on a line: {say, text, expr: 'worried', act: 'lanyard'} (speaker -> actor)
+      const a = actorFor(s.actor || s.say); // optional cues on a line: {say, text, expr: 'worried', act: 'lanyard'} (speaker -> actor; s.actor: a generic speaker's actor)
       if (a && s.expr) a.setExpr(s.expr);
       if (a && typeof s.act === 'string') a.play(s.act);
       return say(s.say, s.text, s);
@@ -202,8 +202,8 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
       return;
     }
     if ('quiet' in s) { // {quiet: 'hh:mm:ss' | null}: the HUD's QUIET IN (state; applied when skipping too)
-      state.quiet = s.quiet;
-      if (typeof hud.quiet === 'function') hud.quiet(s.quiet); else hudShow();
+      if (typeof hud.quiet === 'function') hud.quiet(s.quiet);   // hud.quiet writes state.quiet (and repaints only on a change)
+      else { state.quiet = s.quiet; hudShow(); }
       return;
     }
     if ('choice' in s) return choose(s.choice, s).then((i) => { flow.result = i; if (s.flag) setFlag(s.flag, i); });
@@ -228,7 +228,15 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
     if ('do' in s) return s.do(ctx());
     if ('stare' in s) return stare(s);
     if ('move' in s) return move(s);
-    if ('face' in s) { const a = actorOf(s.face); if (a) a.face(s.to, sk ? 0 : s.dur); return; }
+    if ('face' in s) { // {face, to, dur, wait: true}: awaited until the turn is done (a close-up right after it sees his face)
+      const a = actorOf(s.face);
+      if (!a) return;
+      const p = a.face(s.to, sk ? 0 : s.dur);
+      if (!s.wait || sk) return;
+      let done = false; p.then(() => { done = true; });
+      const t1 = clock.t + (s.dur ?? 0.3) + 0.5;   // (a hidden actor never turns: give up after the turn's time)
+      return waitUntil(() => done || clock.t > t1).then(() => { if (!done) a.face(s.to, 0); });
+    }
     if ('expr' in s) { for (const [id, e] of s.expr) { const a = actorOf(id); if (a) a.setExpr(e); } return; }
     if ('act' in s) { for (const [id, anim, o] of s.act) { const a = actorOf(id); if (a) a.play(anim, o || {}); } return; }
     if ('despawn' in s) { world.despawn(s.despawn); return; }
@@ -395,9 +403,14 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
       testLog('sample ' + h.sample);
       learnSample(h.sample);
     }
-    async function kettle(h) { // `des: true`: Des asks first (spec 13.1)
+    // kettle: true | [steps] | { steps, q, boil(c) }: the steps (a line with its own shot) play before the ask, `q`
+    // replaces 'Put the kettle on?', boil(c) runs when the kettle goes on (a prop's steam / light). `des: true`: Des asks first (spec 13.1)
+    async function kettle(h) {
+      const k = h.kettle && typeof h.kettle === 'object' ? (Array.isArray(h.kettle) ? { steps: h.kettle } : h.kettle) : null, g = G;
       if (h.des) await say('des', 'Tea?');
-      if (!(await ask('Put the kettle on?'))) return false;
+      if (k && k.steps) { await playCutscene(k.steps, { letterbox: false }); if (g !== G) return false; }
+      if (!(await ask((k && k.q) || 'Put the kettle on?'))) return false;
+      if (k && k.boil) k.boil(ctx());
       if (player.actor && where(h)) player.actor.face([hx, hz]);
       ui.sfx('kettle'); // boils, clicks off, steam rises
       const at = h.at ?? h.id, steam = { n: 16, speed: 0.25, life: 1.8, color: 0xf2f2f2 };
@@ -584,8 +597,8 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
       if (Array.isArray(u)) { for (let i = 0; i < u.length; i++) if (!state.flags[u[i]]) return false; return true; }
       return u ? !!state.flags[u] : false;
     };
-    if (TEST.auto) {
-      if (o.auto) await o.auto(ctx());
+    if (TEST.auto) {   // (followers trail the leader's scripted moves, as they would trail the player)
+      if (o.auto) { player.trail = true; try { await o.auto(ctx()); } finally { if (g === G) player.trail = false; } }
       else if (typeof u !== 'function') for (const f of [].concat(u || [])) setFlag(f, true);
       if (u && !solved()) console.warn('TWO: roam auto() left `until` unsolved in ' + flow.sceneId);
       return;
@@ -637,7 +650,7 @@ const { flow, hotspots, inventory, runSteps, playCutscene } = (() => {
     flow.skipping = false; flow.roaming = false; flow.busy = false; flow.sceneId = null; flow.skipOffer = false; flow.slowmo = 1; slowT = 0;
     panelOpen = false; cutDepth = 0; clock.scale = 1; inventory.selected = null; tutOn = false;
     for (const n in loops) { for (const h of loops[n]) h.stop(0.4); loops[n].length = 0; }
-    player.enabled = false;
+    player.enabled = false; player.trail = false;
     ui.inventoryPanel(null); ui.prompt(null); ui.swapIndicator(null); hotspots.reset();
     stareUI(true); silence(false); cam.lock(false);
     emit('flow:stop'); // systems (drones, Chip View, AR, barks) clear themselves

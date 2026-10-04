@@ -35,7 +35,8 @@ button { font: inherit; color: inherit; cursor: pointer; pointer-events: auto; b
 #fade { z-index: 10; opacity: 1; }
 
 /* letterbox 2.35:1 */
-.lb { left: 0; right: 0; height: max(0px, calc((100vh - 100vw / 2.35) / 2)); background: #000; z-index: 6; transition: transform .4s ease-in-out; }
+/* the bars sit under pop-ups (#pops z 6): on a portrait phone the bars cover most of the screen */
+.lb { left: 0; right: 0; height: max(0px, calc((100vh - 100vw / 2.35) / 2)); background: #000; z-index: 5; transition: transform .4s ease-in-out; }
 #lbt { top: 0; transform: translateY(-100%); }
 #lbb { bottom: 0; transform: translateY(100%); }
 #ui.lbon #lbt, #ui.lbon #lbb { transform: none; }
@@ -69,7 +70,8 @@ button { font: inherit; color: inherit; cursor: pointer; pointer-events: auto; b
 #hud .sm b { color: var(--yes); }
 /* HACK %: big centre-top bar (L21, 3.4-3.5) */
 #hack { left: 50%; top: 56px; z-index: 7; transform: translateX(-50%); width: min(560px, 58vw); padding: 8px 14px 10px; border-radius: 12px;
-  background: rgba(10,14,30,.66); text-shadow: 0 1px 2px #000; }
+  background: rgba(10,14,30,.66); text-shadow: 0 1px 2px #000; transition: top .4s ease-in-out; }
+#ui.lbon #hack { top: calc(max(0px, (100vh - 100vw / 2.35) / 2) + 10px); }   /* in a cutscene: just below the top bar */
 #hack .hd { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; font-weight: bold; letter-spacing: .22em; font-size: 15px; }
 #hack .hd span { font-family: var(--mono); font-size: 22px; letter-spacing: .02em; color: var(--yes); }
 #hack .bar { height: 16px; border-radius: 8px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.3); overflow: hidden; }
@@ -192,7 +194,7 @@ body.calm #signal.full, body.calm #ar .arl { animation: none; }   /* Reduce Flas
 #acard hr { width: 64px; border: 0; border-top: 3px solid var(--yes); margin: 0 0 18px; }
 
 /* JARVIS pop-ups: tired corporate web app */
-#pops { inset: 0; z-index: 5; }
+#pops { inset: 0; z-index: 6; }
 .jvw { position: absolute; left: 0; top: 0; }
 .jv { width: 340px; max-width: calc(100vw - 20px); background: #fff; color: #2b2f36; font-family: var(--sys); font-size: 14px; line-height: 1.4; text-align: left;
   border: 1px solid #8e96a4; border-radius: 3px; box-shadow: 0 3px 0 rgba(0,0,0,.18), 0 8px 16px rgba(0,0,0,.25); pointer-events: auto;
@@ -354,6 +356,7 @@ body.chipable #t-chip { display: block; }
 /* touch layouts (phones): keep clear of the stick (left), the buttons (right) and the pause button (top right) */
 #ui.touchui #signal { right: 70px; }
 #ui.touchui #hack { top: 50px; left: 188px; transform: none; width: min(460px, calc(100vw - 480px)); }
+#ui.touchui.lbon #hack { top: calc(max(0px, (100vh - 100vw / 2.35) / 2) + 10px); }
 #ui.touchui #bark { bottom: 10px; left: 188px; width: min(440px, calc(100vw - 420px)); }
 #ui.touchui.talking #bark { bottom: auto; top: 50px; left: 12px; }
 #ui.touchui #take { bottom: auto; top: 120px; left: 12px; right: auto; }

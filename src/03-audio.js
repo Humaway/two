@@ -1849,10 +1849,11 @@ const { AUDIO, sfx, music } = (() => {
   const players = [], handles = new Set();
   let pumpId = 0;
   function livePlayer(P, o) { // schedules twoStep() on the audio clock, 0.2 s ahead (Rue's look-ahead scheduler)
-    const out = gainTo(o.dest || busM, (o.gain ?? 1) * SONG_GAIN), D = speaker(o.speaker, out);
+    const g0 = (o.gain ?? 1) * SONG_GAIN, out = gainTo(o.dest || busM, g0), D = speaker(o.speaker, out);
     const p = { P, live: !!o.live, a: o.a, b: o.b, bar: o.a, s: 0, loop: !!o.loop, next: null, t: (o.at || ctx.currentTime) + 0.06, out, D, W: rev(ctx, D, 1.4, 0.18, 0.6),
-      onStep: o.onStep, onEnd: o.onEnd, done: false, endAt: 0, qt: new Float64Array(64), qi: new Int16Array(64), qh: 0, qn: 0 };
+      onStep: o.onStep, onEnd: o.onEnd, done: false, endAt: 0, qt: new Float64Array(64), qi: new Int16Array(64), qh: 0, qn: 0, g0, pausedAt: -1 };
     players.push(p);
+    if (paused) pausePlayer(p, true);
     if (!pumpId) pumpId = setInterval(pump, 25);
     pump();
     return p;
@@ -1871,6 +1872,7 @@ const { AUDIO, sfx, music } = (() => {
     const now = ctx.currentTime, ahead = now + (document.hidden ? 1.2 : 0.2);
     for (let j = players.length - 1; j >= 0; j--) {
       const p = players[j];
+      if (p.pausedAt >= 0) continue;   // the pause menu: holds its place
       while (!p.done && p.t < ahead) { pstep(p, p.t); p.t += STEP; }
       while (p.qn && p.qt[p.qh] <= now) { const i = p.qi[p.qh]; p.qh = (p.qh + 1) & 63; p.qn--; p.onStep(i & 15, i >> 4); }
       if (p.done && now >= p.endAt) { players.splice(j, 1); release(p, 0.05); if (p.onEnd) p.onEnd(); }
@@ -1884,6 +1886,77 @@ const { AUDIO, sfx, music } = (() => {
     setTimeout(() => p.out.disconnect(), (fade + 0.3) * 1000);
   }
   function stopPlayer(p, fade) { const j = players.indexOf(p); if (j >= 0) { players.splice(j, 1); release(p, fade); } }
+  // pause / resume one live player: on pause it goes quiet and rewinds to the first step that hasn't sounded yet (the
+  // look-ahead already queued up to 0.2 s); on resume everything still to come moves later by the time spent paused.
+  function pausePlayer(p, on) {
+    const now = ctx.currentTime;
+    if (on) {
+      if (p.pausedAt >= 0) return;
+      const cut = now + 0.03;
+      hold(p.out.gain, now); p.out.gain.linearRampToValueAtTime(0, cut);
+      while (p.t - STEP >= cut && !(p.bar === p.a && p.s === 0 && !p.loop)) {   // un-schedule what the look-ahead queued past the cut
+        p.t -= STEP; p.done = false;
+        if (--p.s < 0) { p.s = 15; if (--p.bar < p.a) p.bar = p.b - 1; }
+      }
+      while (p.qn && p.qt[(p.qh + p.qn - 1) & 63] >= cut) p.qn--;
+      p.pausedAt = cut;
+    } else {
+      if (p.pausedAt < 0) return;
+      const d = Math.max(0, now + 0.06 - p.pausedAt);
+      p.pausedAt = -1; p.t += d; if (p.done) p.endAt += d;
+      for (let i = 0; i < p.qn; i++) p.qt[(p.qh + i) & 63] += d;
+      hold(p.out.gain, now); p.out.gain.linearRampToValueAtTime(p.g0, now + 0.06);
+    }
+  }
+  // Buffers on a handle's own timeline (the baked song, the coda, the 1987 song's loop): { b, at, off, len, loop, into }.
+  // runPlan starts every one still due from handle time `from` (a start or a resume) and returns the audio time of `from`.
+  function runPlan(h, plan, from) {
+    const when = ctx.currentTime + 0.06;
+    for (const e of plan) {
+      const rel = from - e.at;
+      if (rel >= e.len) continue;
+      const s = ctx.createBufferSource(); s.buffer = e.b; s.connect(e.into);
+      if (e.loop) s.loop = true;
+      const off = e.off + Math.max(0, rel), o2 = e.loop ? off % e.b.duration : off;
+      s.start(when + Math.max(0, -rel), o2); s.stop(when + Math.max(0, -rel) + e.len - Math.max(0, rel) + 0.05);
+      h.src.push(s);
+    }
+    return when;
+  }
+  // The pause menu (AUDIO.pause): every song handle (AUDIO.song, the 1987 song, music('two')) and live player
+  // (AUDIO.seq, a live-played song) holds its place; h.t stands still while paused. Music cues and beds carry on.
+  let paused = false;
+  function pauseAll(on) {
+    on = !!on;
+    if (!ctx || on === paused) return;
+    paused = on;
+    for (const h of handles) if (h._pause) h._pause(on);
+    for (const p of players) pausePlayer(p, on);
+  }
+  // a handle's pause/resume over its plan (buffers) and/or live player: shared by song() and pudding()
+  function pausable(h, plan, begin, endIn) {
+    let at = -1, timer = 0;
+    h._arm = (from) => { clearTimeout(timer); timer = setTimeout(endIn, (h.duration - from + 0.2) * 1000); };
+    h._pause = (on) => {
+      if (h.stopped || h.start < 0 || !h.out) return;
+      const now = ctx.currentTime;
+      if (on) {
+        if (at >= 0) return;
+        at = h.t; clearTimeout(timer);
+        hold(h.out.gain, now); h.out.gain.linearRampToValueAtTime(0, now + 0.03);
+        for (const s of h.src) s.stop(now + 0.05);
+        h.src.length = 0; h.frozen = at;
+      } else {
+        if (at < 0) return;
+        const from = at; at = -1;
+        const when = runPlan(h, plan, from);
+        h.start = when - from; h.frozen = -1;
+        if (begin) begin(when, from);
+        h._arm(from);
+      }
+    };
+    h._clear = () => clearTimeout(timer);
+  }
 
   // AUDIO.song({ pattern, samples, from, to, muffled, bleed, speaker, gain, fade, coda, dest, onEnd }) -> handle.
   // Plays the baked song if it's ready, else the same arrangement live while it bakes for next time.
@@ -1901,14 +1974,14 @@ const { AUDIO, sfx, music } = (() => {
     const codaLen = o.coda ? (M.pudding_coda ? M.pudding_coda.duration : dur(5, 92) + 6.5) : 0, gap = 0.4;
     let res, rdy;
     const h = {
-      duration: t1 - t0 + tail + (o.coda ? gap + codaLen : 0), start: -1, stopped: false, src: [], p: null, out: null, onEnd: o.onEnd || null,
-      get t() { return ctx && h.start >= 0 ? Math.max(0, Math.min(h.duration, ctx.currentTime - h.start)) : 0; },
+      duration: t1 - t0 + tail + (o.coda ? gap + codaLen : 0), start: -1, stopped: false, src: [], p: null, out: null, onEnd: o.onEnd || null, frozen: -1,
+      get t() { return h.frozen >= 0 ? h.frozen : ctx && h.start >= 0 ? Math.max(0, Math.min(h.duration, ctx.currentTime - h.start)) : 0; },
       get playing() { return h.start >= 0 && !h.stopped && h.t < h.duration; },
       get section() { return h.sectionAt(h.t); },
       sectionAt(t) { const x = t0 + (t ?? h.t); if (x >= SONG_LEN || (o.coda && x > t1 + gap)) return o.coda && x > t1 ? 'CODA' : 'END'; return SECS[BSEC[Math.min(NB - 1, Math.floor(x / BAR))]][0]; },
       stop(f = 0.4) {
         if (h.stopped) return;
-        h.stopped = true; handles.delete(h);
+        h.stopped = true; handles.delete(h); if (h._clear) h._clear();
         if (ctx && h.out) { const t = ctx.currentTime; hold(h.out.gain, t); h.out.gain.linearRampToValueAtTime(0, t + f); for (const s of h.src) s.stop(t + f + 0.05); setTimeout(() => h.out.disconnect(), (f + 0.4) * 1000); }
         if (h.p) stopPlayer(h.p, f);
         res();
@@ -1919,18 +1992,29 @@ const { AUDIO, sfx, music } = (() => {
     if (!ctx) { h.stopped = true; res(); rdy(); return h; }
     handles.add(h);
     const end = () => { if (h.stopped) return; h.stopped = true; handles.delete(h); if (h.onEnd) h.onEnd(); res(); };
+    const plan = [];
+    const env = (when, at) => {   // the out gain from handle time `at` (a start or a resume): fade in, then the tail's fade out
+      const g = h.out.gain, gv = o.gain ?? 1, tl = t1 - t0;
+      hold(g, ctx.currentTime);
+      g.setValueAtTime(0, when);
+      if (h.baked && !last && at >= tl) return;   // resumed inside the tail: it stays faded out
+      g.linearRampToValueAtTime(gv, when + (at > 0 ? 0.04 : o.fade || 0.02));
+      if (h.baked && !last) { g.setValueAtTime(gv, when + tl - at); g.linearRampToValueAtTime(0, when + tl + tail - at); }
+    };
     const begin = (b, coda) => {
       if (h.stopped) return;
-      const when = ctx.currentTime + 0.06, fin = o.fade || 0.02;
-      h.out = gainTo(o.dest || busM, 0); h.out.gain.setValueAtTime(0, when); h.out.gain.linearRampToValueAtTime(o.gain ?? 1, when + fin);
+      h.out = gainTo(o.dest || busM, 0);
       const into = speaker(o.speaker || (o.muffled ? 'monitor' : o.bleed ? 'bleed' : null), h.out);
+      h.baked = !!b;
+      if (b) plan.push({ b, at: 0, off: t0, len: t1 - t0 + tail, into });   // the baked song: one buffer from the `from` section to the end of `to`
+      if (coda) { plan.push({ b: coda, at: t1 - t0 + gap, off: 0, len: coda.duration, into }); h.duration = t1 - t0 + gap + coda.duration; }
+      const when = runPlan(h, plan, 0);
       h.start = when;
-      if (b) { // the baked song: one buffer source from the `from` section to the end of `to`
-        const s = ctx.createBufferSource(); s.buffer = b; s.connect(into); s.start(when, t0); s.stop(when + t1 - t0 + tail + 0.05); h.src.push(s);
-        if (!last) { h.out.gain.setValueAtTime(o.gain ?? 1, when + t1 - t0); h.out.gain.linearRampToValueAtTime(0, when + t1 - t0 + tail); }
-      } else h.p = livePlayer(prep(pat, samples), { dest: into, a: SEC0[from], b: SEC0[to + 1], at: when - 0.06 });
-      if (coda) { const s = ctx.createBufferSource(); s.buffer = coda; s.connect(into); s.start(when + t1 - t0 + gap); h.src.push(s); h.duration = t1 - t0 + gap + coda.duration; }
-      setTimeout(end, (h.duration + 0.2) * 1000);
+      env(when, 0);
+      if (!b) h.p = livePlayer(prep(pat, samples), { dest: into, a: SEC0[from], b: SEC0[to + 1], at: when - 0.06 });
+      pausable(h, plan, (w, at) => env(w, at), end);
+      h._arm(0);
+      if (paused) h._pause(true);   // started while the pause menu is up (its live player pauses itself)
       rdy();
     };
     const pr = bakeSong(pat, { samples });
@@ -1943,18 +2027,22 @@ const { AUDIO, sfx, music } = (() => {
   }
   // The 1987 song as a handle (the jukebox, Rue's AUDIO.song call shape): `loops` times round, then the coda.
   function pudding(o = {}) {
-    let res; const h = { duration: 0, start: -1, stopped: false, src: [], out: null, stop(f = 0.4) { if (h.stopped) return; h.stopped = true; handles.delete(h); if (h.out) { const t = ctx.currentTime; hold(h.out.gain, t); h.out.gain.linearRampToValueAtTime(0, t + f); for (const s of h.src) s.stop(t + f + 0.05); } res(); }, get t() { return h.start >= 0 ? ctx.currentTime - h.start : 0; } };
+    let res; const h = { duration: 0, start: -1, stopped: false, src: [], out: null, frozen: -1, stop(f = 0.4) { if (h.stopped) return; h.stopped = true; handles.delete(h); if (h._clear) h._clear(); if (h.out) { const t = ctx.currentTime; hold(h.out.gain, t); h.out.gain.linearRampToValueAtTime(0, t + f); for (const s of h.src) s.stop(t + f + 0.05); } res(); }, get t() { return h.frozen >= 0 ? h.frozen : h.start >= 0 ? ctx.currentTime - h.start : 0; } };
     h.done = new Promise((r) => { res = r; });
     if (!ctx) { res(); return h; }
     handles.add(h);
     Promise.all([ensureCue('pudding'), ensureCue('pudding_coda')]).then(([a, b]) => {
       if (h.stopped || !a) return;
-      const when = ctx.currentTime + 0.05, n = Math.max(1, o.loops || Math.ceil((o.bars || 8) / 4));
-      h.out = gainTo(o.dest || busM, o.gain ?? 1); const into = speaker(o.speaker, h.out);
-      const s = ctx.createBufferSource(); s.buffer = a; s.loop = true; s.connect(into); s.start(when); s.stop(when + n * a.duration); h.src.push(s);
-      if (b) { const c = ctx.createBufferSource(); c.buffer = b; c.connect(into); c.start(when + n * a.duration); h.src.push(c); }
-      h.start = when; h.duration = n * a.duration + (b ? b.duration : 0);
-      setTimeout(() => { if (h.stopped) return; h.stopped = true; handles.delete(h); if (o.onEnd) o.onEnd(); res(); }, (h.duration + 0.2) * 1000);
+      const n = Math.max(1, o.loops || Math.ceil((o.bars || 8) / 4)), gv = o.gain ?? 1;
+      h.out = gainTo(o.dest || busM, gv); const into = speaker(o.speaker, h.out);
+      const plan = [{ b: a, at: 0, off: 0, len: n * a.duration, loop: true, into }];
+      if (b) plan.push({ b, at: n * a.duration, off: 0, len: b.duration, into });
+      h.duration = n * a.duration + (b ? b.duration : 0);
+      h.start = runPlan(h, plan, 0);
+      pausable(h, plan, (w) => { hold(h.out.gain, ctx.currentTime); h.out.gain.setValueAtTime(0, w); h.out.gain.linearRampToValueAtTime(gv, w + 0.04); },
+        () => { if (h.stopped) return; h.stopped = true; handles.delete(h); if (o.onEnd) o.onEnd(); res(); });
+      h._arm(0);
+      if (paused) h._pause(true);
     });
     return h;
   }
@@ -2100,6 +2188,7 @@ const { AUDIO, sfx, music } = (() => {
     get ready() { return baked; },
     // "two"
     song, bakeSong, seq, pudding, hit: laneHitNow,
+    pause: pauseAll, get paused() { return paused; },   // the pause menu: songs and AUDIO.seq hold their place (31-ui calls it)
     TWO: {
       bpm: 92, step: STEP, bar: BAR, bars: NB, duration: SONG_LEN, lanes: LANE_NAMES,
       sections: SECS.map(([name, chords], i) => ({ name, bars: chords.length, firstBar: SEC0[i], start: SEC0[i] * BAR, end: SEC0[i + 1] * BAR, chords })),
@@ -2117,6 +2206,7 @@ const { AUDIO, sfx, music } = (() => {
       for (let j = players.length - 1; j >= 0; j--) stopPlayer(players[j], 0.05);
       seqP = null;
       for (const h of [...handles]) h.stop(0.05);
+      paused = false;
       for (const h of [...live]) h.stop(0.05);
       for (const k in amb) delete amb[k];
       lastAmb = null; hissOff(); ringing(false, { fade: 0.05 }); muffle(null, 0.05); if (vmH) vmH.stop(0.05);

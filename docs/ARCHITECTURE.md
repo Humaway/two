@@ -103,6 +103,10 @@ A speaker id is a key of `CHARACTERS` (name label + voice blip). Most speakers a
 | `voicemail` | LUKA'S VOICEMAIL | none | Luka's blip through a phone band |
 | `hr`, `desk`, `passenger`, `lifeguard`, `hovercar`, `door_drone`, `train`, `voice1`, `voice2` | HR, DESK, PASSENGER, LIFEGUARD DRONE, HOVER-CAR, DOOR DRONE, TRAIN ANNOUNCEMENT, VOICE 1, VOICE 2 | generic | generic blips |
 
+1.7's people of the Parade: `jettyman` (MAN, actor `sizzle_c`), `skatekid` (KID, `local40_d`), `chipswoman` (WOMAN,
+`sizzle_e`), defined in `01-config.js`. Any generic speaker can wear a particular actor's face and mouth for one line:
+`{ say: 'passenger', actor: 'passenger_c', text }` (also `bark(id, text, { actor })`; the label and voice stay the speaker's).
+
 Extras (look ids, spawned by sets or content): `cust26_a…`, `local40_a…`, `staff_a…` (HQ antlers), `whisper_a…`,
 `passenger_a…`, `priya` and other gift recipients in 3.1.
 
@@ -161,6 +165,11 @@ Each: `{ label, sfx, where, lure: { r, dur } }` (`where` is the credits line, e.
 | `boss` | §10 | `51-mg-boss.js` |
 | `hold_no`, `choice` | 3.6, 3.7 | `52-mg-hold.js` |
 | `credits` | C | `53-mg-credits.js` |
+| `keypad` | 2.2 (2.8 relabels it as `safebox_keypad`, content-side) | `54-mg-keypad.js` |
+
+`DEV_MG` (`89-content-devtest.js`; `?autoplay=1&fast=1&speed=8&scene=DEV_MG&stop=DEV_MG`, `&mg=id,id` for some) runs every
+`MINIGAMES` entry present at run time, each on the set / env / spawn of the scene that uses it, and logs `dev mg <id> on
+<set> <secs> s: ok|FAILED <result>` per game and a total; a throw, a hang (300 s) or an `{ error }` result is an error.
 
 Drone stealth, Chip View, lures, roller door / brass plate strength holds, two-person switches, the train carriage and
 the Starlight sneak are **roam** gameplay built from `33-systems.js`, not mini-games.
@@ -203,7 +212,8 @@ changed here.
 - `CHARACTERS[id] = { name, voice, actor?, silhouette?, duo? }` (§3.1). `say('manager', …)` animates actor `luka40`;
   `speakerActor(id)` → the actor id. `duo: ['chase', 'chase40']` (speaker `chases`): both mouths, a split portrait, both
   blips. Voice fields: `wave f len gap filter soft tumble mono pure ring band hiss`.
-- Line steps: `{ say: id, text, tag, expr, act, speed, auto, name, portrait: false, censor }`. `tag` is the small italic
+- Line steps: `{ say: id, text, tag, expr, act, speed, auto, name, portrait: false, censor, actor }` (`actor`: a generic
+  speaker's line with that actor's portrait and mouth; its `expr` / `act` cues go to that actor). `tag` is the small italic
   tag after the name: `off`, `whisper`, `muffled`, `quietly`, `down the line`, `on the PA`, `filtered`, `gruff`,
   `together`, …
 - `ui.nameGlitch(fromId, toId)`, step `{ nameGlitch: [from, to] }`: the label and portrait glitch for a frame or two;
@@ -228,6 +238,8 @@ would press, so skipped and played runs branch alike). Autoplay presses the firs
 
 ### 5.3 HUD, time cards, UI bits
 
+- Layers: pop-ups (`#pops`, z 6) sit above the letterbox bars (`.lb`, z 5), so a cutscene pop-up on a portrait phone
+  isn't hidden by the bars; the HACK bar moves down below the top bar while the letterbox is on.
 - HUD (top-right pill: NO SERVICE, or "Optus" with bars · QUIET IN · Samples): `hud.set({ noService, quiet:
   'hh:mm:ss' | seconds, samples: true (the live count) | n | false, bars: 0..4 | null, hack } | null)` (null hides it
   all and clears those fields); `hud.quiet(str | seconds | null)`; `hud.samples(n | true | false)`; `hud.bars(n)`;
@@ -264,12 +276,32 @@ would press, so skipped and played runs branch alike). Autoplay presses the firs
   hotspot with `des: true` has DES say "Tea?" first.
 - Endings: after 3.7 the flow goes to A1 / B1 by `state.choice` (else `&ending`, else A); A2 / B2 → C;
   `profile.endingsSeen[A | B]` is set (and saved) when A1 / B1 starts; `emit('ending', 'A' | 'B')`.
+- Cutscene steps `{ face: id, to, dur, wait: true }` waits for the turn (default: not awaited); hotspot `kettle: true |
+  [steps] | { steps, q, boil(c) }` plays its steps (a line with its own shot) before the ask, `q` replaces 'Put the
+  kettle on?', `boil(c)` runs when it goes on (order: text → kettle → ask → steps → door → do). Under autoplay a roam's
+  `auto()` runs with `player.trail = true`: followers trail the leader's scripted moves (outside cutscenes) as they would
+  trail the player. `choose(labels, { prompt, who, name, tag, portrait, disabled, test })`: `prompt` keeps the question
+  above its options.
+- Mini-game host (`MINIGAMES[id] = { start(params, api), update(dt), draw(), end(result), autoplay(api), skipResult,
+  noSkip, opaque }`): `api.finish(r)`, `api.fail()` (one failure; a `{ failed }` result counts once), `api.fails` (this
+  scene's count), `api.opaque(on = true)` / `api.isOpaque` (a full-screen opaque card: the 3D world isn't drawn under it;
+  default `MINIGAMES[id].opaque`), `await api.play(steps)` (pauses `update`, not a cutscene), `api.params`, `api.ui`,
+  `api.overlay`; `flow.minigameId` (the running one or null), `flow.skipMinigame()`. The camera a mini-game cut to stays
+  when it returns (only a roam after it releases): release it yourself, or pass the game's own option (`stall`'s
+  `release`).
 - Mini-games: `api.fail()` counts a failure (a `{ failed }` result counts once); after two in a scene `flow.skipOffer`
   turns on and Pause → "Skip this mini-game" calls `flow.skipMinigame()` (finishes `{ skipped: true,
   ...m.skipResult }`; never for `noSkip`). `flow.minigameId`.
 - Events: `flow:stop` (every scene change and quit: systems clear themselves), `scene:end`, `swap`, `sample:add`,
   `ending`, `minigame:skipoffer`, `signal:full`, `stealth:capture`, `stealth:retry`, `stealth:checkpoint`, `lure`,
   `chip:view`, `saferoom`.
+- Waits: `wait(sec)` / `waitUntil(fn)` resolve at once while `flow.skipping` (and when a skip starts), `waitUntil` even
+  with `fn()` false: right for presentation, a trap for autoplay code that must really wait. `waitUntil(fn, { skip:
+  false, max })` keeps checking every tick through a skip (gives up after `max` s); `wait(sec, { skip: false })` lasts
+  `sec` of game time regardless. Nothing cancels them: put the scene check in `fn`.
+- Pointer: `input.pointer = { x, y, down, pressed, released, over, downX, downY, downT, upX, upY, button }` (CSS px;
+  `downX/downY` where the last press started, `upX/upY` where it ended, recorded in the events so a whole drag inside
+  one tick keeps its start).
 - Input: CHIP is an action (Q / LB / the CHIP touch button, shown only while Chase (2040) can use it):
   `input.pressed('chip')`, `input.held('chip')`. Every hold-to-confirm reads `input.holding(a)` (with
   `options.holdToPress` a press latches until `input.unlatch(a)`, NO, or 5 s; a second CHIP press turns Chip View off).
@@ -308,8 +340,40 @@ would press, so skipped and played runs branch alike). Autoplay presses the firs
 - Colliders are live: a set may push, splice or move boxes in its `colliders` array (or write a box's numbers in place)
   at runtime (pushed bins and racks, doors that open); collisions, drone cones and `lineClear` read them every tick.
   Splice a box out to remove it.
+- `world.anchor(name)` → `{ at, from, fov }` with `at` / `from` as `THREE.Vector3`s (not arrays); `world.mark(name)` → an
+  array `[x, y, z, rotY]`. JARVIS with `on`: the lens aims at the faces' eye level (their mean eye point − 5 cm) and
+  widens to fit them, fixed at the cut (it never re-aims; `size` is ignored).
+- A set may define `render(alpha)`: called by `world.render` before drawing (current set, and a split's right set) to
+  place tick-driven props between the last two ticks (scooters, cars, pelicans); no allocation.
+- Framing: an ORBIT whose circle would hit a wall shrinks (to 20% at worst) and widens its lens to keep the subject's
+  size (≤ 75°); a TWO / THREE in a narrow frame (a split's half) comes round 45° behind the last subject (a dirty
+  two-shot) instead of backing off to the set's own wide camera.
+- Actors: `place()` is a cut: `eyePos` / `headPos` read the pose he will have (place + play in the same tick included).
+  `play('idle')` and `play('stand')` clear `rig.seated` / `rig.floorSit`, a skipped walk ends as a played one (up off a
+  seat, a base anim back to idle), and a despawn clears both. An explicit expression (`setExpr`, `{ expr }`, a line's
+  `expr`) set in the same tick as an anim with its own `.expr` (`still`, `hurt_stand`, `laugh`) wins; a `play()` in a
+  later tick hands the face back to the anim; when such an anim ends, the face it replaced comes back only if nobody
+  set one by hand meanwhile. `a.hold(obj)` of an object that never had a parent lets go of it cleanly.
 - Helpers: `world.actorsIn(x, z, r, out)`, `world.colliders`, `world.collide(actorOrId, x, z)`, `world.resolve(x, z, r,
   out)`, `world.lineClear(x0, z0, x1, z1, pad)`, `world.floorAt(x, z)`, `actor.moveTo(where, { collide: true })`.
+- New anims (04-art): `kneel_work { h = 0.7, z }`, `lean_rail { h = 1.24, z, hand, look }`, `wipe_face { rail }`,
+  `hand_rest { sd, h = 0.72, x, z }`, `peer`, `lean_back { h = 1.12 }` (3.7's poses, promoted), `hand_rail { sd, h = 0.92,
+  x }`, walkAnims `walk_rail` / `walk_rail_l` (a hand on a rail; 2.4's Rue) and `limp` (hurt), `hold_card { show }`
+  (shows `card`), one-shot `phones_off` (headphones_head off into headphones_held; `luka40` has both). `polish { h, z,
+  low }`: `h` puts the hands on a surface `h` m up (the Hero Table: 0.95). Expression `laugh_cry`. Wardrobe:
+  `rig.show('hair_static')` (hair on end, every hero), `rig.attach.card.userData.paint((ctx, w, h) => …)` (a hand-held
+  card, 128 × 80 canvas; `paint(null)` = plain), `rig.ghost(part | [parts] | null, alpha)` (a part fades as a dither:
+  `rig.ghost(['handR', 'foreR'], 0.3)`; reset on spawn), look `chase40_tee` (Chase (2040) at dawn: T-shirt, no coat,
+  lanyard or headphones; `spawn: { chase40: { at, look: 'chase40_tee' } }`). Story dressing: `lanyard_snapped` hides
+  Nadia's `lanyard2` too. `rig.show('santa_hat')` (Luke's cheap Santa hat, fitted), `lanyard_held` (his own lanyard in
+  his right hand, the worn badge's card; heroes and `luka40`; anim `hold_lanyard { out }` shows it; hand it over with
+  `b.hold(a.rig.attach.lanyard_held)`). `rig.fade(k = 1, wash = 0)`: the whole rig's opacity and a warm sun-bleached
+  wash (per-rig transparent copies of every material, swapped in only while fading; built and compiled at boot for
+  looks with `fade: true`: luka, chase, chase40, luka40; `dress()` puts the originals back).
+- An upper-body one-shot (`glance`, `nod`, …) played over a base pose the seated pre-pass can't rebuild (lying,
+  kneeling, crouched, a content seat) keeps that pose under it (`p.base`); over `sit` / `sit_bench` it keeps `p.h`.
+- `world.pool` (look → idle rigs) and `world.rigsOf(look)` (every rig built for a look, pooled or in use).
+- Boot portraits are the canvas's centre square rendered at a fixed 30° across it, whatever the screen's shape.
 - TWO's one-shot anims (`ANIM_ONE` in 04-art: `tether_throw`, `chip_ping`, `coat_throw`, `put_headphones_on`,
   `get_up_hurt`, `brush_shoulder`, `pull_cracker`, `stumble`, `bow`, `hands_halt`) play once and go back, like `nod`.
   Wardrobe: `a.rig.show(name, on)`, `a.rig.dress(state)` (automatic on spawn), `a.rig.chip('on' | 'off' | 'ping' |
@@ -322,6 +386,7 @@ would press, so skipped and played runs branch alike). Autoplay presses the firs
   `chip.rate` (1/6 per s: ~6 s; faster in `chip.hot = [{ at: [x, z] | box: [x0, z0, x1, z1], r, mul }]`) and drains at
   `chip.drainRate` on release; full → `emit('signal:full', { who: 'chase40' })` (stealth on: the drones turn to him,
   Safe Room; else `DRONES.alert`). All of it resets every scene.
+- `chip.show(on, { ads: false })`: a scripted Chip View POV without the Cloud+ ads.
 - `chip.forceOff(on = true, msg)` (CHIP only shows a toast; his light goes dark), `chip.lightOn(on | null)`,
   `chip.show(on)` (the view for POV shots / cutscenes, no Signal), `chip.peek(sec = 1.5) → Promise` (autoplay's CHIP),
   `chip.reset()`.
@@ -346,6 +411,10 @@ would press, so skipped and played runs branch alike). Autoplay presses the firs
   `inCone(id, who) → bool`, `claw(id, k = 1, dur = 0.4)` (the noise drone's claw, 0 closed … 1 open; the model is
   `DRONES.get(id).obj` for a prop to follow), `zap(droneId, actorId, { line }) → Promise` (1.6's static),
   `lines = { escort, laugh }`.
+- `DRONES.goTo(id, at, { speed, then, y })`: `y` = the hover height it arrives at (eased over the flight; it keeps it).
+  `DRONES.lure(…, { transfixed: true })`: a lured drone spots nobody until it leaves the lure (a collapsing cone never
+  spots anyone either: it pulls in to the disc's length first, then opens). `stealth.end({ calm: false })` leaves lured /
+  curious drones as they are (default: `DRONES.calm()`). Cones have a thin dark edge so they read on bright floors.
 - `DRONES.lure(at, sampleId, { r, dur, line, over, y, disc = 0.6 }) → thenable { n, ids, done }`: drones within
   `SAMPLES[id].lure.r` (or `r`) investigate for `lure.dur` (or `dur`) and go back; they hover a metre short of it (`over`:
   right above it; `y`: at that height); while they investigate their cone collapses to a disc of radius `disc`
@@ -378,6 +447,13 @@ would press, so skipped and played runs branch alike). Autoplay presses the firs
 
 ### 5.9 Audio
 
+- `AUDIO.pause(on)` (the pause menu calls it): every song handle (`AUDIO.song`, `AUDIO.pudding`, `music('two')`) and
+  live player (`AUDIO.seq`) holds its place and `h.t` stands still; music cues and beds carry on. `AUDIO.paused`.
+  `AUDIO.bakeSong(pattern, { samples }) → Promise<AudioBuffer>` (cached by pattern). `pattern.bridge`: a sample id, or
+  `null` = the bridge plays with no sample hit (omitted = `'laugh'`).
+- Mini-game SFX: `cloth_swish glass_squeak glass_slap spotless_chime meter_tick meter_fall meter_full plug_click
+  access_granted key_type popup_clear crunch tap_pay marker_squeak card_slide card_insert accepted button_press
+  tongs_click snag_turn sauce_squirt bin_scrape swap_whoosh metronome metronome_hi desk_slap time_jump` (pitch with `rate`).
 - `sfx(name, { vol, rate, lp, at, pan, when, offset }) → seconds`; `music(cue, { fade, cut })`, `music.silence(on)`;
   cues in §3.7 (`music('two')` plays `state.pattern`; `'credits'` adds the 1987 coda).
 - `AUDIO.song({ pattern, samples, from, to, muffled, bleed, speaker, gain, fade, coda, dest, onEnd }) → { t, duration,
