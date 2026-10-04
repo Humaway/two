@@ -1323,6 +1323,7 @@
   // toward it read; a slow rise away (read at step time)
   function topDownChase(c) {
     if (sk(c)) return;
+    c.ui.card(null);   // (a shot step would hide the phone card; this is a do)
     const a = act(c, 'chase'); if (!a) return;
     a.eyePos(V1);
     const fx = Math.sin(a.rotY), fz = Math.cos(a.rotY), x = V1.x + fx * 0.12, z = V1.z + fz * 0.12;

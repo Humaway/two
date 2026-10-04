@@ -1954,8 +1954,8 @@ SETS.reddy26 = (() => {
       // the backroom tube: bursts of flicker (2026); flicker(n) forces n bursts; userData.off; 2040's LED tube is steady
       let tube = 1;
       if (R.tube.userData.off) tube = 0.05;
-      else if (R.flickN > 0) { R.flickT += dt; tube = R.flickT % 0.75 < 0.45 && (t * 17) % 1 < 0.45 ? 0.12 : 1; if (R.flickT >= 0.75) { R.flickT -= 0.75; R.flickN--; } }
-      else if (E26 && Math.sin(t * 1.3) + Math.sin(t * 2.7 + 1) > 1.6 && (t * 17) % 1 < 0.45) tube = 0.12;
+      else if (R.flickN > 0) { R.flickT += dt; tube = R.flickT % 0.75 < 0.45 && (t * 17) % 1 < 0.45 && !reduceFx() ? 0.12 : 1; if (R.flickT >= 0.75) { R.flickT -= 0.75; R.flickN--; } }
+      else if (E26 && Math.sin(t * 1.3) + Math.sin(t * 2.7 + 1) > 1.6 && (t * 17) % 1 < 0.45 && !reduceFx()) tube = 0.12;   // (Reduce Flashing: steady)
       M.tube.emissiveIntensity = tube;
       // the shared clock (both hand pairs), the JARVIS spinners
       R.clockMin += dt / 60;

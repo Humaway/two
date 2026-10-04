@@ -102,12 +102,12 @@ Source reports are in `docs/reports/`.
 
 ## From C/PC (third batch)
 
-- [ ] **reddy26** — `floor_wreck_wide` doesn't show Luke at `pc_luke_desk` through the office door (PC uses pos [10.4,2.5,-1.7] → [6.4,1.0,-10.0], fov 52); `ladder` 'carried' has no side-carry offset (PC reorients it + `pc_ladder` anim); `pc_jordan_phone` (7.5,−8.05) sits beside the folded ladder (PC uses (7.15,−8.05)).
+- [x] **reddy26** — `floor_wreck_wide` doesn't show Luke at `pc_luke_desk` through the office door (PC uses pos [10.4,2.5,-1.7] → [6.4,1.0,-10.0], fov 52); `ladder` 'carried' has no side-carry offset (PC reorients it + `pc_ladder` anim); `pc_jordan_phone` (7.5,−8.05) sits beside the folded ladder (PC uses (7.15,−8.05)). — done (polish): `floor_wreck_wide` = PC's lens (from `[10.4, 2.5, -1.7]` → `[6.4, 1.0, -10.0]`, fov 52: the wreck, the counter, the Yes wall and Luke at his desk through the open door; nothing else used the anchor); `ladder.set('carried')` after `actor.hold(ladder)` lays it folded along the holder's right side (top rail at the right hand, 0.86 m; one-time maths per call); `pc_jordan_phone` → `[7.15, 0, -8.05, π − 0.22]`. PC drops its lens, its carry maths and its J_PHONE (keeps its `pc_ladder` arm pose). 1.1 / 1.2 re-run clean (1.1 never carries the ladder: it only uses `yes_wall`).
 - [ ] **art/world** — `climb` isn't an upper-body anim, so a `{move}` while climbing switches to walk (1.1's ladder; PC raises Jordan with a timed position change).
 
 ## Visual QA (integration pass)
 
-- [ ] **B1** — real-time screenshot pass of the montage (2029 → match cut) and the post-screenshot framing fixes; **B2** entirely (fast autoplay passes; frames unviewed).
+- [x] **B1** — real-time screenshot pass of the montage (2029 → match cut) and the post-screenshot framing fixes; **B2** entirely (fast autoplay passes; frames unviewed). — done (polish): B1 and B2 shot in real time end to end and fixed (see `docs/reports/16-polish-endings.md`); the match cut checked against `scene=1.2` step 1 (same lens via `s12_heroic`, same blocking).
 
 ## Content cleanups now possible (final polish pass; optional, each must keep the scene working)
 
@@ -119,7 +119,7 @@ Engine (63c4619 etc.):
 - 2.1: spawn `chase40` with `{ look: 'chase40_tee' }` (dawn T-shirt) instead of hiding coat/lanyard/headphones.
 - 1.5 / 2.6: `rig.attach.card` + `paint` + `hold_card` instead of content-built card meshes.
 - 1.6: `waitUntil(fn, { skip: false })` instead of its own `until()`; `hair_static` for the zap.
-- A1/B1: `rig.fade` instead of the `world.adopt` wrapper; `world.rigsOf`; `santa_hat` on luke; `lanyard_held`.
+- A1/B1: `rig.fade` instead of the `world.adopt` wrapper; `world.rigsOf`; `santa_hat` on luke; `lanyard_held`. — done (polish): `rig.fade` (A1's wrapper, boot warm-up and per-rig copies are gone; B1's homecoming fades them in out of the smoke with it too), `world.rigsOf('luka40')`, `rig.show('santa_hat')` (A1 and B1). `lanyard_held` kept as is: A1 hands over Future Luka's worn lanyard itself (it leaves his chest in the same move) and lays it with its own placements (badge up in Luka's palm, on his chest on the floor, turning over in A2, looped round the coda's wrist); B1's is a *snapped* strap in Luka's left fist (his right hand is on his ribs) — `lanyard_held` is a whole loop on the right grip, so neither gains.
 - 2.8: `lure({ transfixed })`; `goTo({ y })`; keypad `title`/`prompt`/`okText` instead of the DOM relabel.
 - bridge set: `SETS.bridge.render` instead of wrapping `world.render`.
 
@@ -132,5 +132,5 @@ Sets (12 set commits):
 - 2.6: sample spot `s26_sample_sizzle`.
 - 3.1/3.2: `invite` prop hold/home; `spawnDrones(floor)`; `SETS.hq_floors.reset()` after `dress32`.
 - 3.3: `lamp('mgr')` for the badge insert. 3.7: `ARC` → `s37_st_*`; crane start `s37_crane_a`.
-- A1: `ring(true, { sfx: 'phone_ring', every: 2.5, max: 2 })`; coda shot → `counter_phone`.
-- B1/B2: B2 cups → parade `coffees.show('both')`; B1 `HEROIC` → `s12_heroic`; 2037 frame `screens_all.caption('THE MANAGER')`.
+- A1: `ring(true, { sfx: 'phone_ring', every: 2.5, max: 2 })`; coda shot → `counter_phone`. — done (polish): the set plays the ring (with `'trill'`, every 2 s, max 2: the counter phone's 1.2 double trill, in A1 and B1 alike, and B1's match cut uses `every: 1.6` as 1.2); the coda uses `counter_phone` (re-aimed a little steeper in the set so both hands come in from the sides; PC's HOLD insert sits under its card either way).
+- B1/B2: B2 cups → parade `coffees.show('both')`; B1 `HEROIC` → `s12_heroic`; 2037 frame `screens_all.caption('THE MANAGER')`. — done (polish): all three (B2's content-built cups are gone; the 2037 date card no longer repeats THE MANAGER: the screens say it).
