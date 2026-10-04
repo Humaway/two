@@ -19,6 +19,9 @@ Source reports are in `docs/reports/`.
 
 - [ ] **hq_roof** — from the Remote's screen the `s37_st_*` marks put Future Luka behind Luka; the `s37_crane_a`→`b` glide passes through the Yes letters; `s37_sorry_two` looks at the lift house, not the city.
 
+- [ ] **reddy26** — a second fingerprint decal or `smudge1At(x, z, scale)` (1.1 moves/scales `hero_smudge1`); `pot_plant` anchor looks through the tree; `monitor2` sees the monitor's back; Wall/noticeboard anchors put the lens where the player stands; the backroom door has no collider when shut.
+- [ ] **hq_top** — docs §6 vs code for `glass_popup_ecu`/`glass_moon` (code wins: update doc); `glass_popup` is cropped by the letterbox (P uses [−3.0, 2.15, −14.7]); the ECU shows a title sliver (P uses [−3.04,1.935,−12.95]→[−3.04,1.915,−11.24], fov 31).
+
 ## Engine
 
 - [ ] **systems** — a lured drone's collapsing cone sweeps a wide fan and can spot nearby actors: keep it narrow or skip detection until collapsed.
@@ -35,6 +38,8 @@ Source reports are in `docs/reports/`.
 - [ ] **world** — `eyePos` is stale in the same tick as `place()`: refresh matrices in `place()` (3.7 waits a tick).
 - [ ] **world/docs** — JARVIS shot with `on` re-aims at MID height every frame (faces at the top): document `size: 'CLOSE'`.
 - [ ] **art** — anims used in 3.7 registered content-side as `s37_*`: wiring, forearms on parapet, hand on shoulder, wiping face, hand on table, hurt walk, leaning back on parapet — promote to 04-art.js.
+- [ ] **art** — `polish` hands land at ≈0.46 m crouched / 0.8 m standing, below the Hero Table glass (0.95 m): calibrate (1.1 uses its own `s11_polish`, calls polish with `anim:false`).
+- [ ] **docs** — `world.anchor()` returns `{ at, from }` as Vector3s (not arrays).
 - [ ] **world** — `{shot:'TWO'}` in a split's left half frames the whole room instead of the two subjects (1.3 uses explicit lenses).
 - [ ] **world** — orbits in tight rooms shrink to 20% radius → cramped, head-cropped frames (engine C note).
 - [ ] **systems** — drone floor cones are low-contrast on the bright 2026 store floor (engine C note).
@@ -42,6 +47,8 @@ Source reports are in `docs/reports/`.
 - [ ] **regression** — `DEV_MG` scene in `89-content-devtest.js` that autoplays every MINIGAMES entry.
 
 ## Mini-games
+
+- [ ] **polish** — the default lean walks Chase straight through the counter: use `collide: true` or a waypoint (1.1 parks him at (8.3, −8.1) first).
 
 - [ ] **stall** — release the cutscene camera when the mini-game returns (1.3 calls `cam.release()` itself), or document it in the header.
 
