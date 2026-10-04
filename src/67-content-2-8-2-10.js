@@ -1291,7 +1291,7 @@
       c.state.flags.s29_door = true;
       standA(act(c, 'luka'), [-28.4, 0, -11.7, 0]);   // inside, behind the shut door (his pushing hands too): it opens on him
       const ch = act(c, 'chase');
-      if (ch) { standA(ch, C_WING); ch.rig.show('coaster', true); ch.setExpr('neutral'); }
+      if (ch) { standA(ch, [C_WING[0] - 1.3, 0, C_WING[2], C_WING[3]]); ch.rig.show('coaster', true); ch.setExpr('neutral'); }   // off: deeper in the wing, out of the doorway's view
       const k = UD(c, 'coaster'); if (k) k.place([-28.0, -3.0, -14.0]);
       const co = UD(c, 'coats_sleep'); if (co) { co.show(4); }
     } },
@@ -1312,7 +1312,7 @@
     { face: 'luka', to: PI, dur: 0.6, wait: true },
     // [REVERSE · Chase in the dark of the venue, the coaster in his hand] He's been awake the whole time.
     // (Luka to his turn mark under the cut: the anchors are set for it)
-    { do: (c) => { const a = act(c, 'luka'); if (a) { a.place(L_TURN); a.play('idle'); } } },
+    { do: (c) => { const a = act(c, 'luka'); if (a) { a.place(L_TURN); a.play('idle'); } const ch = act(c, 'chase'); if (ch) { ch.place(C_WING); ch.play('idle'); } } },
     aPush('s29_reverse', 0.15, 7, { fovTo: 33 }),
     { wait: 1.4 },
     aPush('s29_luka_close', 0.12, 8),
