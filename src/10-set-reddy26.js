@@ -883,7 +883,7 @@ SETS.reddy26 = (() => {
       for (let z = -2.2; z > -14; z -= 2.4) { panel(-4.4, z); panel(-2, z); panel(0.4, z); panel(-7.2, z); }
       for (let z = -2.2; z > -12; z -= 2.4) { const m = Math.abs(z + 9.4) < 0.01 ? M.lightRow : M.light; panel(4.3, z, m); panel(6.4, z, m); panel(9.2, z, m); }
       for (const [x, z] of [[-5.6, -3.4], [1.4, -9], [8, -4.6], [-7.6, -12]]) bb(x - 0.3, 3.17, z - 0.3, x + 0.3, 3.2, z + 0.3, 0xcfd3d8);   // aircon vents
-      cyl(0.12, 0.12, 0.12, 8, 0x2a2d33, 9.8, 3.12, -1.2);                                       // ceiling dome camera
+      cyl(0.12, 0.12, 0.12, 8, 0x2a2d33, -1.2, 3.12, -6.8);                                      // ceiling dome camera (mid-floor: clear of the front-right lenses)
       wall(-9.25, -14.75, -9, 0, 3.2, WHITE); wall(11, -17.25, 11.25, 0, 3.2, WHITE);
       wall(-9.25, -14.75, 2.85, -14.5, 3.2, WHITE); wall(2.6, -14.75, 2.85, -12.5, 3.2, WHITE);
       wall(2.6, -12.75, 5.4, -12.5, 3.2, WHITE); wall(7.4, -12.75, 9.4, -12.5, 3.2, WHITE); wall(10.4, -12.75, 11.25, -12.5, 3.2, WHITE);
