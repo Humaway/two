@@ -1375,16 +1375,22 @@
   ];
 
   // Cutscene — "2.3_bench."
+  // sitting down onto the bench from just in front of it: the seated pose at once, eased back onto the seat mark (a
+  // place() straight onto the mark popped him half a metre backward; standing on the mark put his shins in the seat)
+  const sitDown = (id, mark) => [seat(id, 0.45, 'sit_bench'), { do: (c) => {
+    const a = act(c, id), m = c.world.mark(mark); if (!a || !m) return;
+    const x0 = a.pos.x, z0 = a.pos.z;
+    tween(c, 0.5, (k) => { if (k >= 1) { a.place(mark); return; } a.pos.x = x0 + (m[0] - x0) * k; a.pos.z = z0 + (m[2] - z0) * k; });
+  } }];
   const VM = "Hey, it's Luka. I'm probably at work. Leave a message. ^ Chase, if it's you, I'm not doing your shift.";
   CUTSCENES['2.3_bench'] = [
     STORM(0.4),
     { do: (c) => { const l = act(c, 'luka'); if (l) { l.place([-300.0, 0, 0.75, PI]); } const ch = act(c, 'chase'), c4 = act(c, 'chase40'); if (ch) ch.place('s23_chase_stop'); if (c4) c4.place('s23_c40_stop'); } },
     // [MID · from the front] Luka sits on his own memorial bench. He pulls the Santa beard down under his chin.
     BENCH_FRONT,
-    { move: 'luka', to: [-300.0, 0, 0.3, PI] },
-    { face: 'luka', to: 0, dur: 0.5 },
-    { place: 'luka', at: 's23_seat_luka' },
-    seat('luka', 0.45, 'sit_bench'),
+    { move: 'luka', to: [-300.0, 0, 0.58, PI] },
+    { face: 'luka', to: 0, dur: 0.5, wait: true },
+    ...sitDown('luka', 's23_seat_luka'),
     { wait: 0.8 },
     { act: [['luka', 's22_beard_up', { dur: 0.8, loop: false }]] },
     { wait: 0.3 },
@@ -1396,9 +1402,8 @@
     SIT_WIDE,
     { move: 'chase', to: [-298.7, 0, 0.9] },
     { move: 'chase', to: [-299.36, 0, 0.6] },
-    { face: 'chase', to: 0, dur: 0.4 },
-    { place: 'chase', at: 's23_seat_chase' },
-    seat('chase', 0.45, 'sit_bench'),
+    { face: 'chase', to: 0, dur: 0.4, wait: true },
+    ...sitDown('chase', 's23_seat_chase'),
     { wait: 0.6 },
     say('chase', 'Good bench, though.'),
     // LUKA: (after a moment)
@@ -1417,9 +1422,8 @@
     { move: 'chase40', to: [-301.45, 0, -1.2], speed: 1.1 },
     { move: 'chase40', to: [-301.4, 0, 0.75], speed: 1.1 },
     { move: 'chase40', to: [-300.64, 0, 0.6], speed: 1.1 },
-    { face: 'chase40', to: 0, dur: 0.4 },
-    { place: 'chase40', at: 's23_seat_c40' },
-    seat('chase40', 0.45, 'sit_bench'),
+    { face: 'chase40', to: 0, dur: 0.4, wait: true },
+    ...sitDown('chase40', 's23_seat_c40'),
     // (Rue's three-shot, now in daylight.)
     THREE_SHOT,
     { wait: 1.4 },
