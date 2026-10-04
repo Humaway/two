@@ -623,9 +623,11 @@
   const L40_GLASS = [-5.3, 0, -11.95, 0];            // he walks to the glass: just west of his pop-up, the city before him
   // at the glass, facing the city: his face from between him and the glass (the room, the drones, his past self's side
   // behind him): from his left, low / from his right / from his left, high
-  const GLASS_FACE_L = (dur, push = 0.06) => glide([-4.95, 1.55, -11.45], [-5.3, 1.62, -11.98], 44, { pos: [-4.95 - 0.35 * push, 1.55, -11.45 - 0.53 * push], look: [-5.3, 1.62, -11.98], fov: 44 }, dur);
-  const GLASS_FACE_R = (dur, push = 0.06) => glide([-5.65, 1.6, -11.42], [-5.3, 1.6, -11.98], 46, { pos: [-5.65 + 0.35 * push, 1.6, -11.42 - 0.56 * push], look: [-5.3, 1.6, -11.98], fov: 46 }, dur);
-  const GLASS_FACE_H = (dur) => glide([-4.7, 1.72, -11.5], [-5.35, 1.56, -12.0], 52, { pos: [-4.74, 1.71, -11.53], look: [-5.35, 1.56, -12.0], fov: 50 }, dur);
+  // (head and shoulders: the lens slides along the glass to his side rather than into his face)
+  // (L: from outside, through the rained-on glass, onto the face he turns to the city)
+  const GLASS_FACE_L = (dur) => glide([-5.62, 1.62, -10.9], [-5.3, 1.62, -11.98], 40, { pos: [-5.6, 1.62, -10.96], look: [-5.3, 1.62, -11.98], fov: 38 }, dur);
+  const GLASS_FACE_R = (dur, push = 0.1) => glide([-6.6, 1.62, -11.45], [-5.3, 1.6, -11.98], 38, { pos: [-6.6 + 0.9 * push, 1.62, -11.45 - 0.2 * push], look: [-5.3, 1.6, -11.98], fov: 38 }, dur);
+  const GLASS_FACE_H = (dur) => glide([-4.3, 1.98, -11.42], [-5.35, 1.55, -12.0], 44, { pos: [-4.36, 1.96, -11.44], look: [-5.35, 1.55, -12.0], fov: 43 }, dur);
   function climb(c, id, delay, dropTo) {
     const a = act(c, id), top = SETS.hq_top.marks.s33_ladder_top;
     if (!a) return Promise.resolve();
@@ -745,7 +747,7 @@
     } },
     { wait: 3.6 },
     play('luka40', 'still'),
-    { do: () => { if (SETS.hq_top.lamp) SETS.hq_top.lamp('console'); } },
+    // (the 'mgr' spot stays on him through the reveal and the talk: lit at the far end of the long frames too)
     // [CLOSE · Chase] He sees it first. His face.
     CLOSE('chase', { dist: 0.8, push: 0.08, dur: 5 }),
     expr('chase', 'stunned'),
@@ -790,7 +792,7 @@
     expr('luka40', 'neutral'),
     // (Hint 1, paid off.) Before he speaks he glances to his left, at Chase (2040). The empty chair beside the desk sits
     // in the edge of the frame.
-    glide([-6.6, 1.65, -12.5], [-9.1, 1.42, -12.85], 38, { pos: [-6.75, 1.64, -12.52], look: [-9.1, 1.42, -12.85], fov: 37 }, 7),
+    glide([-6.9, 1.75, -11.7], [-9.0, 1.1, -12.85], 50, { pos: [-7.05, 1.73, -11.78], look: [-9.0, 1.1, -12.85], fov: 49 }, 7),   // (him at frame-left, the empty chair at frame-right)
     { wait: 0.6 },
     glanceAt('luka40', 'chase40', 1.6),
     { wait: 1.7 },
@@ -866,7 +868,7 @@
     GLASS_FACE_L(14),
     cue(say('luka40', "I rang him. That Sunday. Six in the morning. 'I'll do it, I just need another pair of hands.' ^ And I watched his hand— ^ ^ I did that. Me. Being the one who could."),
       'And I watched', (c) => closeOn(c, 'chase40', { dist: 0.95, push: 0.06, dur: 8 })),
-    glide([-4.82, 1.66, -11.42], [-5.3, 1.6, -11.98], 48, { pos: [-4.86, 1.66, -11.44], look: [-5.3, 1.6, -11.98], fov: 45 }, 12),
+    glide([-4.55, 1.7, -11.45], [-5.3, 1.6, -11.98], 50, { pos: [-4.6, 1.69, -11.46], look: [-5.3, 1.6, -11.98], fov: 47 }, 12),
     say('luka40', "When the roof came down, I walked out the back. Nobody saw. And I thought: good. ^ Let him think I'm gone. He's safer. Everyone's safer."),
     { par: [
       say('luka40', "And then I couldn't stop seeing it. Every line we sell is a way for someone to get hurt. Every call. Every message. Every 'I'll be there' that isn't. ^ Six years of watching people hurt each other down cables I'm responsible for."),
