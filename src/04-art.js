@@ -1711,8 +1711,8 @@ const buildCharacter = (() => {
     hr: { fem: true, h: 1.7, w: 0.92, skin: '#e8bf9e', hair: '#6a3a22', hairStyle: 'bun', lips: '#b0505a', lash: true, eyes: '#4a5a6a', brow: '#4a2a1a', blush: 0.12, expr: 'happy',
       lapels: true, top: '#1f2a4a', top2: '#f4f4f0', open: true, sleeve: 'long', cuff: '#f4f4f0', collar: 'shirt', collarCol: '#f4f4f0', coat: 0.12, bottom: 'skirt', pants: '#1f2a4a', skirtLen: 0.5, legCol: '#c9a088',
       shoes: 'shoe', shoeCol: '#1a1a1a', ...hq('MEL', 'PEOPLE & CULTURE'), antlers: true, chip: true, attach: ['notepad'] },
-    desk: { h: 1.76, w: 1.0, skin: '#b07a55', hair: '#1e1612', hairStyle: 'crop', eyes: '#2a1a12', brow: '#1e1612', expr: 'happy',
-      top: '#f2f2ee', sleeve: 'long', collar: 'shirt', tie: '#2a4f8f', pants: '#2a2e3a', shoes: 'shoe', shoeCol: '#1a1a1a', ...hq('DEV', 'FRONT DESK'), antlers: true, chip: true },
+    desk: { fem: true, h: 1.66, w: 0.92, skin: '#b07a55', hair: '#1e1612', hairStyle: 'long', lips: '#9a4a4a', lash: true, eyes: '#2a1a12', brow: '#1e1612', expr: 'happy',   // 3.1: "the woman at the desk"
+      top: '#f2f2ee', sleeve: 'long', collar: 'shirt', pants: '#2a2e3a', shoes: 'shoe', shoeCol: '#1a1a1a', ...hq('PRIYA', 'FRONT DESK'), antlers: true, chip: true },
     passenger: { h: 1.74, w: 1.08, belly: 0.5, skin: '#dca888', age: 0.7, hair: '#bdbab4', hairStyle: 'bald', moustache: '#c8c4bc', eyes: '#5a6a7a', brow: '#a8a49c',
       top: '#4a6a4a', sleeve: 'short', collar: 'polo', pants: '#6a6458', shoes: 'shoe', shoeCol: '#3a2a20', chip: true },
     priya: { fem: true, h: 1.62, w: 0.9, skin: '#a8714f', hair: '#140f0d', hairStyle: 'long', lips: '#8a3a3a', lash: true, eyes: '#2a1a12', brow: '#140f0d', blush: 0.1,
