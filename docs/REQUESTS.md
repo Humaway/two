@@ -10,7 +10,7 @@ Source reports are in `docs/reports/`.
 - [x] **parade** — anchor `s23_plaque` camera sits inside an actor standing at `s23_plaque_look`: move the lens to ≈ `[-300.48, 1.02, -0.6]` (or the mark back to z −1.2). **Done:** lens moved to `[-300.48, 1.02, -0.6]`, fov 30 (2.3's own `PLAQUE` lens).
 - [x] **parade** — `s22_c40_close` frames the back of Chase (2040)'s head at `s22_c40_edge`; `s22_piano_cam` / `s22_drone_piano` put the drone between camera and bench, seated heads below the 1.3 m lid. **Done:** `s22_c40_close` now frontal (from `[7.3, 1.62, -16.35]`); `s22_piano_cam` = 2.2's `BOTH_FRONT` lens high over the lid; `s22_drone_piano` → `[8.35, 1.9, -21.6]` (2.2's `PIANO_TOP`, off the bench lenses).
 - [x] **flat** — the `s21_*` anchors don't match `docs/sets/flat.md`; floor setup doesn't allow lying down on couch/bed (2.1 sleepers sit up). **Done:** code wins: `s21_dawn_wide` / `s21_box` (moved by the set builder to clear the couch and Luka) now use 2.1's tested `DAWN_WIDE` / `BOX` lenses and `docs/sets/flat.md` matches the code; lying: `SETS.flat.lie(true)` makes the couch seat (0.42) and the mattress (0.56) `floor(x, z)` (off by default and on every `dress()`), new marks `s21_couch_lie` / `s21_bed_lie` for `lie` / `sleep_back` (checked in setview: both lie on top).
-- [ ] **sandgate** — `queue.bubble` returns head + 0.28 m, the doc says + 0.4 m (sizzle compensates).
+- [x] **sandgate** — `queue.bubble` returns head + 0.28 m, the doc says + 0.4 m (sizzle compensates). **Done (code wins):** kept + 0.28 m (47-mg-sizzle is tuned to it), added an optional `bubble(i, out, lift = 0.28)`; header + `docs/sets/sandgate.md` now say + 0.28.
 
 - [ ] **reddy26** — anchor `s12_heroic` (y 0.85) sits under the Hero Table glass (0.93–0.95): raise to ≈ y 1.02; from `s12_twoshot` the JARVIS monitor hides Chase at `s11_chase_phone` (content uses pos [6.95,1.45,−5.3] → [6.1,1.4,−8.4]); `floor_wreck_wide` puts the wreck under the dialogue box.
 - [ ] **reddy26** — `blast()` fells the tree at 0.25 s (inside the slow-motion close): add `blast({ tree: false })` or a delayed fall (1.2 calls `xmas_tree.userData.fall()` again at the real-time wide).
@@ -25,7 +25,7 @@ Source reports are in `docs/reports/`.
 - [ ] **bridge** — the `ch_shoulder` camera ([-5.8, 0.5, 214]) has the west barrier filling ~⅓ of the frame during the chase.
 
 - [ ] **train** — `aisle_B_far`/`aisle_B_near` (and the A pair) face opposite ways but both `ease`: crossing z ±4.8 swoops through a 0.25 s top-down over the player — drop `ease` on those cams; `passenger_b` is a woman but the reindeer owner is a man (2.7 spawns `reindeer_man`, look local40_c); no `lean` anim.
-- [ ] **sandgate** — `h26_sizzle` sample spot sits inside the gazebo collider (2.6 uses its own spot at the table front).
+- [x] **sandgate** — `h26_sizzle` sample spot sits inside the gazebo collider (2.6 uses its own spot at the table front). **Done:** `s26_sample_sizzle` and `hotspots.h26_sizzle` moved to 2.6's spot at the table front `[-6.40, 0, -0.05]` (r 0.7); doc updated.
 
 - [ ] **hq_floors** — no `reset()`; `bank.open(0)` eases 3 s outside a skip so on Continue the bank slides shut on arrival: add `SETS.hq_floors.reset()` or an instant option; `drones` data uses `y` + path names (3.2 maps them to `hover` + point arrays).
 - [ ] **hq_roof** — `roof_hatch` anchor sits south of the hatch so the lid fills the frame (3.2 uses a lens from the east).

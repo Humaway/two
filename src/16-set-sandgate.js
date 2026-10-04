@@ -26,7 +26,8 @@
 //   side over the plate at Luka and Luke (the spec lens sat behind both cooks' backs); entrance is a pan cam on the portal
 //   axis (the spec position had the (4, -6) column dead centre); the corner cam/zone is new; s26_exit_wide aims further
 //   left so Luke at the plate is in frame; the hotplate's wind guard is on its +Z (customer) side.
-// Queue (SETS.sandgate.queue): reset(n, live?) · front() · advance() · count · bubble(i, out) · look(i) · visits(i) · length()
+// Queue (SETS.sandgate.queue): reset(n, live?) · front() · advance() · count · bubble(i, out, lift = 0.28) (head + lift) · look(i)
+//   · visits(i) · length()
 //   · live(on, target) · leave(i). Customers are queue indices 0..4 = looks sizzle_a..e.
 // Props (userData APIs): hotplate.sizzle(level) · snags.set(i, state|u, side?) / turn(i) / reset() · onions.stir() /
 //   cook(u) · tongs_spare · order_build.show({bread, snag, onions, sauce}) / give() · sauces.squeeze(kind) ·
@@ -968,7 +969,7 @@ SETS.sandgate = (() => {
   const QUEUE = {
     reset: (n, live) => queueReset(n, live === undefined ? R.state === 'sizzle26' : live), front: queueFront, advance: queueAdvance,
     get count() { return QS.count; },
-    bubble(i, out) { const c = CUST && CUST[i]; if (!c || !out) return out; out.set(c.x, c.rig.height + 0.28, c.z); return out; },   // head + 0.4 m
+    bubble(i, out, lift = 0.28) { const c = CUST && CUST[i]; if (!c || !out) return out; out.set(c.x, c.rig.height + lift, c.z); return out; },   // head + 0.28 m (or + lift)
     look: (i) => CUSTL[i], visits: (i) => (CUST && CUST[i] ? CUST[i].visits : 0), length: () => Q.length,
     live(on, target = 5) { QS.live = !!on; QS.target = on ? target : Q.length; },
     leave(i) { const c = CUST && CUST[i]; if (!c || c.st === 'hidden') return; const k = Q.indexOf(i); if (k >= 0) { Q.splice(k, 1); for (let j = 0; j < Q.length; j++) { const o = CUST[Q[j]]; o.slot = j; slotXZ(o, j); if (o.st === 'wait') o.st = 'step'; } } startLeave(c, false); },
@@ -1322,7 +1323,7 @@ SETS.sandgate = (() => {
       s26_chase_march: [-5.15, 0, 0.55, PI], s26_luka_back: [-2.60, 0, 1.40, -2.4], s26_c40_back: [-3.40, 0, 2.30, -2.6], s26_c40_aside: [-3.10, 0, 1.15, -2.2],
       // the Sausage Sizzle (the mini-game places them)
       sz_luka: [-7.55, 0, -3.25, 0], sz_luke: [-6.65, 0, -3.25, 0], sz_luke_takeover: [-7.30, 0, -3.25, 0], sz_luka_aside: [-8.10, 0, -3.30, 0.3],
-      sz_chase: [-5.60, 0, -1.75, 0], sz_c40: [-4.10, 0, -1.60, -0.5], s26_sample_sizzle: [-6.40, 0, -2.05, PI],
+      sz_chase: [-5.60, 0, -1.75, 0], sz_c40: [-4.10, 0, -1.60, -0.5], s26_sample_sizzle: [-6.40, 0, -0.05, PI],
       // 2.6_invite and the exit
       s26_luke_invite: [-4.00, 0, -0.10, 0.5], s26_inv_chase: [-3.20, 0, 0.90, -2.6], s26_inv_luka: [-2.20, 0, 0.40, -2.3], s26_inv_c40: [-2.60, 0, 1.70, -2.5],
       s26_go_1: [-0.6, 0, -6.5, PI], s26_go_2: [0.4, 0, -7.0, PI], s26_go_3: [1.2, 0, -6.2, PI], s26_luke_watch: [-7.10, 0, -3.25, 0.9],
@@ -1387,7 +1388,7 @@ SETS.sandgate = (() => {
     storm: STORM,
     wind(level) { R.windOver = level == null ? null : Math.max(0, Math.min(1, +level)); },
     hotspots: {
-      h26_tongs: { at: [-5.6, 0, 0.6], r: 1.2 }, h26_sizzle: { at: [-6.40, 0, -2.05], r: 0.8 }, h26_urn: { at: [-7.30, 0, 0.35], r: 0.9 },
+      h26_tongs: { at: [-5.6, 0, 0.6], r: 1.2 }, h26_sizzle: { at: [-6.40, 0, -0.05], r: 0.7 }, h26_urn: { at: [-7.30, 0, 0.35], r: 0.9 },
       h26_sign: { at: [-2.90, 0, 1.00], r: 1.0 }, h26_portal: { box: [-3.0, -11.0, 3.0, -9.6] },
     },
     ar: [   // AR labels for Chip View (systems): everything printed in 2040 is blank without the chip

@@ -227,7 +227,7 @@ Sun disc (unit ×400): `arvo26` (−0.62, 0.70, 0.35) · `gust26` dimmed, partly
 | `sizzle_sign` | the A-frame | 2.6 | gentle rock in `gust26` (±0.03 rad) |
 | `gazebo` | canopy + legs | 2.6 | valance flap (vertex-free: the valance strip's `rotation.x` sine, amplitude 0.05 → 0.25 in `gust26`); tinsel sway |
 | `bunting` | 24 flags along the canopy edge (IM) | 2.6, 2.7 | sway (rotation per instance from a sine table, 24 matrices) |
-| `customers` | 5 ambient rigs `sizzle_a…e` (2040 locals with chip lights: a tradie in shorts, a mum with a pram-less hover-pram, an old man with a dog lead and no dog, a teen with a skateboard under the arm, a woman in netball kit) | 2.6 | driven by `queue` (§12); speech-bubble anchors at head + 0.4 m for the mini-game's order bubbles |
+| `customers` | 5 ambient rigs `sizzle_a…e` (2040 locals with chip lights: a tradie in shorts, a mum with a pram-less hover-pram, an old man with a dog lead and no dog, a teen with a skateboard under the arm, a woman in netball kit) | 2.6 | driven by `queue` (§12); speech-bubble anchors at head + 0.28 m (`bubble(i, out, lift)`) for the mini-game's order bubbles |
 | `fare_gates` | 4 cabinets, 6 paddles, 3 readers | 2.6 (bg), 2.7 | `open(lane, on)` paddles swing 1.3 rad (0.4 s), colliders follow; `reader(lane, 'idle' \| 'tap3' \| 'ok')` repaints `t_reader` (one shared canvas; only lane 2 changes) |
 | `train_standing` | 2-car train at the platform behind the glazing, doors open, interior glow | 2.6, 2.7 | static; `glow(on)` |
 | `traffic` | 4 hover-cars (IM, instanceColor) | 2.6 | glide along the road both ways (z 11.5 / 15.0), wrap at x ±60 |
@@ -280,7 +280,7 @@ Sun disc (unit ×400): `arvo26` (−0.62, 0.70, 0.35) · `gust26` dimmed, partly
 | `sz_luke_takeover` | [−7.30, 0, −3.25, 0] | Luke takes the tongs after three burnt ("Easy, Santa."); Luka steps to `sz_luka_aside` [−8.10, 0, −3.30, 0.3] |
 | `sz_chase` | [−5.60, 0, −1.75, 0] | Chase at the build spot, facing the customers |
 | `sz_c40` | [−4.10, 0, −1.60, −0.5] | Chase (2040) at the cash tin, looking lost |
-| `s26_sample_sizzle` | [−6.40, 0, −2.05, PI] | Chase holds his phone over the onions (between the table and the plate, facing −Z) |
+| `s26_sample_sizzle` | [−6.40, 0, −0.05, PI] | Chase holds his phone out over the onions from the table front, facing −Z (behind the table is inside the gazebo's collider) |
 
 **2.6 — `2.6_invite` and the exit**
 
@@ -355,7 +355,7 @@ valance (the sight line is at y ≈ 1.6 where it crosses z −3.6, the valance h
 | id | at | r | verb | who | scene | does |
 | --- | --- | --- | --- | --- | --- | --- |
 | `h26_tongs` | [−5.6, 0, 0.6] (the table front) | 1.2 | Grab some tongs | any, after `2.6_luke` | 2.6 | starts the mini-game `sizzle` (Luke's "Nobody gets a favour from me on an empty stomach. Grab some tongs." is content's) |
-| `h26_sizzle` | [−6.40, 0, −2.05] (`s26_sample_sizzle`) | 0.8 | Hold to record | `only: 'chase'`, `sample: 'sizzle'` | 2.6 (inside the mini-game as a Chase action, or after it) | sample **Sizzle**; `onions.stir()` + `hotplate.sizzle(1)` |
+| `h26_sizzle` | [−6.40, 0, −0.05] (`s26_sample_sizzle`) | 0.7 | Hold to record | `only: 'chase'`, `sample: 'sizzle'` | 2.6 (inside the mini-game as a Chase action, or after it) | sample **Sizzle**; `onions.stir()` + `hotplate.sizzle(1)` |
 | `h26_urn` | [−7.30, 0, 0.35] (`kettle`) | 0.9 | Kettle | any | 2.6 | "Put the kettle on? [YES] [NO]" (the urn); `world.puff('urn')` |
 | `h26_sign` | [−2.90, 0, 1.00] | 1.0 | Examine | any | 2.6 | no scripted line: a silent INSERT `s26_sign` (optional; content may omit) |
 | `h26_portal` | trigger box [−3.0, −11.0, 3.0, −9.6] | — | — | all three | 2.6 end | ends 2.6 (if content gives control after `2.6_invite` instead of the cutscene walk) |
@@ -457,7 +457,7 @@ SETS.sandgate = {
     advance(),                 // front customer takes the sandwich → walks `cust_out`; others step up one slot; a
                                //   hidden customer re-enters at the tail from `cust_in` (with an accessory swap the 2nd time)
     count,                     // served so far
-    bubble(i, out),            // writes the head+0.4 m world position of customer i into `out` (Vector3) for UI bubbles
+    bubble(i, out, lift = 0.28), // writes the head + lift world position of customer i into `out` (Vector3) for UI bubbles
   },
   paths: {
     cust_out:  [[-5.6, 0.15], [-9.8, 1.0], [-15.0, 6.5]],
