@@ -143,7 +143,7 @@
   CARDS.s24_cork.size = [1300, 830];
 
   // ============================================================ 2.4 — "Every Sunday"
-  const S24 = { tok: 0, phase: '' };
+  const S24 = { tok: 0, phase: '', side: 1 };
   const S24_FLAGS = ['s24_bell', 's24_door', 's24_phone_down', 's24_brick', 's24_ex_polaroid', 's24_ex_cork', 's24_ex_walkman', 's24_ex_card', 's24_ex_tin', 's24_tea', 's24_gate'];
   const RUE_KETTLE = [-4.62, 2.40, -7.70, PI + 0.35];    // by the stove (the kettle mark itself is the player's save spot)
   const WALKMAN_AT = [-5.55, 3.1, -1.08];
@@ -159,35 +159,55 @@
   }
   // Rue's examine lines: he stops where he is, turns to Chase and says it (he doesn't walk to the thing: let him be)
   const RUE_STOP = { do: (c) => { const a = act(c, 'rue'); if (a) { a.place([a.pos.x, a.pos.y, a.pos.z, a.rotY]); a.play('idle'); } } };
+  const V2 = new THREE.Vector3();
+  // the shot for one of Rue's lines in the roam: the two of them face each other at a talking distance (under the cut,
+  // Rue steps back if he's on top of Chase), and the lens is Chase's eyeline: just in front of his face, a little to one
+  // side, on Rue head and shoulders. Nobody stands between (Chase is behind the lens; Luka trails Chase).
+  // open floor in the front room Rue can stand on to talk (clear of the armchairs, the tables, the sideboard, the arch)
+  const RUE_SPOTS = [[-4.0, -4.3], [-3.9, -3.35], [-4.4, -1.0], [-1.0, -2.3], [0.8, -1.6], [1.4, -3.3], [-5.2, -3.6], [-2.9, -1.9]];
   function rueShot(c) {
     if (sk(c)) return;
     const r = act(c, 'rue'), ch = act(c, 'chase'); if (!r || !ch) return;
-    const d = Math.hypot(r.pos.x - ch.pos.x, r.pos.z - ch.pos.z);
-    if (d >= 3.4) { closeOn(c, 'rue', { dist: 1.15, yaw: 0.18, fov: 38, push: 0.1, dur: 7, ly: 0.05 }); return; }
-    // right beside him (the side table): Rue gives him room first, a step back (under the cut)
-    if (d < 1.45) {
-      const ux = d > 0.01 ? (r.pos.x - ch.pos.x) / d : 1, uz = d > 0.01 ? (r.pos.z - ch.pos.z) / d : 0;
-      for (const [vx, vz] of [[ux, uz], [-uz, ux], [uz, -ux]]) {
-        const tx = ch.pos.x + vx * 1.6, tz = ch.pos.z + vz * 1.6;
-        if (c.world.lineClear(ch.pos.x, ch.pos.z, tx, tz, 0.3)) { r.place([tx, r.pos.y, tz, Math.atan2(-vx, -vz)]); break; }
+    const dOf = (x, z) => Math.hypot(x - ch.pos.x, z - ch.pos.z);
+    const d = dOf(r.pos.x, r.pos.z);
+    if (d >= 3.4) { r.face('chase', 0.5); closeOn(c, 'rue', { dist: 1.15, yaw: 0.18, fov: 38, push: 0.1, dur: 7, ly: 0.05 }); return; }
+    if (d < 1.5) {   // right beside him (the side table): under the cut Rue is a step away, on open floor, facing him
+      let best = null, bs = 1e9;
+      const l = act(c, 'luka');
+      for (const [x, z] of RUE_SPOTS) {   // (all in the front room: nothing between them above table height)
+        const dc = dOf(x, z); if (dc < 1.5 || dc > 3.2) continue;
+        const sc = Math.abs(dc - 1.9) + 0.3 * Math.hypot(x - r.pos.x, z - r.pos.z) + (l && Math.hypot(x - l.pos.x, z - l.pos.z) < 0.8 ? 5 : 0);
+        if (sc < bs) { bs = sc; best = [x, z]; }
+      }
+      if (best) r.place([best[0], r.pos.y, best[1], r.rotY]);
+    }
+    const a = Math.atan2(ch.pos.x - r.pos.x, ch.pos.z - r.pos.z);
+    r.place([r.pos.x, r.pos.y, r.pos.z, a]); r.face(a, 0.05);
+    ch.place([ch.pos.x, ch.pos.y, ch.pos.z, a + PI]); ch.face(a + PI, 0.05);
+    // Luka (trailing Chase) out of Rue's single: if he's beside Rue or in the line, he steps in behind Chase's shoulder
+    const lk = act(c, 'luka');
+    if (lk) {
+      const ex = r.pos.x - ch.pos.x, ez = r.pos.z - ch.pos.z, el = Math.hypot(ex, ez) || 1, t = ((lk.pos.x - ch.pos.x) * ex + (lk.pos.z - ch.pos.z) * ez) / el;
+      const off = Math.abs((lk.pos.x - ch.pos.x) * ez - (lk.pos.z - ch.pos.z) * ex) / el;
+      if (t > 0.2 && off < 1.0) {
+        for (const sd of [1, -1]) {
+          const x = ch.pos.x - ex / el * 0.9 + ez / el * 0.55 * sd, z = ch.pos.z - ez / el * 0.9 - ex / el * 0.55 * sd;
+          if (c.world.lineClear(ch.pos.x, ch.pos.z, x, z, 0.15)) { lk.place([x, lk.pos.y, z, a + PI]); break; }
+        }
       }
     }
-    // close by: a three-quarter close on Rue from off Chase's line (so Chase isn't between), on whichever side is clear
-    ch.face('rue', 0.5);
-    const base = Math.atan2(ch.pos.x - r.pos.x, ch.pos.z - r.pos.z);
-    let yaw = 0.18;
-    for (const y of [1.05, -1.05, 0.75, -0.75]) {
-      const lx = r.pos.x + Math.sin(base + y) * 1.3, lz = r.pos.z + Math.cos(base + y) * 1.3;
-      if (c.world.lineClear(r.pos.x, r.pos.z, lx, lz, 0.2)) { yaw = y; break; }
-    }
-    closeOn(c, 'rue', { dist: 1.15, yaw, fov: 38, push: 0.08, dur: 7, ly: 0.05 });
+    r.eyePos(V1); ch.eyePos(V2);
+    const dx = V1.x - V2.x, dz = V1.z - V2.z, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L, sd = (S24.side = -S24.side) * 0.2;
+    // the lens sits a third of the way from Chase to Rue (never closer than 1.05 m to Rue), a little to one side
+    const k = Math.max(0, Math.min(0.32, L - 1.05)), px = V2.x + ux * k - uz * sd, pz = V2.z + uz * k + ux * sd, py = V2.y - 0.03;
+    c.cam.shot({ shot: 'CAM', pos: [px, py, pz], look: [V1.x, V1.y - 0.05, V1.z], fov: L < 1.6 ? 36 : 32,
+      to: { pos: [px + ux * 0.1, py, pz + uz * 0.1], look: [V1.x, V1.y - 0.05, V1.z], fov: L < 1.6 ? 36 : 32 }, dur: 7, ease: 'linear' });
   }
   const rueSays = (text, o = {}) => [
     RUE_STOP,
-    { face: 'rue', to: 'chase', dur: 0.7 },
     { do: rueShot },
-    { expr: [['rue', o.expr || 'fond']] },
-    { wait: 0.3 },
+    { expr: [['rue', o.expr || 'happy']] },
+    { wait: 0.4 },
     slow('rue', text),
   ];
   // his slow round while the tea brews: kettle -> the side table (the brick phone comes out of his pocket) -> the arch
@@ -324,7 +344,7 @@
           { face: 'chase', to: -H, dur: 0.3 },
           aPush('rue_house', 'walkman', 0.08, 5),
           { wait: 1.8 },
-          ...rueSays("Fourth copy. I wore the others out. ^ Still the only song I listen to. It's got a kettle in it."),
+          ...rueSays("Fourth copy. I wore the others out. ^ Still the only song I listen to. It's got a kettle in it.", { expr: 'fond' }),
         ] },
       // The brick phone, once Rue has set it down on the side table: Rue's line, the TEST key, the old trill, Record?
       { id: 'h24_brick', at: [-5.20, 2.40, -0.52], r: 0.62, only: 'chase', verb: 'Examine', when: (s) => S24.phase === 'explore' && !!s.flags.s24_phone_down,
@@ -357,8 +377,10 @@
           aPush('rue_house', 'bic_tin', 0.08, 4),
           { wait: 1.8 },
         ] },
-      // Kettle (save): RUE: "Put the kettle on? ^ I've just put it on. You can put it on again."
-      { id: 'h24_kettle', at: [-3.20, 2.40, -8.10], r: 1.0, verb: 'Use', when: (s) => S24.phase === 'explore', do: (c) => kettle24(c) },
+      // Kettle (save): RUE: "Put the kettle on? ^ I've just put it on. You can put it on again." (his line in its own
+      // shot, then the ask; the steam comes out of the kettle itself: `at` is its anchor, puff() finds the prop)
+      { id: 'h24_kettle', at: 'kettle_rue', r: 1.05, verb: 'Use', when: (s) => S24.phase === 'explore',
+        kettle: { steps: rueSays("Put the kettle on? ^ I've just put it on. You can put it on again."), boil: (c) => { const k = P(c, 'kettle_rue'); if (k) k.userData.boil(true); } } },
     ],
     steps: [
       ['cutscene', '2.4_knock'],
@@ -411,22 +433,6 @@
     ],
     grants: { flags: { santa: true, s24_door: true, s24_brick: true, s24_tea: true, s24_gate: true }, items: ['brick_phone'], samples: ['brick'], quiet: '25:28:00', noService: false },
   };
-
-  // the save: Rue's line first, then the ask (spec §13.1 + 2.4's kettle line)
-  async function kettle24(c) {
-    const sid = c.flow.sceneId;
-    await c.playCutscene(rueSays("Put the kettle on? ^ I've just put it on. You can put it on again."), { letterbox: false });
-    if (c.flow.sceneId !== sid) return;
-    const yes = await c.ask('Put the kettle on?');
-    if (!yes || c.flow.sceneId !== sid) return;
-    const me = c.world.actor(c.state.active); if (me) me.face([-3.2, 2.4, -8.5]);
-    c.sfx('kettle');
-    const k = P(c, 'kettle_rue'); if (k) k.userData.boil(true);
-    const steam = { n: 16, speed: 0.25, life: 1.8, color: 0xf2f2f2 };
-    await c.wait(1.8); if (c.flow.sceneId !== sid) return; c.world.puff('kettle_rue', steam);
-    await c.wait(1.4); if (c.flow.sceneId !== sid) return; c.world.puff('kettle_rue', steam);
-    if (saveGame()) c.ui.toast('Saved.');
-  }
 
   // Opening (PLAY "Knock."): the house from across the road; the three come along the footpath; the gate. Chase (2040)
   // stops at the gate and won't come in.
@@ -528,10 +534,15 @@
   ];
 
   // Cutscene — "2.4_tea." Front room, three in armchairs (Chase (2040) still out at the gate, visible through the louvres).
-  const TEA_WIDE = aPush('rue_house', 's24_tea_wide', 0.35, 14);
+  // the master: Luka's profile at the left edge, Chase across the coffee table, Rue in his armchair; the louvres behind
+  // (the set's s24_tea_wide sits right behind Luka's head: a red blob in the corner)
+  const TEA_WIDE = glideCam([-4.2, 4.25, -4.7], [-3.05, 3.1, -0.7], 62, { pos: [-4.1, 4.2, -4.55], look: [-3.05, 3.1, -0.7], fov: 60 }, 14);
   const TEA_RUE = aPush('rue_house', 's24_tea_rue', 0.4, 12, { fov: 30, fovTo: 28 });
-  const BOYS = aPush('rue_house', 's24_twoshot_boys', 0.12, 6);
-  const LOUVRE = aPush('rue_house', 's24_louvre_pov', 0.0, 6, { fov: 17, fovTo: 15 });
+  const BOYS = aPush('rue_house', 's24_twoshot_boys', 0.12, 6, { fov: 50, fovTo: 48 });   // (wider: Chase whole)
+  // Rue's look out through the louvres: from just inside the front wall, standing height, so Chase (2040) at his gate reads
+  // over the verandah rail (the seated eyeline, s24_louvre_pov, sees him only through the dowels)
+  const C40_TEA = [-0.35, 0, 13.95, PI];
+  const LOUVRE = glideCam([-3.2, 4.35, -0.4], [-0.35, 1.5, 13.95], 14, { pos: [-3.15, 4.33, -0.2], look: [-0.35, 1.5, 13.95], fov: 12 }, 6);
   const PHONE_T = aPush('rue_house', 'brick_phone_table', 0.08, 8);
   const TIN = aPush('rue_house', 'bic_tin', 0.06, 5);
   const LINE16 = "This line's from 1987. It's older than everything he owns. He can't see it. He can't hear it. ^ Yous used to ring me on it. Every Sunday. Eight years. ^ Then it stopped.";
@@ -544,7 +555,7 @@
       const l = act(c, 'luka'), ch = act(c, 'chase');
       if (l) l.place('s24_seat_luka');
       if (ch) ch.place('s24_seat_chase');
-      const c4 = act(c, 'chase40'); if (c4) { c4.place('s24_c40_gate'); c4.play('idle'); }
+      const c4 = act(c, 'chase40'); if (c4) { c4.place(C40_TEA); c4.play('idle'); }
       const st = P(c, 'storm_bank'); if (st) st.userData.set(0.45);
     } },
     seat('rue'), seat('luka'), seat('chase'),
@@ -587,7 +598,7 @@
     { wait: 0.8 },
     slow('rue', 'Knowing is the heaviest thing I ever carried. ^ I wouldn\'t have put it down for anything.'),
     // (Rue looks through the louvres at the man standing at his gate.)
-    glance('rue', [-0.6, 0, 13.9], 3.6),
+    glance('rue', C40_TEA, 3.6),
     { wait: 1.0 },
     LOUVRE,
     { do: (c) => { const st = P(c, 'storm_bank'); if (st) st.userData.build(0.5); } },
@@ -626,8 +637,12 @@
   const YARD = aPush('rue_house', 's24_yard_wide', 0.6, 9);
   const GATE_TWO = aPush('rue_house', 's24_gate_two', 0.2, 8);
   const HANDS = aPush('rue_house', 's24_hands', 0.05, 5);
-  const VERANDAH = aPush('rue_house', 's24_verandah_wide', 0.25, 14);
+  // from behind Rue on the verandah, high under the roof: his back, his right hand on the rail, the three small on the
+  // street going toward the water (the set's s24_verandah_wide sits at his head: a blur of white hair)
+  const VERANDAH = glideCam([-2.3, 4.45, 0.75], [14.0, 1.6, 16.5], 46, { pos: [-2.15, 4.42, 0.9], look: [14.0, 1.6, 16.5], fov: 44 }, 14);
   const C40_AWAY = 0.75;   // Chase (2040) at the gate, turned down the street toward the water: he can't look at him
+  // Rue on his stairs: the right hand sliding down the handrail (x -0.65, 0.92 m over the treads; he walks at x -0.35)
+  const railWalk = (on) => ({ do: (c) => { const r = act(c, 'rue'); if (r) r.walkAnim = on ? 'walk_rail' : 'walk'; } });
   CUTSCENES['2.4_gate'] = [
     { do: (c) => {
       S24.phase = 'gate';
@@ -645,7 +660,9 @@
     // He can't look at him.
     YARD,
     { fade: 'in', dur: 1.0 },
+    railWalk(true),
     { move: 'rue', to: 's24_rue_stair_foot', speed: 0.62 },
+    railWalk(false),
     { move: 'rue', to: [-0.25, 0, 9.4], speed: 0.7, nowait: true },
     CLOSE('chase40', { yaw: -0.25, dist: 1.2, fov: 36, push: 0.1, dur: 6 }),
     { wait: 2.8 },
@@ -701,7 +718,7 @@
     prop('gate', (u) => u.open(1)),
     { sfx: 'clunk', vol: 0.25, rate: 2.2 },
     { do: (c) => {
-      const r = act(c, 'rue'); if (r) { r.place('s24_rue_watch'); r.play('idle'); r.setExpr('still'); }
+      const r = act(c, 'rue'); if (r) { r.walkAnim = 'walk'; r.place('s24_rue_watch'); r.play('hand_rail', { h: 1.0, x: 0.3 }); r.setExpr('still'); }
       const l = act(c, 'luka'), ch = act(c, 'chase'), c4 = act(c, 'chase40');
       if (l) l.place([12.0, 0, 14.7, H]); if (ch) ch.place([11.2, 0, 15.3, H]); if (c4) { c4.place([13.0, 0, 15.0, H]); c4.setExpr('neutral'); }
     } },
@@ -770,6 +787,8 @@
   }
   // one updater for the scene: the chip-off prompt when Chase (2040) reaches the trigger, the dock trigger
   function inBox(a, x0, z0, x1, z1) { return !!a && a.pos.x > x0 && a.pos.x < x1 && a.pos.z > z0 && a.pos.z < z1; }
+  // all three at the scooters: the one you play inside the dock, the other two at least through the gate
+  const docked = () => inBox(world.actor(state.active), 6.2, 1.2, 10.8, 8.4) && inBox(world.actor('luka'), 5.6, 0.0, 11.6, 9.0) && inBox(world.actor('chase'), 5.6, 0.0, 11.6, 9.0) && inBox(world.actor('chase40'), 5.6, 0.0, 11.6, 9.0);
   function watch25() {
     if (S25.upd) return;
     const f = () => {
@@ -777,10 +796,7 @@
       if (flow.skipping || !flow.roaming || flow.busy) return;
       const F = state.flags;
       if (!F.chip_off && !S25.chipNow && inBox(world.actor('chase40'), 6.0, -33.5, 13.3, -28.5)) { S25.chipNow = true; hotspots.trigger('h25_chip'); return; }
-      if (F.s25_gate && !F.s25_dock) {
-        const a = world.actor(state.active);
-        if (inBox(a, 6.2, 1.2, 10.8, 8.4) && inBox(world.actor('luka'), 5.6, 0.0, 11.6, 9.0) && inBox(world.actor('chase'), 5.6, 0.0, 11.6, 9.0) && inBox(world.actor('chase40'), 5.6, 0.0, 11.6, 9.0)) F.s25_dock = true;
-      }
+      if (F.s25_gate && !F.s25_dock && docked()) F.s25_dock = true;
     };
     S25.upd = f; addUpdate(f);
   }
@@ -900,9 +916,11 @@
           if (!c.state.samples.includes('boom')) console.error('TWO 2.5: the Boom gate was not recorded');
           await to('chase', [7.6, 0, 2.6]);
           await to('chase', [8.2, 0, 4.6]);
-          await until(c, () => c.state.flags.s25_dock, 8);
-          if (!c.state.flags.s25_dock) { for (const id of ['luka', 'chase40']) await to(id, id === 'luka' ? 's25_dock_luka' : 's25_dock_c40'); await until(c, () => c.state.flags.s25_dock, 4); }
-          if (!c.state.flags.s25_dock) c.state.flags.s25_dock = true;
+          // Luka and Chase (2040) trail him in (autoplay's player.trail); the roam's watcher only runs in play, so the
+          // dock check is made here
+          await until(c, docked, 10);
+          if (docked()) c.state.flags.s25_dock = true;
+          else { const at = (id) => { const a = act(c, id); return a ? id + ' ' + a.pos.x.toFixed(2) + ',' + a.pos.z.toFixed(2) : id + ' -'; }; console.error('TWO 2.5: the party did not reach the scooter dock: ' + ['chase', 'luka', 'chase40'].map(at).join(' | ')); c.state.flags.s25_dock = true; }
         },
       }],
       ['objective', null],
@@ -948,9 +966,10 @@
     aPush('bridge', 's25_teddy_hatch', 0.2, 7),
     { expr: [['teddy', 'tired']] },
     slow('teddy', 'No. ^ Sorry.'),
-    // CHASE (2040) explains
-    { face: 'luka', to: 'chase40', dur: 0.5 }, { face: 'chase', to: 'chase40', dur: 0.5 },
-    aPush('bridge', 's25_explain', 0.3, 12),
+    // CHASE (2040) explains: turned to the two of them, over Chase's shoulder, the checkpoint behind (the set's s25_explain
+    // sees his back)
+    { face: 'luka', to: 'chase40', dur: 0.5 }, { face: 'chase', to: 'chase40', dur: 0.5 }, { face: 'chase40', to: [8.2, 0, -42.9], dur: 0.5 },
+    glideCam([8.75, 1.62, -44.6], [9.9, 1.45, -40.5], 40, { pos: [8.82, 1.62, -44.3], look: [9.9, 1.45, -40.5], fov: 38 }, 12),
     { wait: 0.5 },
     slow('chase40', "There's a bug. The system needs a human to say yes before anyone crosses. So they kept one human. ^ That's Teddy. ^ In a lockdown, Teddy has to say no to everyone."),
     { face: 'luka', to: 0, dur: 0.5 }, { face: 'chase', to: 0, dur: 0.5 }, { face: 'chase40', to: 0, dur: 0.5 },
@@ -960,6 +979,7 @@
   CUTSCENES.chip25 = [
     { letterbox: true },
     { place: 'chase40', at: 's25_chip' },
+    { face: 'chase40', to: 0, dur: 0.15, wait: true },   // (whatever turn the walk left him in: facing the checkpoint)
     { do: (c) => { const a = act(c, 'chase40'); if (a) a.rig.chip('ping'); } },
     glideCam([5.6, 2.2, -25.0], [9.0, 1.4, -31.0], 42, { pos: [6.0, 2.0, -26.0], look: [9.0, 1.45, -31.0], fov: 40 }, 5),
     { sfx: 'drone_scan', vol: 0.45 },
@@ -1181,11 +1201,7 @@
     if (l) { l.play('scooter_laugh'); l.setExpr('laugh'); const b = l.rig.attach.santa_beard; if (b) b.userData.state('ear'); }
     if (!sk(c) && c.AUDIO && c.AUDIO.laugh) c.AUDIO.laugh();
   }
-  function laughCry(c, id) {   // laughing and crying at the same time
-    const a = act(c, id); if (!a) return;
-    a.setExpr('laugh');
-    const f = a.rig.face; if (f) { f.tears = 1; f.redraw(); }
-  }
+  const laughCry = (c, id) => { const a = act(c, id); if (a) a.setExpr('laugh_cry'); };   // laughing and crying at the same time
   CUTSCENES['2.5_laugh'] = [
     // [TRACK · side-on, the two scooters and six drones in a neat line behind them, everyone at exactly 25 km/h]
     { shot: 'WIDE', on: ['luka', 'chase', 'chase40'], move: 'track', track: 'alongside', side: 'right', dist: 15, height: 0.95, offset: -4.5, fov: 40 },
@@ -1217,8 +1233,9 @@
     { wait: 1.2 },
     { do: (c) => { if (!sk(c) && c.AUDIO && c.AUDIO.laugh) c.AUDIO.laugh(); } },
     { wait: 1.6 },
-    // [WIDE] Chase (2040) is laughing and crying at the same time and doesn't care which.
-    { shot: 'WIDE', on: ['chase40', 'luka', 'chase'], move: 'track', track: 'ahead', dist: 6.5, height: 1.0, fov: 40 },
+    // [WIDE] Chase (2040) is laughing and crying at the same time and doesn't care which. (A wide lens close to him: his
+    // face reads, Luka and Chase on the other scooter and the six drones behind)
+    { shot: 'WIDE', on: 'chase40', move: 'track', track: 'ahead', dist: 3.0, height: 0.35, offset: 0.6, fov: 50 },
     { do: (c) => { const a = act(c, 'chase40'); if (a) a.play('scooter_laugh'); laughCry(c, 'chase40'); } },
     { wait: 3.4 },
   ];
@@ -1233,7 +1250,6 @@
       for (const [id, m] of [['luka', 's25_bw_luka'], ['chase', 's25_bw_chase'], ['chase40', 's25_bw_c40']]) { const a = act(c, id); if (a) { a.place(m); a.play('idle'); a.setExpr('neutral'); } }
       const ch = act(c, 'chase'); if (ch) ch.rig.show('phone', false);
       const l = act(c, 'luka'); if (l) { const b = l.rig.attach.santa_beard; if (b) b.userData.state('on'); }
-      const c4 = act(c, 'chase40'); if (c4 && c4.rig.face) { c4.rig.face.tears = 0; }
       const M = SB && SB.marks;
       if (M) for (let i = 0; i < 6; i++) { const m = M['d25_edge_' + (i + 1)], d = DRONES.get(CHASERS[i]); if (m && d && (Math.abs(d.z - m[2]) > 3 || sk(c))) { DRONES.spawn(CHASERS[i], { at: [m[0], 0, m[2]], face: m[3], hover: m[1], cone: false, ai: false, showPath: false }); DRONES.light(CHASERS[i], 'escort'); } }
       c.flow.setFollow(null);

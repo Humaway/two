@@ -114,17 +114,6 @@
     };
     ANIMS.s22_beard_up.upper = true;
   }
-  // Luka's finger along the top rail (2.3, hint 2): leaning in, the right hand sweeping along the rail
-  if (!ANIMS.s23_finger) {
-    ANIMS.s23_finger = (r, t, p) => {
-      const k = K(); if (!k) return ANIMS.idle(r, t, p);
-      k.base(r, t);
-      const u = k.ez(Math.min(1, t / 3.3)), P_ = r.parts;
-      P_.torso.rotation.x += 0.32; P_.head.rotation.x = 0.42; P_.head.rotation.y = -0.25 + 0.5 * u;
-      k.arm(r, -1, 0.28 - 0.38 * u, -0.06, 0.5, 1, -0.6, -0.4);
-      P_.handR.rotation.set(0.9, 0, 0.2);
-    };
-  }
   // Chase (2040) on the path holding his own elbow (2.3 step 6)
   if (!ANIMS.s23_elbow) {
     ANIMS.s23_elbow = (r, t, p) => {
@@ -403,45 +392,46 @@
   // =================================================================== 2.1 — "Senior Casual"
   // SETS.flat: +Z out to the bay (balcony door, kitchen window), +X the kitchen. Marks/anchors from src/13-set-flat.js.
   const S21_FLAGS = ['s21_slate', 's21_play', 's21_photo', 's21_kettle_line', 's21_plan', 's21_box', 's21_done', 'santa'];
-  const COUCH = [-1.62, 0, -2.42, 0];            // Chase asleep sitting up on the couch, facing the balcony
+  const COUCH = [-1.62, 0, -2.42, 0];            // Chase sitting up on the couch, facing the balcony
   const STAND = [-1.55, 0, -1.85, -0.35];        // off the couch
-  // [WIDE · from inside, through the balcony door]
-  const DAWN_WIDE = glideCam([-0.55, 1.95, -3.3], [-2.65, 0.95, 1.4], 54, { pos: [-1.05, 1.78, -2.55], look: [-2.75, 1.05, 1.35], fov: 49 }, 8);
-  // Chase on the couch (asleep, then sitting up): a loose close that holds both head heights
-  const COUCH_CLOSE = glideCam([-1.0, 1.2, -1.42], [-1.62, 1.02, -2.42], 40, { pos: [-1.08, 1.24, -1.56], look: [-1.62, 1.18, -2.42], fov: 38 }, 8);
-  // over Chase's right shoulder on the couch: Luka through the glass, Chase's head at the frame's edge
-  const COUCH_OTS = glideCam([-1.02, 1.42, -3.25], [-2.95, 1.0, 1.2], 40, { pos: [-1.05, 1.4, -3.05], look: [-2.95, 1.02, 1.2], fov: 37 }, 6);
+  // a set anchor's lens as the start of a glide to `to` (anchor data read at load: the set files come first)
+  function aGlide(setId, name, to, dur = 6, ease = 'linear') {
+    const an = SETS[setId] && SETS[setId].anchors && SETS[setId].anchors[name];
+    if (!an) return { shot: 'INSERT', at: name };
+    return glideCam(an.from.slice(), an.at.slice(), an.fov || 40, to, dur, ease);
+  }
+  // [WIDE · from inside, through the balcony door] (the set's s21_dawn_wide, easing in toward the glass)
+  const DAWN_WIDE = aGlide('flat', 's21_dawn_wide', { pos: [-1.05, 1.78, -2.55], look: [-2.75, 1.05, 1.35], fov: 49 }, 8);
   // the room from the corner (the gameplay camera's own angle: control hands over without a jump)
   const ROOM = { shot: 'CAM', pos: [2.0, 2.45, -0.12], look: [-1.6, 0.9, -2.1], fov: 58 };
   const DOOR_MID = glideCam([-1.9, 1.5, -1.4], [-0.95, 1.38, -3.75], 40, { pos: [-1.72, 1.48, -1.82], look: [-0.95, 1.38, -3.75], fov: 38 }, 6);
   const LUKA_OTS = glideCam([-3.6, 1.62, -1.65], [-2.82, 1.08, 1.4], 40, { pos: [-3.58, 1.6, -1.45], look: [-2.82, 1.1, 1.4], fov: 38 }, 5);
   const HAND = { shot: 'INSERT', at: 's21_hand_frame', card: ['s21_hand', {}] };
-  const BAL_LOCKED = { shot: 'CAM', pos: [-2.28, 1.42, -1.95], look: [-2.28, 1.0, 1.05], fov: 38 };   // one locked two-shot, side-on
+  const BAL_LOCKED = { shot: 'CAM', pos: [-2.28, 1.52, -1.95], look: [-2.28, 1.3, 1.05], fov: 40 };   // one locked two-shot, side-on (heads clear of the bars)
   // dawn behind them, a soft fill from the room so faces read in the locked shot (the dawn preset, lit from inside)
   const BAL_LIGHT = { hemi: [0xdccfdc, 0x4a3e46, 1.0], dir: [0xffc8b4, 0.6, [2, 5, -9]], spot: [0xffb0a0, 1.4] };
-  const PLAN_WIDE = glideCam([2.3, 1.72, -0.22], [2.3, 0.85, -1.55], 62, { pos: [2.3, 1.66, -0.32], look: [2.3, 0.86, -1.55], fov: 60 }, 8);
+  // the table from the window side, as wide as the kitchen allows: all three faces and the toast inside the bars
+  const PLAN_WIDE = glideCam([2.3, 1.8, -0.1], [2.25, 0.85, -1.55], 66, { pos: [2.3, 1.76, -0.17], look: [2.25, 0.86, -1.55], fov: 63 }, 8);
   const PLAN_TOP = glideCam([2.3, 1.5, -0.84], [2.3, 0.76, -0.97], 40, { pos: [2.3, 1.38, -0.88], look: [2.3, 0.76, -0.97], fov: 40 }, 6);
-  // from the foot of the bed, past the box: Luka's face as he kneels to it
-  const BOX = glideCam([-2.15, 1.45, -4.05], [-1.45, 0.72, -5.35], 46, { pos: [-2.1, 1.38, -4.15], look: [-1.45, 0.72, -5.35], fov: 44 }, 5);
+  // from the foot of the bed, past the box: Luka's face as he kneels to it (the set's s21_box)
+  const BOX = aGlide('flat', 's21_box', { pos: [-2.1, 1.38, -4.15], look: [-1.45, 0.72, -5.35], fov: 44 }, 5);
   const SANTA_MID = glideCam([0.35, 1.58, -4.3], [-1.05, 1.42, -5.4], 40, { pos: [0.1, 1.56, -4.5], look: [-1.05, 1.44, -5.4], fov: 38 }, 7);
 
   function reset21(c) {
     for (const f of S21_FLAGS) delete c.state.flags[f];
     const i = c.state.inventory.indexOf('santa'); if (i >= 0) c.state.inventory.splice(i, 1);
   }
-  // Chase (2040) at dawn: T-shirt, no coat, no lanyard, nothing round his neck; dressed for the plan
-  function c40Dressed(c, on) {
-    const a = act(c, 'chase40'); if (!a) return;
-    for (const p of ['coat', 'lanyard', 'headphones_neck']) if (a.rig.attach[p]) a.rig.show(p, on);
-  }
-  // 4:52 am: Luka on the balcony with the tea towel, Chase asleep sitting up on the couch, Chase (2040) asleep in the bedroom
+  // 4:52 am: Luka on the balcony with the tea towel, Chase asleep on the couch, Chase (2040) asleep in the bedroom (in his
+  // T-shirt: the scene spawns him with look chase40_tee). Both lie down: lie(true) makes the seat and the mattress floor.
   function open21(c) {
     reset21(c);
-    if (SETS.flat && SETS.flat.dress && c.world.setId === 'flat') SETS.flat.dress('dawn21');
+    const SF = SETS.flat;
+    if (SF && SF.dress && c.world.setId === 'flat') SF.dress('dawn21');
+    if (SF && SF.lie) SF.lie(true);
     const l = act(c, 'luka'), ch = act(c, 'chase'), c4 = act(c, 'chase40');
     if (l) { l.hold(null); l.place('s21_bal_polish'); l.hold('tea_towel', 'R'); l.play('polish'); l.setExpr('tired'); }
-    if (ch) { ch.place(COUCH); ch.play('sit', { h: 0.42 }); ch.rig.seated = true; ch.play('sleep', { h: 0.42 }); ch.setExpr('sleep'); }
-    if (c4) { c4.place('s21_bed_c40'); c4.play('sit', { h: 0.55 }); c4.rig.seated = true; c4.play('sleep', { h: 0.55 }); c4.setExpr('sleep'); c40Dressed(c, false); }
+    if (ch) { ch.rig.seated = false; ch.place('s21_couch_lie'); ch.play('lie'); ch.setExpr('sleep'); }
+    if (c4) { c4.rig.seated = false; c4.place('s21_bed_lie'); c4.play('sleep_back'); c4.setExpr('sleep'); }
     const sl = P(c, 'slate_desk'); if (sl) sl.userData.screen('off');
     if (SETS.flat.snore) SETS.flat.snore(true);
   }
@@ -450,7 +440,7 @@
     title: 'Senior Casual', set: 'flat', env: 'dawn', time: 'Sunday 23 December 2040, 4:52 am', place: "Chase's flat, Redcliffe",
     playable: ['chase', 'luka'], swap: false, music: null,
     hud: { noService: false, quiet: '31:06:00', samples: false, bars: null },
-    spawn: { luka: 's21_bal_polish', chase: COUCH, chase40: 's21_bed_c40' },
+    spawn: { luka: 's21_bal_polish', chase: 's21_couch_lie', chase40: { at: 's21_bed_lie', look: 'chase40_tee' } },
     hotspots: [
       // The music slate on the desk (Chase): a thin glass tablet. One folder: two. Inside: 2,847 items.
       { id: 'h21_slate', at: 's21_slate_chase', r: 0.95, only: 'chase', when: (s) => !s.flags.s21_slate, flag: 's21_slate',
@@ -557,22 +547,32 @@
     { sfx: 'cloth_swish', vol: 0.1 },
     { wait: 2.2 },
     // [CLOSE · Chase on the couch] He wakes, sees Luka through the glass, and watches him for a while.
-    COUCH_CLOSE,
-    { wait: 1.4 },
+    { do: (c) => lyingLens(c, 'close') },
+    { wait: 1.6 },
     { expr: [['chase', 'tired']] },
-    { act: [['chase', 'sit', { h: 0.42 }]] },
-    { wait: 0.9 },
-    { do: (c) => { const a = act(c, 'chase'); if (a && !sk(c)) a.play('glance', { yaw: -0.3, dur: 1.4 }); } },
-    { wait: 1.2 },
-    COUCH_OTS,
+    { wait: 1.0 },
+    { do: (c) => { const a = act(c, 'chase'); if (a && !sk(c)) a.play('glance', { yaw: 0.35, dur: 5 }); } },
+    { wait: 1.4 },
+    { do: (c) => lyingLens(c, 'ots') },
     { wait: 3.4 },
-    // Control to Chase.
+    // Control to Chase: up off the couch (under the cut to the room)
+    { do: (c) => { const a = act(c, 'chase'); if (SETS.flat.lie) SETS.flat.lie(false); if (a) { a.place(COUCH); a.play('sit', { h: 0.42 }); a.rig.seated = true; a.setExpr('tired'); } } },
     ROOM,
+    { wait: 0.6 },
     { act: [['chase', 'stand', { h: 0.42, dur: 1 }]] },
     { wait: 1.0 },
     unseat('chase'),
     { move: 'chase', to: STAND },
   ];
+  // Chase lying on the couch, head on the east arm, feet to the west: 'close' = his face from the balcony side, a little
+  // above; 'ots' = from past his head (over the arm), the glass and Luka polishing beyond. Computed from his eyes.
+  function lyingLens(c, kind) {
+    if (sk(c)) return;
+    const a = act(c, 'chase'); if (!a) return;
+    a.eyePos(V1);
+    if (kind === 'close') c.cam.shot(glideCam([V1.x - 0.42, V1.y + 0.5, V1.z + 0.78], [V1.x - 0.2, V1.y - 0.04, V1.z], 38, { pos: [V1.x - 0.38, V1.y + 0.45, V1.z + 0.66], look: [V1.x - 0.2, V1.y - 0.03, V1.z], fov: 36 }, 7));
+    else c.cam.shot(glideCam([V1.x + 0.42, V1.y + 0.42, V1.z - 0.3], [-2.75, 1.0, 1.25], 40, { pos: [V1.x + 0.38, V1.y + 0.4, V1.z - 0.22], look: [-2.75, 1.02, 1.25], fov: 37 }, 6));
+  }
 
   // Cutscene — "2.1_dont."
   CUTSCENES['2.1_dont'] = [
@@ -580,7 +580,7 @@
       const ch = act(c, 'chase'), c4 = act(c, 'chase40');
       if (ch) { ch.place('s21_slate_chase'); ch.hold('slate_desk', 'R'); ch.play('reading_bare'); ch.setExpr('neutral'); }
       if (c4) { c4.rig.seated = false; c4.place('s21_door_c40'); c4.play('idle'); c4.setExpr('neutral'); }
-      c40Dressed(c, false);
+      if (SETS.flat.lie) SETS.flat.lie(false);
       if (SETS.flat.snore) SETS.flat.snore(false);
       const bd = P(c, 'bedroom_door'); if (bd) bd.userData.open(1.4);
     } },
@@ -647,7 +647,7 @@
       const ch = act(c, 'chase'), l = act(c, 'luka'), c4 = act(c, 'chase40');
       const bd = P(c, 'balcony_door'); if (bd) bd.userData.open(1);
       if (c4) c4.place([-0.2, 0, -5.2, PI]);                       // gone back to the bedroom
-      if (l) { l.place([-3.0, 0, 1.1, 0.95]); l.hold('tea_towel', 'R'); l.play('polish'); l.setExpr('tired'); }
+      if (l) { l.place([-3.0, 0, 1.18, 1.05]); l.hold('tea_towel', 'R'); l.play('polish'); l.setExpr('tired'); }
       const t = P(c, 'teas'); if (t) t.userData.state('bench');
       if (ch) { ch.place([-1.75, 0, -1.2, 0.2]); ch.play('idle'); ch.hold('teas', 'R'); ch.play('carry_mug'); ch.setExpr('neutral'); }
     } },
@@ -706,7 +706,6 @@
       if (l) { l.hold(null); l.place('s21_plan_luka'); l.play('sit', { h: 0.46 }); l.rig.seated = true; l.setExpr('tired'); }
       if (ch) { ch.place('s21_plan_chase'); ch.play('sit', { h: 0.5 }); ch.rig.seated = true; ch.setExpr('neutral'); }
       if (c4) { c4.place('s21_plan_c40'); c4.play('sit', { h: 0.46 }); c4.rig.seated = true; c4.setExpr('neutral'); }
-      c40Dressed(c, true);
       const bd = P(c, 'bedroom_door'); if (bd) bd.userData.open(1.4);
       const bx = P(c, 'deco_box'); if (bx) bx.userData.state('under');
     } },
@@ -799,18 +798,20 @@
   const S22_FLAGS = ['s22_code', 's22_plate', 's22_green', 's22_played', 's22_sneak', 's22_out'];
   const DRONE = 'd22';
   const DRONE_HOME = [10.0, 0, -31.0];
-  const PIANO_TOP = [8.35, 1.34, -21.6];          // where the drone hangs: just past the piano's south end, clear of the bench lenses
+  // where the drone hangs (the set's s22_drone_piano): just past the piano's south end, clear of the bench lenses
+  const PIANO_TOP = ((m) => (m ? [m[0], m[1], m[2]] : [8.35, 1.9, -21.6]))(SETS.parade && SETS.parade.marks && SETS.parade.marks.s22_drone_piano);
   const POCKET = [11.1, -35.2, 14.3, -30.8];
   const inBox = (b, x, z) => x >= b[0] && x <= b[2] && z >= b[1] && z <= b[3];
   const TAG = new THREE.Vector3(8.3, 1.55, -19.1);
   const S22 = { phase: '', guardT: 0, upd: null, listening: false, handle: null };
-  const LANE_TRACK = glideCam([9.75, 1.85, -1.6], [8.4, 1.3, -14.0], 44, { pos: [9.3, 1.75, -5.4], look: [8.5, 1.35, -30.0], fov: 40 }, 6.5, 'linear');
+  // from the Parade footpath, all three from behind as they walk in, the statues at the far end
+  const LANE_TRACK = glideCam([8.5, 2.0, 0.2], [8.5, 1.35, -14.0], 42, { pos: [8.5, 1.85, -4.6], look: [8.5, 1.35, -30.0], fov: 40 }, 6.5, 'linear');
   const STATUES = glideCam([8.5, 1.7, -23.5], [8.5, 1.45, -33.8], 34, { pos: [8.5, 1.65, -25.2], look: [8.5, 1.5, -33.8], fov: 32 }, 7);
   const DRONE_END = glideCam([8.4, 1.55, -25.8], [10.0, 1.9, -31.0], 38, { pos: [8.6, 1.6, -26.6], look: [10.0, 1.9, -31.0], fov: 36 }, 5);
   const PLATE_LENS = { shot: 'CAM', pos: [9.75, 1.45, -16.9], look: [8.25, 0.85, -19.0], fov: 46 };   // Luka heaving the brass plate up
   const KEYPAD = { shot: 'CAM', pos: [8.36, 1.1, -18.66], look: [8.37, 0.88, -19.12], fov: 32 };
   const AR_TAG = glideCam([7.2, 1.62, -16.9], [8.3, 1.5, -19.1], 38, { pos: [7.45, 1.6, -17.4], look: [8.3, 1.5, -19.1], fov: 34 }, 3);
-  const LANE_BAY = glideCam([9.75, 1.32, -19.25], [-17.0, 7.0, 380], 22, { pos: [9.75, 1.32, -19.15], look: [-17.0, 7.0, 380], fov: 20 }, 7);
+  const LANE_BAY = glideCam([9.75, 1.32, -19.25], [-45.0, 6.0, 380], 19, { pos: [9.75, 1.32, -19.15], look: [-45.0, 6.0, 380], fov: 17 }, 7);   // the bridge between the lamp and the palm
   // from the lane's end (in front of the statues), up the lane to the piano; then panning with Chase into the pocket
   const EXIT_WIDE = { shot: 'CAM', pos: [7.5, 2.3, -32.5], look: [8.7, 1.0, -20.5], fov: 40 };
   const EXIT_PAN = { shot: 'CAM', pos: [7.5, 2.3, -32.5], look: [8.0, 1.0, -24.5], fov: 44, to: { pos: [7.6, 2.2, -32.6], look: [12.2, 1.0, -32.6], fov: 50 }, dur: 3.6, ease: 'linear' };
@@ -960,6 +961,7 @@
         steps: [
           { do: (c) => { if (!sk(c)) { AR.show(true); chip.show(true); } } },
           AR_TAG,
+          { face: 'chase40', to: [8.3, 0, -19.1], dur: 0.4 },
           { wait: 1.6 },
           { do: (c) => { chip.show(false); AR.show(null); } },
           CLOSE('chase40', { yaw: 0.5, dist: 1.0, fov: 36, push: 0.08, dur: 5 }),
@@ -1001,7 +1003,7 @@
       { id: 'h22_replay', at: [9.75, 0, -20.2], r: 1.0, only: 'chase', verb: 'Play', when: (s) => !!s.flags.s22_sneak && !s.flags.s22_out && !MINIGAMES.piano.playing,
         do: (c) => { sneakOn(c); } },
       // the café's tea urn: the save point
-      { id: 'h22_urn', at: 'urn', r: 1.45, verb: 'Use', kettle: true },
+      { id: 'h22_urn', at: [3.2, 1.55, -7.05], r: 1.45, verb: 'Use', kettle: true },   // at: the urn's lid (the steam rises from it)
     ],
     steps: [
       ['cutscene', '2.2_lane'],
@@ -1100,7 +1102,8 @@
   const TURN_CH = glideCam([8.42, 1.56, -19.32], [9.4, 1.1, -20.3], 36, { pos: [8.5, 1.55, -19.4], look: [9.4, 1.1, -20.3], fov: 35 }, 7);
   const TURN_C40 = glideCam([8.42, 1.56, -20.58], [9.4, 1.1, -19.6], 36, { pos: [8.5, 1.55, -20.5], look: [9.4, 1.1, -19.6], fov: 35 }, 7);
   const MIRROR = glideCam([11.45, 1.5, -19.95], [9.3, 1.0, -19.95], 40, { pos: [11.2, 1.48, -19.95], look: [9.3, 1.0, -19.95], fov: 39 }, 10);   // from behind: the same slumped backs
-  const BOTH_FRONT = glideCam([7.25, 2.62, -19.95], [9.45, 1.12, -19.95], 44, { pos: [7.35, 2.56, -19.95], look: [9.45, 1.12, -19.95], fov: 43 }, 8);   // high over the lid: both faces
+  // over the lid: both faces side by side, the same posture (the set's s22_piano_cam sits higher and wider: the faces read small)
+  const BOTH_FRONT = glideCam([7.85, 1.92, -19.95], [9.45, 1.15, -19.95], 36, { pos: [7.95, 1.82, -19.95], look: [9.45, 1.12, -19.95], fov: 34 }, 8);
   const LUKA_HIDE = [7.0, 0, -21.5, 1.02];        // crouched behind the piano's south end, facing the bench
   const PIANO_SHOTS = [   // [bar, shot]: cut on the music (Chase's playing-on runs 6x under autoplay)
     [4, glideCam([10.45, 1.75, -20.95], [8.6, 0.98, -20.05], 40, { pos: [10.2, 1.65, -20.7], look: [8.6, 0.98, -20.05], fov: 38 }, 9)],                 // over his shoulder at the keys
@@ -1257,10 +1260,10 @@
   const ELBOW = [-300.35, 0, -8.4, 0.1];           // Chase (2040) on the path, behind them
   const THREE_SHOT = glideCam([-300.0, 0.98, 3.6], [-300.0, 0.86, 0.05], 40, { pos: [-300.0, 0.97, 3.25], look: [-300.0, 0.86, 0.05], fov: 40 }, 12);
   // over the seat, down onto the top rail: his hand sliding along it, the shine, his head bowed behind
-  const RAIL = glideCam([-300.62, 1.22, 0.36], [-300.82, 0.9, -0.24], 36, { pos: [-300.36, 1.2, 0.33], look: [-300.45, 0.9, -0.24], fov: 34 }, 3.4);
+  const RAIL = glideCam([-300.75, 1.22, 0.36], [-300.95, 0.9, -0.24], 36, { pos: [-300.45, 1.21, 0.345], look: [-300.63, 0.9, -0.24], fov: 34 }, 3.4);
   const SEAT = glideCam([-300.3, 1.5, -0.5], [-300.25, 0.47, 0.05], 34, { pos: [-300.3, 1.35, -0.45], look: [-300.25, 0.47, 0.06], fov: 32 }, 4);
-  // from beside his shoulder (the parade anchor's lens sits inside whoever reads the plaque); the card covers it
-  const PLAQUE = { shot: 'CAM', pos: [-300.48, 1.02, -0.6], look: [-300.0, 0.84, -0.27], fov: 30, card: ['s23_plaque', {}] };
+  // from beside his shoulder (the set's s23_plaque); the card covers it
+  const PLAQUE = { shot: 'INSERT', at: 's23_plaque', card: ['s23_plaque', {}] };
   const STORM = (u) => ({ do: (c) => { const s = P(c, 'storm_clouds'); if (s) s.userData.build(u); } });
 
   function open23(c) {
@@ -1272,7 +1275,14 @@
     c.state.flags.santa = true;
   }
   // [INSERT · Luka's finger running along the top rail] It's polished to a mirror shine. Not a grain of salt or dust.
-  // Fresh frangipani lying on the seat.
+  // Fresh frangipani lying on the seat. Leaning in from behind the bench, his right hand on the top rail (0.9 m up,
+  // 0.48 m ahead of him) slides along it from his right to his left (the RAIL lens pans with it).
+  function railHand(c) {
+    const a = act(c, 'luka'); if (!a) return;
+    a.play('hand_rest', { sd: -1, h: 0.9, z: 0.48, x: 0.42 });
+    if (sk(c)) { a.p.x = 0.08; return; }
+    tween(c, 3.3, (k) => { a.p.x = 0.42 - 0.34 * k; });
+  }
   function railRun(c) {
     const b = P(c, 'bench'); if (!b) return;
     if (sk(c)) { b.userData.glint(null); return; }
@@ -1292,7 +1302,7 @@
       { id: 'h23_rail', at: [-301.0, 0, -0.72], r: 0.6, flag: 's23_rail',
         steps: [
           { place: 'luka', at: [-300.55, 0, -0.72, 0] },
-          { act: [['luka', 's23_finger', { dur: 3.6, loop: false }]] },
+          { do: (c) => railHand(c) },
           RAIL,
           { do: (c) => railRun(c) },
           { sfx: 'glass_squeak', vol: 0.18 },
@@ -1308,6 +1318,8 @@
       // Sit down? [YES] [NO]
       { id: 'h23_sit', at: [-300.0, 0, 0.85], r: 1.0, verb: 'Sit', flag: 's23_sit',
         ask: { q: 'Sit down?', test: true, no: [say('luka', '…Yeah. In a sec.')] } },
+      // the coffee cart's urn by the picnic shelter: the save point
+      { id: 'h23_urn', at: [-288.65, 1.5, -10.35], r: 1.2, verb: 'Use', kettle: true },   // at: urn_w's lid (the steam rises from it)
     ],
     steps: [
       ['cutscene', '2.3_path'],
@@ -1317,6 +1329,7 @@
         until: 's23_sit',
         async auto(c) {
           const T = (id) => c.hotspots.trigger(id);
+          await T('h23_urn');
           await c.runSteps([{ move: 'luka', to: [-300.0, 0, -0.85, 0] }]);
           await T('h23_plaque');
           await T('h23_rail');

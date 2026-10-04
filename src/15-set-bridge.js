@@ -24,8 +24,8 @@
 // Static geometry: one Builder per region merged by material (vertex-coloured M.vc + painted road / concrete / grass / foam
 // / atlas), painted textures 64-256 px with nearest filtering only where something must read; every repeat instanced;
 // nothing is created after build(); update() allocates nothing. Scooters, cars and pelicans are placed at render time
-// (interpolated between ticks like actors, so mounted riders never slip) by wrapping world.render once: the engine has no
-// per-set render hook (a `def.render(alpha)` would replace the wrap).
+// (interpolated between ticks like actors, so mounted riders never slip) from the set's render(alpha) hook, which
+// world.render calls before it draws.
 //
 // Marks: teddy_seat kettle gate_L_post dock_w1..3 dock_e1..3 credits_teddy · s25_start_luka s25_start_chase s25_start_c40
 //   s25_chip s25_cp_start s25_cp_cross s25_cp_plaza s25_hatch s25_panel_chase s25_desk_chase s25_wait_c40 s25_scan_luka
@@ -1567,7 +1567,7 @@ SETS.bridge = (() => {
     mountTick(false);
     queueTick(dt, t); deckTick(dt, t);
     towersTick(dt, t); boothTick(dt, t); skyTick(dt, t); dropsTick(dt); pelTick(dt);
-    if (!R.hooked || !cur) visuals(1);
+    if (!cur) visuals(1);   // (while current, the render(alpha) hook places them between ticks)
   }
 
   // ---------------------------------------------------------- build
@@ -1589,12 +1589,6 @@ SETS.bridge = (() => {
     for (const p of R.bollards) if (p[0] > 6) COL.push([p[0] - 0.17, p[2] - 0.17, p[0] + 0.17, p[2] + 0.17]);
     COL.push([8.40, 40, 8.60, 760], [-6.50, 40, -6.25, 760]);   // framing only: the deck's railings and the boardwalk's rails
     for (const [x0, z0, x1, z1] of RAILS) COL.push([Math.min(x0, x1) - 0.1, Math.min(z0, z1) - 0.1, Math.max(x0, x1) + 0.1, Math.max(z0, z1) + 0.1]);
-    // the render-time interpolation hook (scooters, cars, pelicans move like actors: between the last two ticks)
-    if (!R.hooked && typeof world !== 'undefined' && world && typeof world.render === 'function' && !world.render.__bridge) {
-      const wr = world.render;
-      const f = function (alpha) { if (R.root && R.scoot && isCur()) visuals(alpha); return wr.call(this, alpha); };
-      f.__bridge = true; world.render = f; R.hooked = true;
-    }
     if (!R.stopHook && typeof on === 'function') { R.stopHook = true; on('flow:stop', () => { MOUNTS.length = 0; CR.on = false; if (CR.sw) swerveEnd(); R.ask.user = true; }); }
     R.scene = typeof state !== 'undefined' && state ? state.scene : null;
     R.env = null; R.envSnap = true; R.lastT = -1; R.amb = null; R.screenMode = null; R.torchOwned = false;
@@ -1724,6 +1718,8 @@ SETS.bridge = (() => {
       credits25:  { bg: 0xe6b884, fog: [0xf0caa0, 0.0040], hemi: [0xffe8cc, 0x6a5a48, 0.95], dir: [0xffb070, 1.20, [-14, 5, 6]],  spot: [0xffd8a0, 4.0], rain: 0 },
     },
     build, marks, anchors, cams, zones, colliders: COL, floor, update,
+    // world.render calls this before drawing (the current set, or the split's right half): render-time placement
+    render(alpha) { if (R.root && R.scoot && isCur()) visuals(alpha); },
     props: [
       'gate_R', 'gate_M', 'gate_L', 'booth', 'booth_lamp', 'booth_bulb', 'no_button', 'no_cap', 'desk_fan', 'fan_head', 'fan_blades', 'booth_screen', 'booth_speaker',
       'reason_panel', 'reason_card_0..5', 'reader_card_0..5', 'panel_led', 'desk_card', 'desk_card_blank', 'desk_card_xmas', 'kettle_booth', 'radio_booth',
