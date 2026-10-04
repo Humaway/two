@@ -1255,7 +1255,8 @@
   // z -0.24 (y 0.8..0.9) with the brass plaque on its rear face; the path z -9.1..-6.9; the bay and the bridge ahead.
   const S23_FLAGS = ['s23_plaque', 's23_rail', 's23_sit'];
   const PATH_WIDE = { shot: 'CAM', pos: [-304.0, 1.7, -30.0], look: [-306.0, 1.0, -8.0], fov: 22 };   // locked, long lens
-  const BENCH_FRONT = glideCam([-299.65, 1.22, 3.1], [-300.0, 0.9, 0.05], 40, { pos: [-299.7, 1.18, 2.7], look: [-300.0, 0.9, 0.05], fov: 40 }, 8);
+  // (it starts high enough for him standing, and comes down with him as he sits)
+  const BENCH_FRONT = glideCam([-299.65, 1.4, 3.3], [-300.0, 1.12, 0.05], 44, { pos: [-299.7, 1.18, 2.7], look: [-300.0, 0.9, 0.05], fov: 40 }, 6);
   const SIT_WIDE = glideCam([-295.6, 1.55, 4.8], [-300.6, 0.75, -2.2], 46, { pos: [-295.9, 1.5, 4.5], look: [-300.6, 0.75, -2.2], fov: 45 }, 9);
   // locked, from behind the bench and up the path: the two on the bench against the bay, Chase (2040) alone on the path
   const BEHIND = { shot: 'CAM', pos: [-298.5, 2.0, -14.0], look: [-300.2, 0.9, 0.5], fov: 36 };
