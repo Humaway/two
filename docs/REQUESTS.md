@@ -100,6 +100,11 @@ Source reports are in `docs/reports/`.
 
 - [x] **main** — `warmRig` bakes portraits by cropping the centre square of the screen canvas; on portrait screens that zooms to just the face (Polaroids, dialogue faces): render portraits from a fixed-aspect target. — done: the warm lens opens so the centre square always spans 30°.
 
+## From C/PC (third batch)
+
+- [ ] **reddy26** — `floor_wreck_wide` doesn't show Luke at `pc_luke_desk` through the office door (PC uses pos [10.4,2.5,-1.7] → [6.4,1.0,-10.0], fov 52); `ladder` 'carried' has no side-carry offset (PC reorients it + `pc_ladder` anim); `pc_jordan_phone` (7.5,−8.05) sits beside the folded ladder (PC uses (7.15,−8.05)).
+- [ ] **art/world** — `climb` isn't an upper-body anim, so a `{move}` while climbing switches to walk (1.1's ladder; PC raises Jordan with a timed position change).
+
 ## Visual QA (integration pass)
 
 - [ ] **B1** — real-time screenshot pass of the montage (2029 → match cut) and the post-screenshot framing fixes; **B2** entirely (fast autoplay passes; frames unviewed).
