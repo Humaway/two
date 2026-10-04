@@ -440,7 +440,7 @@ cams: {
   cp_dock:    { type: 'fixed', pos: [3.2, 4.2, 12.5],   look: [8.3, 0.6, 3.6],   fov: 50 },
   cp_overview:{ type: 'fixed', pos: [-4.0, 9.0, -46.0], look: [4.0, 0.0, -10.0], fov: 50 },  // filmable land outside the walk
   ch_launch:  { type: 'fixed', pos: [11.6, 3.6, 30.0],  look: [4.0, 0.6, 12.0],  fov: 50 },
-  ch_shoulder:{ type: 'fixed', pos: [-5.8, 0.5, 214.0], look: [1.0, 0.9, 168.0], fov: 38 },  // low on the W shoulder, looking back up the road
+  ch_shoulder:{ type: 'fixed', pos: [-4.9, 0.7, 214.0], look: [1.8, 0.95, 168.0], fov: 40 },  // low on the W shoulder (1.2 m off the barrier), looking back up the road
   ch_lamp:    { type: 'fixed', pos: [6.2, 12.0, 364.0], look: [0.5, 2.2, 336.0], fov: 50 },  // from a lamp head on the hump
   ch_channel: { type: 'fixed', pos: [26.0, 3.5, 650.0], look: [2.0, 1.2, 598.0], fov: 32 },  // long lens from the channel-marker beacon
   ch_end:     { type: 'fixed', pos: [16.5, 5.2, 790.0], look: [4.0, 0.4, 750.0], fov: 46 },
@@ -484,7 +484,7 @@ arrays it mutates each tick (allocation-free); in side segments it calls `cam.ov
 | --- | --- | --- | --- |
 | 10 | 60 | `ch_launch` | the scooters drop onto lane L; drones peel off tower_E behind them |
 | 60 | 150 | FOLLOW | low behind |
-| 150 | 215 | `ch_shoulder` | low on the west shoulder (x −5.8, 0.5 m up): scooters and drones approach and blast past, railing posts and lamps receding |
+| 150 | 215 | `ch_shoulder` | low on the west shoulder (x −4.9, 0.7 m up, clear of the barrier): scooters and drones approach and blast past, railing posts and lamps receding |
 | 215 | 330 | FOLLOW | |
 | 330 | 360 | `ch_lamp` | high on the rising hump: the drone formation reads from above |
 | 360 | (laugh) | `2.5_laugh` cutscene; `chase.cruise(true)` | |
