@@ -104,7 +104,7 @@ const input = (() => {
       let any = false;
       for (let i = 0; i < PADA.length; i++) {
         const a = PADA[i], b = g.buttons[CONFIG.pad[a]], d = !!(b && b.pressed);
-        if (d && !pPrev[a]) { push(a); any = true; }
+        if (d && !pPrev[a]) { push(a); any = true; gesture(); }   // (a pad press may count as activation: the audio unlock tries)
         pad[a] = d; pPrev[a] = d;
       }
       let x = g.axes[0] || 0, y = -(g.axes[1] || 0);
@@ -183,6 +183,15 @@ const input = (() => {
   });
   addEventListener('pointercancel', () => { I.pointer.down = false; ms.yes = ms.no = false; });
   addEventListener('contextmenu', (e) => e.preventDefault());
+  // Ghost taps: a touch tap's click lands on whatever is under the finger when it lifts, so a tap that opened a menu,
+  // a choice or a pop-up (PRESS YES, advancing a line) would also press the button that just appeared under it.
+  // A trusted click only counts on a button the same press started on.
+  let downEl = null;
+  addEventListener('pointerdown', (e) => { downEl = e.target; }, true);
+  addEventListener('click', (e) => {
+    const b = e.isTrusted && e.target.closest ? e.target.closest('button') : null;
+    if (b && !(downEl && b.contains(downEl))) { e.stopImmediatePropagation(); e.preventDefault(); }
+  }, true);
   addEventListener('focusin', (e) => { if (e.target.tagName === 'BUTTON') e.target.blur(); }); // Enter/Space are YES, never a native click
   addEventListener('gamepadconnected', () => { pads++; });
   addEventListener('gamepaddisconnected', () => { pads = Math.max(0, pads - 1); padClear(); });
@@ -250,14 +259,22 @@ function loadGame() {
   const st = Object.assign(newState(), s.state);
   if (!st.flags || typeof st.flags !== 'object' || Array.isArray(st.flags)) st.flags = {};
   for (const k of ['inventory', 'samples', 'names', 'bugs']) if (!Array.isArray(st[k])) st[k] = [];
-  if (typeof st.scene !== 'string') st.scene = '1.1';
+  if (typeof st.scene !== 'string' || st.scene === 'P' || !SCENES[st.scene]) st.scene = '1.1';   // (a save from another build)
+  if (typeof st.active !== 'string') st.active = 'luka';
   return st;
 }
 function hasSave() { return !!loadGame(); }
 function loadPrefs() { // boot: stored options and profile over the defaults (endingsSeen merged key by key)
   const s = readSave();
   if (!s) return;
-  if (s.options && typeof s.options === 'object') Object.assign(options, s.options);
+  if (s.options && typeof s.options === 'object') { // only known keys of the right type and range (a stale or hand-edited save can't break the text or the mix)
+    const OK = { controls: ['modern', 'tank'], textSpeed: ['slow', 'normal', 'fast'], textSize: ['normal', 'large'] };
+    for (const k in options) {
+      const v = s.options[k];
+      if (typeof v !== typeof options[k] || (OK[k] && !OK[k].includes(v))) continue;
+      options[k] = typeof v === 'number' ? (isFinite(v) ? Math.max(0, Math.min(1, v)) : options[k]) : v;
+    }
+  }
   if (s.profile && typeof s.profile === 'object') {
     const seen = s.profile.endingsSeen;
     Object.assign(profile, s.profile);

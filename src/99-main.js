@@ -189,7 +189,10 @@ async function boot() {
   const yes = document.createElement('button');
   yes.className = 'jv-b foc'; yes.textContent = 'YES';
   ld.querySelector('.jv-btns').append(yes);
-  input.gesture = () => { if (typeof AUDIO !== 'undefined') AUDIO.init(); };
+  // the audio unlock re-arms itself: a pad's YES is not a user gesture everywhere, so a later key, click, tap or pad
+  // press still starts (or resumes) the context. AUDIO.init() is idempotent and cheap once the context exists.
+  const unlock = () => { if (typeof AUDIO !== 'undefined') AUDIO.init(); input.gesture = unlock; };
+  input.gesture = unlock;
   TWO_TEST.ready = true;
   await new Promise((res) => {
     const f = () => { if (input.pressed('yes')) { input.consume('yes'); done(); } };
@@ -197,6 +200,7 @@ async function boot() {
     yes.onclick = done;
     addUpdate(f);
   });
+  if (typeof AUDIO !== 'undefined') AUDIO.init();   // (YES on a pad fired no key/pointer gesture: make the context now)
   ui.sfx('chime_ready');
   ld.classList.add('off');
   if (!profile.seenPrologue) { state = newState(); flow.start('P'); } else menus.title();   // P ends on the title (flow)

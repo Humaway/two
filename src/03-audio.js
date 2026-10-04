@@ -1838,6 +1838,7 @@ const { AUDIO, sfx, music } = (() => {
   function listener(camera) {
     if (!ctx || !camera) return;
     const e = camera.matrixWorld.elements, l = ctx.listener;
+    for (let i = 4; i < 15; i++) if (!isFinite(e[i])) return;   // a degenerate camera (NaN) must not throw every frame
     if (l.positionX) {
       l.positionX.value = e[12]; l.positionY.value = e[13]; l.positionZ.value = e[14];
       l.forwardX.value = -e[8]; l.forwardY.value = -e[9]; l.forwardZ.value = -e[10];

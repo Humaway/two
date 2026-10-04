@@ -1075,7 +1075,15 @@ const menus = (() => {
     if (b) return b;
     b = btns[k] = document.createElement('button'); b._k = k;
     b.append(document.createElement('span'), document.createElement('em'));
-    b.addEventListener('click', () => { if (M.mode === 'menu') { sel = b._k; paint(); act(); } });
+    b.addEventListener('click', (e) => {
+      if (M.mode !== 'menu') return;
+      sel = b._k;
+      const it = items[sel];
+      // a value (‹ Modern ›, a volume) by click or tap: the left half of the value steps back, anywhere else forward
+      // (touch has no left/right in menus, and a volume that only went up could never come down again)
+      if (it && it.adj && !it.act && !it.dis) { const r = b.lastChild.getBoundingClientRect(); ui.sfx('pop', { vol: 0.5 }); it.adj(e.clientX < r.left + r.width / 2 ? -1 : 1); paint(); return; }
+      paint(); act();
+    });
     b.addEventListener('pointerenter', () => { if (M.mode === 'menu' && sel !== b._k) { sel = b._k; paint(); } });
     return b;
   }
