@@ -292,10 +292,10 @@ from a seeded RNG (they landed one by one). Lights `setColorAt` Yes yellow × (0
 | `s37_l40_kneel` | [−1.65, 0, −12.35, −1.03] | Future Luka kneeling beside him, wrapping the bandage |
 | `s37_l40_edge`, `s37_c40_edge` | [3.8, 0, −11.95, 0], [4.6, 0, −11.95, 0] | 3.7_sorry: side by side at the parapet, facing the city, forearms on the cap |
 | `s37_l40_sit` | [−3.2, 0, −11.9, PI] | 3.7_staying: Future Luka sits next to his past self against the parapet |
-| `s37_st_chase` | [−0.3, 0, −18.25, PI] | 3.7_storage: at the Remote (JARVIS-CAM faces) |
-| `s37_st_luka` | [0.5, 0, −17.9, −2.66] | |
-| `s37_st_l40` | [0.95, 0, −17.45, −2.6] | leaning in, reading the small print |
-| `s37_st_c40` | [−0.95, 0, −17.45, 2.6] | |
+| `s37_st_chase` | [−0.36, 0, −17.77, 2.925] | 3.7_storage: at the Remote (JARVIS-CAM faces) |
+| `s37_st_luka` | [0.18, 0, −17.73, −2.882] | |
+| `s37_st_l40` | [0.91, 0, −17.51, −2.49] | leaning in, reading the small print |
+| `s37_st_c40` | [−1.10, 0, −17.53, 2.507] | |
 | `s37_f_chase`, `s37_f_luka` | [−0.9, 0, −18.95, H], [0.9, 0, −18.95, −H] | 3.7_fears: the two past selves face each other across the Remote; also the **hands** two-shot and the Choice |
 | `s37_f_l40`, `s37_f_c40` | [3.8, 0, −11.95, PI], [4.6, 0, −11.95, PI] | the two older men side by side, leaning back on the parapet, watching (Luka nods at them) |
 
@@ -321,15 +321,15 @@ from a seeded RNG (they landed one by one). Lights `setColorAt` Yes yellow × (0
 | `s32r_crane_b` | [6.0, −6.0, 6.0] | [−6.0, 9.5, −31.0] | 54 | crane end (6 s rise over the sign): the deck, the three at the hatch and the empty sleigh, the parapet with the countdown glow rising over it, the Valley's dimmed neon below, the river, the Story Bridge left of centre, the black-green storm overhead |
 | `s32r_feet` | [6.0, −10.0, −11.0] | [4.0, −4.0, 24.0] | 40 | (optional cut) from outside: **QUIET IN 00:17:00** glowing on the facade in the lower half, the parapet and the three's heads and shoulders above it — "under their feet" (they must be at `s32r_hatch_luka`/`s32r_drop`/`s32r_chase`, ≤ 2.5 m from the parapet) |
 | `facade_countdown` | [0.0, −19.0, −10.7] | [0.0, −17.0, 26.0] | 36 | INSERT the band alone (spare) |
-| `roof_hatch` | [8.0, 0.1, −12.9] | [7.2, 1.9, −14.6] | 44 | CLOSE the maintenance hatch: Luka hauls it open; below, dark |
+| `roof_hatch` | [8.0, 0.45, −12.95] | [10.6, 2.3, −14.9] | 46 | CLOSE the maintenance hatch: Luka hauls it open; below, dark |
 | `s32r_drop_shot` | [9.8, 1.3, −13.0] | [7.4, 1.6, −15.4] | 42 | Luka pulls off the beard and hat and drops them on the cardboard sleigh: "Right." |
 | `sleigh` | [11.0, 0.8, −12.4] | [10.2, 1.6, −17.4] | 46 | the photographer's view: the empty sleigh in the ring light's beam, the parapet and the storm city behind |
 | `yes_sign` | [0.0, 6.0, −36.0] | [0.0, 2.0, −20.0] | 40 | the Yes sign from the deck |
-| `s37_crane_a` | [0.0, 0.0, −16.0] | [2.0, 15.0, −44.0] | 52 | WIDE the roof at golden hour (crane start): high behind the crown, down over the Yes sign onto the roof, the ring glowing, the Valley to the shining river, the Story Bridge left, the CBD and the low sun right |
+| `s37_crane_a` | [0.0, 1.0, −4.0] | [1.5, 17.5, −35.3] | 52 | WIDE the roof at golden hour (crane start): high behind the crown, down over the Yes sign onto the roof, the ring glowing, the Valley to the shining river, the Story Bridge left, the CBD and the low sun right |
 | `s37_crane_b` | [0.0, −4.0, 10.0] | [−3.0, 6.0, −33.0] | 56 | crane end: lower, over the deck; steam rising from the puddles, the collapsed sleigh and the beard in its puddle at frame left |
 | `s37_remote_mid` | [0.0, 0.7, −18.9] | [−2.2, 1.5, −16.6] | 44 | MID: the ring of four hundred, the Remote on the soggy present, Chase wiring it into the brick phone |
 | `s37_bandage` | [−2.1, 0.75, −12.0] | [−0.6, 0.95, −13.9] | 40 | CLOSE: Luka against the parapet, Future Luka wrapping his ribs (the lens sits in the ring's gap) |
-| `s37_sorry_two` | [4.2, 1.45, −11.8] | [−0.6, 1.6, −12.3] | 34 | 3.7_sorry: **one locked two-shot**, side-on along the parapet: both in profile, the city falling away screen-right |
+| `s37_sorry_two` | [3.4, 1.2, −11.6] | [7.9, 1.8, −9.3] | 38 | 3.7_sorry: **one locked two-shot** from beyond the parapet's east end: both faces three-quarter (side-on profiles 0.8 m apart hide each other), the city and the low sun behind them, the facade dropping away screen-left |
 | `s37_c40_close` | [4.6, 1.6, −11.95] | [5.6, 1.62, −9.9] | 34 | CLOSE Chase (2040): he laughs and it turns into something else (a floating lens 1 m beyond the parapet) |
 | `s37_staying_two` | [−2.8, 0.75, −11.9] | [−2.8, 1.0, −14.6] | 42 | the two Lukas against the parapet, the ring's pods glowing in the lower frame |
 | `s37_check` | [0.0, 0.75, −18.9] | [0.9, 1.25, −17.2] | 40 | MID: Chase at the Remote, the pre-call check ("Drones are at… ^ 3%") |

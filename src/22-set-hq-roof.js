@@ -63,7 +63,7 @@
 //   sleigh's front board is low (top 0.7) so the dropped hat/beard read on the seat (hat (10.45, 0.62, -12.6), beard
 //   (9.95, 0.645, -12.35)); the brick phone is art's PROPS.brick_phone (no t_brick); re-aimed anchors: s32r_crane_a (the
 //   letters are now y 3.2..11.2), s32r_feet, roof_hatch, s32r_drop_shot, sleigh, s37_bandage (both heads in, Luka 3/4
-//   front), s37_sorry_two (3/4 front from beyond the parapet: side-on profiles 0.8 m apart hide each other),
+//   front), s37_sorry_two (3/4 front from beyond the parapet's east end, the city behind: side-on profiles hide each other),
 //   s37_staying_two (lens 1.4 m further north so the outer row glows along the bottom), s37_check (over kneeling Chase's
 //   right shoulder: the spec's lens stood on s37_st_l40 and saw only his back; use it before the four gather),
 //   remote_screen (lens 0.25 m further back so standing faces fit the JARVIS fov), a1_hands_slate (from in front and
@@ -1089,7 +1089,7 @@ SETS.hq_roof = (() => {
       // 3.7
       s37_chase_remote: [0.0, 0, -18.3, PI], s37_luka_sit: [-2.4, 0, -11.9, PI], s37_l40_kneel: [-1.65, 0, -12.35, -1.03],
       s37_l40_edge: [3.8, 0, -11.95, 0], s37_c40_edge: [4.6, 0, -11.95, 0], s37_l40_sit: [-3.2, 0, -11.9, PI],
-      s37_st_chase: [-0.3, 0, -18.25, PI], s37_st_luka: [0.5, 0, -17.9, -2.66], s37_st_l40: [0.95, 0, -17.45, -2.6], s37_st_c40: [-0.95, 0, -17.45, 2.6],
+      s37_st_chase: [-0.36, 0, -17.77, 2.925], s37_st_luka: [0.18, 0, -17.73, -2.882], s37_st_l40: [0.91, 0, -17.51, -2.49], s37_st_c40: [-1.10, 0, -17.53, 2.507],   // 3.7's arc: every face clear of the next from the Remote's screen
       s37_f_chase: [-0.9, 0, -18.95, H], s37_f_luka: [0.9, 0, -18.95, -H], s37_f_l40: [3.8, 0, -11.95, PI], s37_f_c40: [4.6, 0, -11.95, PI],
       // A1 / B1
       a1_luka: [0.6, 0, -17.6, -2.4], a1_l40: [1.3, 0, -16.9, 0.75], a1_chase: [-0.6, 0, -17.6, 2.4], a1_c40: [-1.3, 0, -16.9, -0.75],
@@ -1102,15 +1102,15 @@ SETS.hq_roof = (() => {
       s32r_crane_b:     { at: [6.0, -6.0, 6.0], from: [-6.0, 9.5, -31.0], fov: 54 },
       s32r_feet:        { at: [6.0, -7.0, -11.0], from: [4.0, 1.0, 24.0], fov: 46 },
       facade_countdown: { at: [0.0, -19.0, -10.7], from: [0.0, -17.0, 26.0], fov: 36 },
-      roof_hatch:       { at: [8.0, 0.1, -12.9], from: [9.1, 1.95, -14.8], fov: 44 },
+      roof_hatch:       { at: [8.0, 0.45, -12.95], from: [10.6, 2.3, -14.9], fov: 46 },   // from the east: the shaft, the lid side-on, Luka whole at s32r_hatch_luka
       s32r_drop_shot:   { at: [9.6, 1.15, -13.2], from: [8.05, 1.6, -12.0], fov: 46 },
       sleigh:           { at: [11.1, 0.85, -12.4], from: [9.7, 1.7, -17.8], fov: 46 },
       yes_sign:         { at: [0.0, 6.0, -36.0], from: [0.0, 2.0, -20.0], fov: 40 },
-      s37_crane_a:      { at: [0.0, 0.0, -16.0], from: [2.0, 15.0, -44.0], fov: 52 },
+      s37_crane_a:      { at: [0.0, 1.0, -4.0], from: [1.5, 17.5, -35.3], fov: 52 },   // over the letters' tops (y 11.2) and south of them: a -> b never crosses the sign
       s37_crane_b:      { at: [0.0, -4.0, 10.0], from: [-3.0, 6.0, -33.0], fov: 56 },
       s37_remote_mid:   { at: [0.0, 0.7, -18.9], from: [-2.2, 1.5, -16.6], fov: 44 },
       s37_bandage:      { at: [-2.05, 0.72, -12.1], from: [-3.15, 1.18, -14.0], fov: 42 },
-      s37_sorry_two:    { at: [4.25, 1.45, -11.95], from: [1.5, 1.75, -9.75], fov: 32 },
+      s37_sorry_two:    { at: [3.4, 1.2, -11.6], from: [7.9, 1.8, -9.3], fov: 38 },   // from beyond the parapet's east end: both faces 3/4, the city + the low sun behind (not the lift house)
       s37_c40_close:    { at: [4.6, 1.6, -11.95], from: [5.6, 1.62, -9.9], fov: 34 },
       s37_staying_two:  { at: [-2.8, 0.68, -11.9], from: [-2.8, 0.78, -16.0], fov: 32 },
       s37_check:        { at: [-0.12, 0.72, -18.81], from: [0.65, 1.55, -17.85], fov: 40 },
