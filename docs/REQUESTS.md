@@ -5,10 +5,10 @@ Source reports are in `docs/reports/`.
 
 ## Sets
 
-- [ ] **parade** — add `s17_pass`, `s17_turn`, `s18_pass` to `SETS.parade.paths` (1.7/1.8 currently inject them at runtime in `63-content-1-7-1-8.js`; remove the injection after).
-- [ ] **parade** — Region W (Woody Point) has no kettle/urn: add a save point mark + hotspot spot (e.g. a kiosk urn) for 2.3/B2.
-- [ ] **parade** — anchor `s23_plaque` camera sits inside an actor standing at `s23_plaque_look`: move the lens to ≈ `[-300.48, 1.02, -0.6]` (or the mark back to z −1.2).
-- [ ] **parade** — `s22_c40_close` frames the back of Chase (2040)'s head at `s22_c40_edge`; `s22_piano_cam` / `s22_drone_piano` put the drone between camera and bench, seated heads below the 1.3 m lid.
+- [x] **parade** — add `s17_pass`, `s17_turn`, `s18_pass` to `SETS.parade.paths` (1.7/1.8 currently inject them at runtime in `63-content-1-7-1-8.js`; remove the injection after). **Done:** in `PATHS` with the same values (the content's `if (!p[k])` fill is now a no-op; `paths()`/`PATHS17` can go).
+- [x] **parade** — Region W (Woody Point) has no kettle/urn: add a save point mark + hotspot spot (e.g. a kiosk urn) for 2.3/B2. **Done:** a coffee cart by the picnic shelter (local (11, −10.6)) with prop `urn_w` (`steam()`), mark `kettle_w`, anchor `urn_w`; hotspot `{ at: 'urn_w', r: 1.2, kettle: true }`.
+- [x] **parade** — anchor `s23_plaque` camera sits inside an actor standing at `s23_plaque_look`: move the lens to ≈ `[-300.48, 1.02, -0.6]` (or the mark back to z −1.2). **Done:** lens moved to `[-300.48, 1.02, -0.6]`, fov 30 (2.3's own `PLAQUE` lens).
+- [x] **parade** — `s22_c40_close` frames the back of Chase (2040)'s head at `s22_c40_edge`; `s22_piano_cam` / `s22_drone_piano` put the drone between camera and bench, seated heads below the 1.3 m lid. **Done:** `s22_c40_close` now frontal (from `[7.3, 1.62, -16.35]`); `s22_piano_cam` = 2.2's `BOTH_FRONT` lens high over the lid; `s22_drone_piano` → `[8.35, 1.9, -21.6]` (2.2's `PIANO_TOP`, off the bench lenses).
 - [ ] **flat** — the `s21_*` anchors don't match `docs/sets/flat.md`; floor setup doesn't allow lying down on couch/bed (2.1 sleepers sit up).
 - [ ] **sandgate** — `queue.bubble` returns head + 0.28 m, the doc says + 0.4 m (sizzle compensates).
 
@@ -33,7 +33,7 @@ Source reports are in `docs/reports/`.
 
 - [ ] **hq_top** — optional lamp preset near `mgr_turn` (the 3.3 badge insert is dark).
 
-- [ ] **parade** — a `coffees` prop in Region W for B2 (B2 builds two cups in its file, like foreshore26 has).
+- [x] **parade** — a `coffees` prop in Region W for B2 (B2 builds two cups in its file, like foreshore26 has). **Done:** `coffees` (+ `coffee_luka40`, `coffee_chase40`) with foreshore26's API `show(who|'both', on)`, `hold(who, on, hand)`, `home()`; homes = B2's spots (seat by Luka (2040)'s hip, pad by Chase (2040)'s foot); hidden by every `dress()`, so B2's own cups are unaffected until it switches; anchor `coffees_w`.
 - [ ] **reddy40** — an optional caption mode for the address canvas ("THE MANAGER" for the B1 2037 frame).
 - [ ] **sets (optional)** — a funeral frame for B1's 2035 (B1 builds a small hall at load, parked in reddy26 at (40, −60, −40)).
 

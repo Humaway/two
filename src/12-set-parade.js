@@ -18,7 +18,8 @@
 //   REGION W (built in local coordinates; world = local + W0, W0 = [-300, 0, 0]); only one region ever draws:
 //     bench at local (0,0,0) facing +Z (1.9 m, seat 0.45, top rail 0.8..0.9 at z -0.24, memorial plaque on its rear face
 //     at (0, 0.84, -0.275)), concrete pad, path z -9.1..-6.9, railing z 6.5 (x -22..22), headland wall + rocks to the water
-//     (y -2.6), Norfolk pines, picnic shelter (14,-12), blank council sign (-8.5,-9.8), padded bin (4.5,-9.6), pandanus,
+//     (y -2.6), Norfolk pines, picnic shelter (14,-12) + coffee cart (11,-10.6; its urn is the region's kettle),
+//     blank council sign (-8.5,-9.8), padded bin (4.5,-9.6), pandanus,
 //     Woody jetty stub x 24.8..27.2, bell buoy (10,-2.6,70), houses z -55..-65; bridge A(105,-2.6,365) -> B(-100,-2.6,372).
 // Region visibility: dress() sets it per state; update() also follows the render camera (x < -150 -> W) so a shot in the
 // other region never shows an empty world (setview, credits vignettes).
@@ -33,13 +34,13 @@
 //   s22_piano_c40 s22_c40_edge s22_luka_hide s22_sneak_1..3 s22_exit s22_cp_lane s22_sample_cicadas
 //   s23_walk_luka s23_walk_chase s23_walk_c40 s23_c40_stop s23_chase_stop s23_luka_stop s23_plaque_look s23_sit_prompt
 //   s23_seat_luka s23_seat_chase s23_seat_c40 s23_c40_elbow b2_luka40 b2_c40 b2_crowd_1..5 b2_stop_1..5 b2_kid_start
-//   b2_kid_stop b2_pelican_land b1_33_luka b1_33_chase
+//   b2_kid_stop b2_pelican_land b1_33_luka b1_33_chase kettle_w (Region W's save point: hotspot at 'urn_w', kettle: true)
 // Anchors: s17_crane_a s17_crane_b s17_lifeguard s17_track s17_car_turn s17_plaque s17_plaque_mid s17_pov_chip blank_sign tree
 //   bollard kiosk hover_parked jetty_waves pelican_pole jetty_man skate_kid chips_window flat_door s17_dusk_exit urn
 //   s18_ext_window s22_lane_track s22_statues s22_drone_end s22_ar_tag s22_limiter s22_keypad s22_piano_play s22_piano_cam
 //   s22_c40_close s22_lane_bay s22_luka_hiss s22_exit b1_2031_poster crane_sky_p wp_canon s23_path_wide s23_plaque
 //   s23_rail_a s23_rail_b s23_seat s23_bench_front s23_c40_close s23_storm b2_slate b2_wide_path b2_crane_a b2_crane_b
-//   credits_bench credits_bridge b1_2033_jetty
+//   credits_bench credits_bridge b1_2033_jetty urn_w coffees_w
 // Cams (zones in brackets): fp_far_west fp_west fp_mid fp_east chips carpark_fs jetty_plaza jetty_near jetty_end park_west
 //   park_east lane_mouth lane_end wp_canon wp_bench_close wp_bench_front
 // Props (userData API): region_p region_w · hovercar_hero drive(pathId, speed)->Promise, indicate(on), stop() ·
@@ -51,12 +52,14 @@
 //   limiter_plate lift(u), prop(bool) · keypad press(d) · lane_bollards up(bool) · statues · lane_palm · water_p foam_p
 //   glitter_p · bench glint(u|null), polished(bool) · memorial_plaque · frangipani · bench_pad · railing_w ·
 //   bell_buoy · storm_clouds build(u), flicker(on) · puddles · slate_speaker screen('off'|'drafts'|'sent'|'play') ·
-//   skateboard ride(actorId|null) · woody_jetty · council_sign_w · grass_w · water_w foam_w ·
+//   skateboard ride(actorId|null) · woody_jetty · council_sign_w · coffee_cart_w · urn_w steam() ·
+//   coffees (luka40/chase40 cups, hidden by every dress()) show(who | 'both', on), hold(who, on = true, hand = 'L'), home() ·
+//   grass_w · water_w foam_w ·
 //   band_p/_w band_skirt_p/_w haze_p/_w bridge_p/_w bridge_lights_p/_w sun_p/_w clouds_p/_w
 // Env: day golden dusk evening morning wp_morning wp_washed wp_sunset (first = default).
 // Dress states: day17 evening18 lane22 festival31 (P) · bench23 xmas40 sunset33 credits (W). AUTO by scene id:
 //   1.7 day17 · 1.8 evening18 · 2.2 lane22 · 2.3 bench23 · B2 xmas40 · C credits · anything else day17.
-// Extras on the entry: W0, dress(state), region(), paths{}, ar[], lightsLevel().
+// Extras on the entry: W0, dress(state), region(), paths{} (incl. s17_pass s17_turn s18_pass), ar[], lightsLevel().
 SETS.parade = (() => {
   const PI = Math.PI, H = PI / 2, TAU = PI * 2;
   const WX = -300, W0 = [WX, 0, 0];
@@ -1131,7 +1134,7 @@ SETS.parade = (() => {
     for (let i = 2; i < 7; i++) { const [ax, az] = COAST[i], [bx, bz] = COAST[i + 1]; const L = Math.hypot(bx - ax, bz - az); const g = new THREE.BoxGeometry(L, 0.16, 0.5); g.rotateY(-Math.atan2(bz - az, bx - ax)); g.translate((ax + bx) / 2, 0.02, (az + bz) / 2); put(g, 0xe0c898); }
     gnd(-40, -9.1, 40, -6.9, 0.02, M.pave, 1.4, CONC);                                       // the path
     gnd(-40, -11.6, 40, -9.5, 0.012, M.vc, 2, 0x6a5a40);                                     // garden bed
-    seed = 33; for (let x = -39; x < 40; x += 1.5 + rnd() * 1.2) ico(0.36 + rnd() * 0.18, [0x4f8a3e, 0x5c9644, 0x68a04c, 0x5a8a50][Math.floor(rnd() * 4)], x, 0.16, -10.7 + rnd() * 0.5, 0.55);
+    seed = 33; for (let x = -39; x < 40; x += 1.5 + rnd() * 1.2) { const r = 0.36 + rnd() * 0.18, col = [0x4f8a3e, 0x5c9644, 0x68a04c, 0x5a8a50][Math.floor(rnd() * 4)], z = -10.7 + rnd() * 0.5; if (x < 9.7 || x > 12.3) ico(r, col, x, 0.16, z, 0.55); }   // (the coffee cart stands in the gap at x 11)
     bb(-1.2, 0, -0.6, 1.2, 0.04, 0.6, 0xc8c4bc);                                              // the pad
     for (const [x, z, r] of [[-12.5, 5.7, 0.5], [-7.2, 5.9, 0.38], [-3.8, 5.6, 0.32], [4.6, 5.8, 0.42], [8.8, 5.6, 0.36], [13.4, 5.8, 0.5]]) { ico(r, 0x5a8a48, x, r * 0.35, z, 0.55); ico(r * 0.7, 0x6c9a50, x + r * 0.7, r * 0.25, z - 0.2, 0.5); }   // pigface by the railing
     // railing: two rails (posts instanced)
@@ -1184,6 +1187,40 @@ SETS.parade = (() => {
     R.puddles = addW(part('puddles', () => { for (const [x, z, w, d] of [[-6, -8.2, 1.4, 0.7], [-2.6, -7.5, 1.0, 0.5], [3.2, -8.4, 1.6, 0.8], [7.6, -7.8, 0.9, 0.5], [0.8, 0.3, 0.9, 0.45], [-0.7, -0.45, 0.7, 0.35]]) tq(w, d, [64, 0, 64, 64], x, z > -1 ? 0.045 : 0.03, z, 0.3, -H, M.atlasT, 128, 64); }, null, 0, { floor: false }));
     // ---- props: council sign, bin, Woody jetty, bell buoy, slate speaker, skateboard
     addW(part('council_sign_w', () => { bb(-0.05, 0, -0.05, 0.05, 1.95, 0.05, 0x6a6e74); bb(-0.52, 1.18, -0.06, 0.52, 1.92, -0.02, 0xd8dce0); tq(1.0, 0.7, W_BLANK, 0, 1.55, -0.015, 0, 0, M.atlasW, 256, 128); }, [-8.5, 0, -9.8]));
+    // the coffee cart by the picnic shelter (local (11, -10.6), serving hatch to the path): Region W's kettle is its
+    // hot-water urn (prop urn_w, steam()); stacked cups, a blank menu board (no AR here), a striped canopy
+    addW(part('coffee_cart_w', () => {
+      const BODY = 0x3f6f60, TRIM = 0xe8e2d4, TOP = 0xb8b2a6, CAN = 0xf2eee4, STRIPE = 0x4f8a78;
+      bb(-0.8, 0.2, -0.42, 0.8, 1.0, 0.42, BODY); bb(-0.8, 0.2, 0.42, 0.8, 0.26, 0.44, TRIM); bb(-0.8, 0.94, 0.42, 0.8, 1.0, 0.44, TRIM);
+      bb(-0.86, 1.0, -0.46, 0.86, 1.05, 0.54, TOP);                                                     // counter (overhangs the hatch)
+      for (const sx of [-1, 1]) { cyl(0.2, 0.2, 0.07, 12, 0x1c1c1c, sx * 0.5, 0.2, -0.44, H); cyl(0.07, 0.07, 0.075, 8, 0x8a8e94, sx * 0.5, 0.2, -0.44, H); }
+      bb(-0.74, 0, 0.3, -0.68, 0.2, 0.36, 0x2a2c30); bb(0.68, 0, 0.3, 0.74, 0.2, 0.36, 0x2a2c30);       // front legs
+      for (const [x, z] of [[-0.8, -0.4], [0.8, -0.4], [-0.8, 0.5], [0.8, 0.5]]) bb(x - 0.025, 1.05, z - 0.025, x + 0.025, 2.1, z + 0.025, 0x8a8e94);
+      for (let k = 0; k < 8; k++) boxR(0.24, 0.05, 1.3, k % 2 ? STRIPE : CAN, -0.84 + k * 0.24, 2.14, 0.05, 0.12);   // canopy, tipped to the hatch
+      for (let k = 0; k < 8; k++) bb(-0.96 + k * 0.24, 1.98, 0.66, -0.72 + k * 0.24, 2.1, 0.68, k % 2 ? STRIPE : CAN);   // valance
+      for (let k = 0; k < 3; k++) cyl(0.04, 0.032, 0.11, 8, 0xf4f2ec, -0.5, 1.105 + k * 0.03, 0.22);    // a stack of takeaway cups
+      cyl(0.045, 0.045, 0.012, 8, 0xf8f8f6, -0.28, 1.056, 0.24); bb(-0.15, 1.05, 0.1, 0.05, 1.16, 0.3, 0x5a3a26);   // lids, a tip jar box
+      bb(-0.05, 0, 0.62, 0.05, 0.85, 0.66, 0x2a2c30); bb(-0.32, 0.5, 0.63, 0.32, 0.95, 0.65, 0x2a2c30); bb(-0.29, 0.53, 0.652, 0.29, 0.92, 0.66, 0xe4e6e2);   // menu board (blank)
+    }, [11.0, 0, -10.6]));
+    R.urnW = addW(part('urn_w', () => {
+      cyl(0.15, 0.16, 0.04, 12, 0x3a3e44, 0, 0.02, 0); cyl(0.13, 0.13, 0.36, 12, 0xd8dce2, 0, 0.22, 0); cyl(0.135, 0.135, 0.03, 12, 0xb8bec4, 0, 0.39, 0);
+      cyl(0.05, 0.07, 0.05, 10, 0x2a2c30, 0, 0.44, 0); boxR(0.04, 0.04, 0.1, 0x2a2c30, 0, 0.11, 0.14); bb(-0.02, 0.05, 0.17, 0.02, 0.1, 0.21, 0x2a2c30);
+      boxR(0.045, 0.045, 0.03, 0xe83a3a, 0.07, 0.28, 0.12);
+    }, [11.35, 1.05, -10.35], 0, { floor: false }));
+    R.urnW.userData.steam = () => { if (typeof world !== 'undefined' && world.puff) world.puff([WX + 11.35, 1.5, -10.35], { n: 16, speed: 0.25, life: 1.8, color: 0xf2f2f2 }); };
+    // the two takeaway coffees (B2: Luka (2040)'s on the seat by his hip, Chase (2040)'s on the pad by his foot); hidden
+    // until show(): separate meshes so content can put one in a hand (hold), as foreshore26's coffees
+    R.coffees = addW(new THREE.Group()); R.coffees.name = 'coffees'; R.cups = {};
+    for (const who of ['luka40', 'chase40']) {
+      const h = CUP_W[who], g = part('coffee_' + who, () => {
+        cyl(0.043, 0.031, 0.12, 10, 0xf4f2ec, 0, 0.064, 0); cyl(0.0425, 0.036, 0.046, 10, 0x9a6a3e, 0, 0.068, 0);
+        cyl(0.046, 0.046, 0.012, 10, 0xf8f8f6, 0, 0.13, 0); cyl(0.038, 0.044, 0.01, 10, 0xeeeeea, 0, 0.14, 0); bb(0.012, 0.144, -0.006, 0.028, 0.1465, 0.006, 0x3a2a20);
+      }, h, h[3], { floor: false });
+      g.visible = false; R.coffees.add(g); R.cups[who] = { mesh: g, held: null };
+    }
+    R.coffees.userData.show = (who, on = true) => { for (const k in R.cups) if (who === 'both' || who === k || who == null) R.cups[k].mesh.visible = !!on; };
+    R.coffees.userData.hold = (who, on = true, hand = 'L') => holdCupW(who, on, hand);
+    R.coffees.userData.home = () => { for (const k in R.cups) homeCupW(k); };
     addW(part('bin_w', () => { cyl(0.3, 0.27, 0.95, 10, CREAM, 0, 0.475, 0); cyl(0.31, 0.31, 0.06, 10, SEAM, 0, 0.95, 0); for (const y of [0.3, 0.62]) cyl(0.305, 0.305, 0.03, 10, SEAM, 0, y, 0); }, [4.5, 0, -9.6]));
     R.wjetty = addW(part('woody_jetty', () => {
       bb(24.8, -1.3, 4, 27.2, -1.0, 40, TIMBER); for (let z = 4.5; z < 40; z += 0.9) bb(24.81, -1.005, z, 27.19, -0.996, z + 0.04, 0x847664);
@@ -1243,6 +1280,23 @@ SETS.parade = (() => {
     });
   }
 
+  const CUP_W = { luka40: [0.42, 0.465, 0.06, 0.6], chase40: [-0.86, 0.03, 0.42, -0.4] };   // Region W local [x, y, z, ry]
+  function holdCupW(who, on, hand) {   // into the actor's grip (as the rigs' mug); on = false puts it back
+    const c = R.cups && R.cups[who]; if (!c) return;
+    if (!on) { homeCupW(who); return; }
+    const a = typeof world !== 'undefined' && world.actors ? world.actors.get(who) : null;
+    const g = a && a.rig && a.rig.attach ? a.rig.attach[hand === 'R' ? 'gripR' : 'gripL'] : null;
+    if (!g) return;
+    g.add(c.mesh); c.held = g;
+    c.mesh.position.set(0, -0.02, -0.04); c.mesh.rotation.set(H, 0, 0); c.mesh.scale.setScalar(1 / ((a.rig.d && a.rig.d.s) || 1));
+    c.mesh.visible = true;
+  }
+  function homeCupW(who) {
+    const c = R.cups && R.cups[who]; if (!c) return;
+    if (c.held) { R.coffees.add(c.mesh); c.held = null; }
+    const h = CUP_W[who]; c.mesh.position.set(h[0], h[1], h[2]); c.mesh.rotation.set(0, h[3], 0); c.mesh.scale.setScalar(1);
+  }
+
   // ---------------------------------------------------------- build
   function build() {
     COL.length = 0; T = textures(); initMats();
@@ -1252,7 +1306,8 @@ SETS.parade = (() => {
     buildP(R.rp);
     buildW(R.rw);
     COL.push([-322, 6.3, -278, 6.7], [-317, -10.4, -316, 6.7], [-284, -10.4, -283, 6.7], [-317, -10.4, -283, -10],
-      [-301.0, -0.3, -299.0, 0.3], [-308.7, -9.95, -308.3, -9.65], [-295.8, -9.9, -295.2, -9.3], [-318.6, 3.4, -317.4, 4.6]);
+      [-301.0, -0.3, -299.0, 0.3], [-308.7, -9.95, -308.3, -9.65], [-295.8, -9.9, -295.2, -9.3], [-318.6, 3.4, -317.4, 4.6],
+      [-289.86, -11.05, -288.14, -9.98]);   // the coffee cart (its counter overhang)
     R.fars = [R.far_p, R.far_w];
     R.scene = typeof state !== 'undefined' && state ? state.scene : null; R.env = null;   // dressed below for this scene: update re-dresses on the next change R.dressed = null; R.region = null; R.level = 0; R.levelTo = 0; R.levelDrawn = -1;
     R.torchOwned = false; R.ambKey = null; R.chirpT = 0; R.bellT = 0; R.bellUp = false; R.lifeLit = '';
@@ -1327,6 +1382,7 @@ SETS.parade = (() => {
     R.slate.visible = false; R.slate.userData.screen('off');
     R.skate.visible = st === 'xmas40'; R.rider = null; R.skate.position.set(-14.5, 0, -8.2); R.skate.rotation.y = H;
     R.pelWOn = st === 'xmas40';
+    R.coffees.userData.home(); R.coffees.userData.show('both', false);
     setRegion(reg);
     sendAmbience();
   }
@@ -1635,7 +1691,7 @@ SETS.parade = (() => {
     // 2.2
     s22_enter_luka: [7.6, 0, -4.4, PI], s22_enter_chase: [9.4, 0, -4.2, PI], s22_enter_c40: [8.5, 0, -3.5, PI],
     s22_stop_luka: [7.5, 0, -12.0, PI], s22_stop_chase: [9.4, 0, -12.4, PI], s22_stop_c40: [8.5, 0, -11.2, PI],
-    s22_drone: [10.0, 1.9, -31.0, 0], s22_drone_piano: [8.3, 2.2, -20.0, H], s22_chip_c40: [7.0, 0, -16.8, 2.64],
+    s22_drone: [10.0, 1.9, -31.0, 0], s22_drone_piano: [8.35, 1.9, -21.6, H], s22_chip_c40: [7.0, 0, -16.8, 2.64],
     s22_plate_luka: [8.05, 0, -18.5, PI], s22_keypad: [8.6, 0, -18.5, PI], s22_piano_chase: [9.45, 0, -20.3, -H], s22_piano_c40: [9.45, 0, -19.6, -H],
     s22_c40_edge: [6.6, 0, -15.4, 2.61], s22_luka_hide: [7.0, 0, -21.5, 0.6],
     s22_sneak_1: [6.8, 0, -17.0, PI], s22_sneak_2: [6.8, 0, -25.0, PI], s22_sneak_3: [7.0, 0, -31.5, PI], s22_exit: [13.2, 0, -33.0, H],
@@ -1652,10 +1708,16 @@ SETS.parade = (() => {
     b2_kid_start: [-315.0, 0, -8.2, H], b2_kid_stop: [-302.2, 0, -8.4, 0.3], b2_pelican_land: [-294.4, 1.07, 6.5, PI],
     // optional B1 frames (the Woody jetty, sunset33)
     b1_33_luka: [-274.5, -1.0, 21.6, 0.3], b1_33_chase: [-273.6, -1.0, 21.9, -0.4],
+    // Region W's save point: the coffee cart's urn by the picnic shelter (hotspot at: 'urn_w', kettle: true)
+    kettle_w: [-288.7, 0, -9.35, PI],
   };
   const PATHS = {   // [[x, z], ...]: drones fly at their own height, cars at the road
     car17_track: [[10, 3.0], [-44, 3.0], [-47, 6.5], [-47, 14]],
     car18_ext: [[14, -1.0], [48, -1.0]],
+    // the hero car's legs in 1.7 / 1.8 (63-content-1-7-1-8.js used to add these at runtime; identical values)
+    s17_pass: [[-3, 3.0], [-44, 3.0], [-47, 6.5], [-47, 14]],
+    s17_turn: [[-39.5, 3.0], [-44, 3.0], [-47, 6.5], [-47, 16]],
+    s18_pass: [[17, -1.0], [52, -1.0]],
     walk_fp: [[-40, -5.4], [40, -5.4]], walk_prom: [[-40, 6.7], [40, 6.7]],
     s17_patrol_park: [[4.4, 10.8], [12.4, 10.8], [12.4, 15.8], [4.4, 15.8]],   // loop round the wrapped tree (8.4, 13.2)
     s17_patrol_plaza: [[-18, 10], [-7, 10], [-7, 16], [-18, 16]],
@@ -1724,8 +1786,8 @@ SETS.parade = (() => {
       s22_limiter:    { at: [8.3, 0.86, -19.13], from: [8.3, 1.1, -18.5], fov: 34 },
       s22_keypad:     { at: [8.39, 0.86, -19.12], from: [8.36, 1.08, -18.72], fov: 30 },
       s22_piano_play: { at: [8.6, 0.95, -20.0], from: [10.4, 1.75, -20.9], fov: 40 },
-      s22_piano_cam:  { at: [9.5, 1.15, -19.95], from: [7.15, 2.05, -19.95], fov: 44 },
-      s22_c40_close:  { at: [6.6, 1.6, -15.4], from: [7.8, 1.6, -14.2], fov: 36 },
+      s22_piano_cam:  { at: [9.45, 1.12, -19.95], from: [7.3, 2.6, -19.95], fov: 44 },   // high over the lid: both seated faces
+      s22_c40_close:  { at: [6.6, 1.58, -15.4], from: [7.3, 1.62, -16.35], fov: 36 },    // in front of him at s22_c40_edge
       s22_lane_bay:   { at: [-30.0, 3.0, 380], from: [8.2, 1.62, -15.2], fov: 30 },
       s22_luka_hiss:  { at: [7.0, 1.0, -21.5], from: [7.6, 1.3, -23.2], fov: 40 },
       s22_exit:       { at: [13.2, 0.9, -33.2], from: [7.0, 2.6, -28.8], fov: 46 },
@@ -1734,7 +1796,7 @@ SETS.parade = (() => {
       // Region W (world)
       wp_canon:        { at: [-300.5, 0.7, 4.0], from: [-298.5, 2.0, -13.0], fov: 40 },
       s23_path_wide:   { at: [-306.0, 1.0, -8.0], from: [-304.0, 1.7, -30.0], fov: 22 },
-      s23_plaque:      { at: [-300.0, 0.84, -0.27], from: [-300.0, 0.95, -0.78], fov: 26 },
+      s23_plaque:      { at: [-300.0, 0.84, -0.27], from: [-300.48, 1.02, -0.6], fov: 30 },   // beside the reader's shoulder at s23_plaque_look
       s23_rail_a:      { at: [-300.7, 0.86, -0.24], from: [-301.2, 1.08, -0.82], fov: 30 },
       s23_rail_b:      { at: [-299.3, 0.86, -0.24], from: [-299.8, 1.08, -0.82], fov: 30 },
       s23_seat:        { at: [-300.25, 0.47, 0.05], from: [-300.3, 1.5, -0.45], fov: 34 },
@@ -1748,6 +1810,8 @@ SETS.parade = (() => {
       credits_bench:   { at: [-300.0, 0.6, 0.0], from: [-296.2, 1.4, -4.6], fov: 40 },
       credits_bridge:  { at: [-300.0, 4.0, 368], from: [-300.0, 1.6, 5.5], fov: 14 },
       b1_2033_jetty:   { at: [-274.0, -0.2, 22.0], from: [-282.0, 0.4, 12.0], fov: 38 },
+      urn_w:           { at: [-288.65, 1.22, -10.35], from: [-288.85, 1.55, -9.2], fov: 34 },   // Region W's kettle (the cart's urn)
+      coffees_w:       { at: [-300.2, 0.3, 0.2], from: [-299.7, 1.05, 1.25], fov: 36 },      // B2: the two cups by the bench
     },
     cams: {
       fp_far_west:    { type: 'pan', pos: [-27.0, 4.6, 2.2], base: [-40.0, 0.8, -5.2], look: 'player', fov: 44, limit: 0.55 },
@@ -1794,7 +1858,7 @@ SETS.parade = (() => {
       'billboard_blank', 'kiosk', 'chip_shop_window', 'awning_tinsel', 'urn', 'flat_door', 'flat_window', 'window_figures', 'flat_balcony_lights',
       'stage_2031', 'poster_2031', 'piano', 'limiter_light', 'limiter_plate', 'keypad', 'lane_bollards', 'statues', 'lane_palm', 'water_p', 'foam_p',
       'glitter_p', 'bench', 'memorial_plaque', 'frangipani', 'bench_pad', 'railing_w', 'bell_buoy', 'storm_clouds', 'puddles', 'slate_speaker',
-      'skateboard', 'woody_jetty', 'council_sign_w', 'grass_w', 'water_w', 'foam_w', 'band_p', 'band_w', 'band_skirt_p', 'band_skirt_w', 'haze_p', 'haze_w',
+      'skateboard', 'woody_jetty', 'council_sign_w', 'coffee_cart_w', 'urn_w', 'coffees', 'coffee_luka40', 'coffee_chase40', 'grass_w', 'water_w', 'foam_w', 'band_p', 'band_w', 'band_skirt_p', 'band_skirt_w', 'haze_p', 'haze_w',
       'bridge_p', 'bridge_w', 'bridge_lights_p', 'bridge_lights_w', 'sun_p', 'sun_w', 'clouds_p', 'clouds_w',
     ],
     get ambience() { return AMB[ambKey()] || AMB.day17; },
