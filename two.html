@@ -19914,7 +19914,7 @@ try {
 //   · green_room {kettle_steam()} · kettle_sl · region_m / m_ann / m_mall / m_ct / region_s / region_f (dress only).
 // PATHS (V.paths, [x, z] or [x, y, z] lists): d28_swoop d28_high_a/_b walk_mall shush_loop gust traffic_east/_west
 //   walk_starlight sneak29 to_desk to_posters to_stage. Inside, moveTo has no pathfinding: route via these.
-// AMBIENCE (03-audio names): street crowd_whisper + thunder + hum + hover_traffic · inside hum/thunder (muffled) with the
+// AMBIENCE (03-audio names): street thunder + hum + hover_traffic (no crowd_whisper: it screeched) · inside hum/thunder (muffled) with the
 //   rain kind 'roof' · night29 thunder (+ rain_street while the stage door is open) · lit city + rain 'street'.
 SETS.valley = (() => {
   const PI = Math.PI, H = PI / 2, TAU = PI * 2;
@@ -21985,12 +21985,12 @@ SETS.valley = (() => {
   };
   const AMBIENCE = { loops: [], room: 'none' };
   const AMBS = {   // loop names from 03-audio.js (crowd_whisper, thunder, hum, hover_traffic, city, rain_* via the rain kind)
-    street: { loops: ['crowd_whisper', ['thunder', 0.55], ['hum', 0.2], ['hover_traffic', 0.4]], room: 'none', rain: 'street' },
+    street: { loops: [['thunder', 0.55], ['hum', 0.2], ['hover_traffic', 0.4]], room: 'none', rain: 'street' },   // (no crowd_whisper: its formant chirps screeched)
     dusty: { loops: [['hum', 0.35], { name: 'thunder', vol: 0.45, lp: 700 }], room: 'room', rain: 'roof' },
     night: { loops: [['thunder', 0.85]], room: 'room', rain: 'roof' },
     nightOpen: { loops: [['thunder', 0.85], ['rain_street', 0.7]], room: 'room', rain: 'roof' },
     three: { loops: [['hum', 0.45], { name: 'thunder', vol: 0.25, lp: 600 }], room: 'room', rain: 'roof' },
-    lit: { loops: [['city', 0.7], ['crowd_whisper', 0.2]], room: 'none', rain: 'street' },
+    lit: { loops: [['city', 0.7]], room: 'none', rain: 'street' },
     neon: { loops: [['city', 0.9], ['hover_traffic', 0.5]], room: 'none', rain: 'street' },
     gig: { loops: [], room: 'room', rain: 'roof' },
   };

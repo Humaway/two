@@ -819,13 +819,13 @@ mirror ball sparkles).
 
 ## 10. Ambience and `update(dt, ctx)`
 
-**Ambience** (`ambience: { loops: ['whisper_crowd', 'thunder_far', 'neon_hum', 'hover_far'], room: 'none' }` default;
+**Ambience** (spec default below; the code's street state is `thunder` + `hum` + `hover_traffic`: the whispering crowd loop was dropped because its formant chirps screeched;
 `dress()` re-sends `AUDIO.ambience({ loops })` + `AUDIO.setRoom(room)` when the state changes, guarded by
 `typeof AUDIO !== 'undefined'`). Loop names are requests to the audio owner (`03-audio.js`).
 
 | State | Loops | Room |
 | --- | --- | --- |
-| `quiet28`, `transit28` | `whisper_crowd` (many soft sibilant voices, no words), `thunder_far` (distant rolls every 20–40 s), `neon_hum` (faint 100 Hz buzz near signs), `hover_far` | `none` (street) |
+| `quiet28`, `transit28` | ~~`whisper_crowd`~~ (dropped: it screeched), `thunder_far` (distant rolls every 20–40 s), `neon_hum` (faint 100 Hz buzz near signs), `hover_far` | `none` (street) |
 | `dusty28` | `room_tone` (dusty hum), `thunder_far` (muffled) | `hall` (medium-large, dull reverb) |
 | `night29` | `rain_roof` (heavy, on a tin roof), `thunder` (with the flashes); when the stage door is open: `rain_street` crossfades up | `hall` |
 | `three210` | `rain_roof` (thinning: its gain follows the env rain amount), `desk_hum` (a faint mains hum from the half-alive desk) | `hall` |
