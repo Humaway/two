@@ -12,6 +12,9 @@ Source reports are in `docs/reports/`.
 - [ ] **flat** — the `s21_*` anchors don't match `docs/sets/flat.md`; floor setup doesn't allow lying down on couch/bed (2.1 sleepers sit up).
 - [ ] **sandgate** — `queue.bubble` returns head + 0.28 m, the doc says + 0.4 m (sizzle compensates).
 
+- [ ] **reddy26** — anchor `s12_heroic` (y 0.85) sits under the Hero Table glass (0.93–0.95): raise to ≈ y 1.02; from `s12_twoshot` the JARVIS monitor hides Chase at `s11_chase_phone` (content uses pos [6.95,1.45,−5.3] → [6.1,1.4,−8.4]); `floor_wreck_wide` puts the wreck under the dialogue box.
+- [ ] **reddy26** — `blast()` fells the tree at 0.25 s (inside the slow-motion close): add `blast({ tree: false })` or a delayed fall (1.2 calls `xmas_tree.userData.fall()` again at the real-time wide).
+
 ## Engine
 
 - [ ] **systems** — a lured drone's collapsing cone sweeps a wide fan and can spot nearby actors: keep it narrow or skip detection until collapsed.
@@ -21,12 +24,15 @@ Source reports are in `docs/reports/`.
 - [ ] **config** — confirm speaker ids MAN, KID, WOMAN (1.7 human moments; currently defined in `63-content-1-7-1-8.js`) or move them to `01-config.js`.
 - [ ] **art** — Chase (2040) T-shirt outfit for 2.1 dawn (currently: coat, lanyard and headphones hidden).
 - [ ] **art** — chip light renders as a fairly large bright square (engine C note).
+- [ ] **world** — `{shot:'TWO'}` in a split's left half frames the whole room instead of the two subjects (1.3 uses explicit lenses).
 - [ ] **world** — orbits in tight rooms shrink to 20% radius → cramped, head-cropped frames (engine C note).
 - [ ] **systems** — drone floor cones are low-contrast on the bright 2026 store floor (engine C note).
 - [ ] **docs** — ENGINE.md cheat sheet + ARCHITECTURE §5: mini-game host (api.fail, api.fails, noSkip, skipResult, flow.skipMinigame, flow.minigameId), `AUDIO.bakeSong(pattern, {samples})`, `pattern.bridge` null semantics, `choose({prompt})`, `api.opaque`, `input.pointer.downX/downY`, new SFX names.
 - [ ] **regression** — `DEV_MG` scene in `89-content-devtest.js` that autoplays every MINIGAMES entry.
 
 ## Mini-games
+
+- [ ] **stall** — release the cutscene camera when the mini-game returns (1.3 calls `cam.release()` itself), or document it in the header.
 
 - [ ] **keypad** — no keypad mini-game exists; `64-content-2-1-2-3.js` registers a port of Rue's alarm keypad as `MINIGAMES.keypad` if absent. Move it into a mini-game file (`54-mg-keypad.js`) and drop the content-side copy.
 - [ ] **world** — a per-set render hook (`def.render(alpha)`) called by `world.render` before drawing; `15-set-bridge.js` currently wraps `world.render` once to interpolate scooters/cars/pelicans between ticks.
