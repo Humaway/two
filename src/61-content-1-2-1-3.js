@@ -264,10 +264,11 @@
   // the phone rings (a 2026 landline: the double trill at the handset, every 1.6 s, four at most) until he answers
   const RING_O = { sfx: 'trill', every: 1.6, vol: 0.55, max: 4 };
   const ring = (on) => ({ prop: 'store_phone', fn: (o) => { if (o.userData.ring) { if (on && !flow.skipping) o.userData.ring(true, RING_O); else o.userData.ring(false); } } });
-  // BAM (1.2 step 16): the table goes, the flash, Luka launched, the alarms
+  // BAM (1.2 step 16): the table goes, the flash, Luka launched, the alarms; the music cuts dead on the blast
   function bam(c) {
     const t = P(c, 'hero_table'); if (t) t.userData.blast({ instant: sk(c), tree: false });   // (the tree goes over at the real-time wide)
-    const ra = P(c, 'store_radio'); if (ra) ra.userData.playing = true;   // the radio keeps playing
+    c.music(null, { cut: true });
+    const ra = P(c, 'store_radio'); if (ra) ra.userData.playing = false;
     const lo = P(c, 'tether_loose'); if (lo) lo.visible = true;           // one tether lands behind the counter
     const j = act(c, 'jordan'); if (j) { j.face([5.6, 0, -5.3], 0); j.play('duck'); j.setExpr('scared'); }
     const ch = act(c, 'chase'); if (ch) ch.setExpr('stunned');
@@ -419,7 +420,7 @@
     BAM_WIDE,
     { wait: 0.35 },
     { do: (c) => bam(c) },
-    { loop: 'alarm', vol: 0.2, rate: 1.0 }, { loop: 'alarm', vol: 0.16, rate: 1.13 }, { loop: 'alarm', vol: 0.16, rate: 0.89 }, { loop: 'alarm', vol: 0.13, rate: 1.27 },
+    { loop: 'alarm', vol: 0.08, rate: 1.0 }, { loop: 'alarm', vol: 0.064, rate: 1.13 }, { loop: 'alarm', vol: 0.064, rate: 0.89 }, { loop: 'alarm', vol: 0.052, rate: 1.27 },
     { wait: 0.3 },
     // [SLOW MOTION · CLOSE · Luka mid-air, 1.5 s] His face as the display he polished for two hours disintegrates in the
     // background: from above the staff side, his upturned face low in frame, the blast beyond him, tracking him over
@@ -447,7 +448,7 @@
     // Stare, 3 s. Luka upside down. Chase frozen with the receiver. The figure.
     { do: (c) => { const a = act(c, 'luka'); if (a) a.visible = true; } },
     STARE,
-    { par: [{ stare: 3 }, { do: async (c) => { await c.wait(0.3); c.music(null, { fade: 1.2 }); const r = P(c, 'store_radio'); if (r) r.userData.playing = false; } }] },
+    { stare: 3 },
     { music: null, cut: true },
     { do: (c) => { const r = P(c, 'store_radio'); if (r) r.userData.playing = false; } },
     // FIGURE (a silhouette until he turns his collar down): "…Sorry." (He looks down at the wreck.) "^ Was that new?"
@@ -533,7 +534,7 @@
     { place: 'chase', at: [7.15, 0, -9.95, -0.45] },
     { place: 'luka', at: [5.4, 0, -7.9, 0.25] },
     WIDE_35,
-    { sfx: 'alarm', vol: 0.55 },
+    { sfx: 'alarm', vol: 0.22 },
     // he steps back off Luka and squares up to the pair of them (1.4 m out: room for the closes)
     { move: 'chase40', to: C40_GAP, nowait: true },
     { wait: 0.9 },
@@ -796,7 +797,7 @@
   CUTSCENES['1.3_setup'] = [
     { do: (c) => nextTick().then(() => dress13(c)) },
     { do: (c) => { c.world.prebuild('reddy40'); } },   // the split's right half, built behind this cutscene
-    { loop: 'alarm', vol: 0.12, rate: 1.0, lp: 700 }, { loop: 'alarm', vol: 0.1, rate: 1.13, lp: 700 }, { loop: 'alarm', vol: 0.1, rate: 0.89, lp: 700 }, { loop: 'alarm', vol: 0.08, rate: 1.27, lp: 700 },
+    { loop: 'alarm', vol: 0.048, rate: 1.0, lp: 700 }, { loop: 'alarm', vol: 0.04, rate: 1.13, lp: 700 }, { loop: 'alarm', vol: 0.04, rate: 0.89, lp: 700 }, { loop: 'alarm', vol: 0.032, rate: 1.27, lp: 700 },
     { place: 'luka', at: M13.luka }, { place: 'chase', at: M13.chase }, { place: 'chase40', at: M13.c40 },
     { place: 'luke', at: M13.lukeStare }, { place: 'jordan', at: M13.jordan },
     play('jordan', 's13_ladder'),
@@ -978,7 +979,7 @@
     { despawn: 'luka' }, { despawn: 'chase' }, { despawn: 'chase40' },
     { do: (c) => { const tt = P(c, 'hero_tethers'); if (tt) tt.userData.swing(0.55); const s = P(c, 'smoke_floor'); if (s && s.userData.amount) s.userData.amount(0.8, 0); } },
     { do: (c) => { const lk = act(c, 'luke'); if (lk) { lk.visible = true; lk.setExpr('stunned'); lk.place([6.4, 0, -13.5, 0]); } const j = act(c, 'jordan'); if (j) { j.place(M13.jordan); j.play('s13_ladder'); j.setExpr('worried'); } } },
-    { loop: 'alarm', vol: 0.16, rate: 1.0 }, { loop: 'alarm', vol: 0.13, rate: 1.13 }, { loop: 'alarm', vol: 0.13, rate: 0.89 }, { loop: 'alarm', vol: 0.1, rate: 1.27 },
+    { loop: 'alarm', vol: 0.064, rate: 1.0 }, { loop: 'alarm', vol: 0.052, rate: 1.13 }, { loop: 'alarm', vol: 0.052, rate: 0.89 }, { loop: 'alarm', vol: 0.04, rate: 1.27 },
     // [WIDE · locked, the store floor] Smoke over the wreck of the Hero Table, tinsel on the floor, four tethers swinging
     // slower and slower. Luke steps out of the corridor. Jordan stands holding the ladder.
     FLOOR_LOCK,
