@@ -1109,7 +1109,11 @@ const menus = (() => {
       b.lastChild.style.display = it.val || it.sub ? '' : 'none';
       b.className = (k === sel ? 'sel' : '') + (it.dis ? ' dis' : '');
     }
-    if (btns[sel] && items.length > 8) btns[sel].scrollIntoView({ block: 'nearest' });
+    const b = btns[sel];   // keep the selection in view by scrolling the list only (scrollIntoView could shift the whole page)
+    if (b && list.scrollHeight > list.clientHeight) {
+      const lr = list.getBoundingClientRect(), br = b.getBoundingClientRect();
+      if (br.top < lr.top) list.scrollTop -= lr.top - br.top; else if (br.bottom > lr.bottom) list.scrollTop += br.bottom - lr.bottom;
+    }
   }
   function act() {
     const it = items[sel];

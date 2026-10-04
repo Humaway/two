@@ -2286,7 +2286,7 @@ SETS.valley = (() => {
     if (R.neonT < 1) { R.neonT = Math.min(1, R.neonT + dt / R.neonDur); R.neonLv = R.neonFrom + (R.neonTo - R.neonFrom) * smooth(R.neonT); }
     const lv = R.neonLv;
     M.neonM.color.copy(MAG).multiplyScalar(lv * burst(t, 0.3)); M.neonT.color.copy(TEAL).multiplyScalar(lv * burst(t, 2.1)); M.neonR.color.copy(REDN).multiplyScalar(lv * burst(t, 4.4));
-    M.nap.color.copy(MAG).multiplyScalar(lv); const pb = t % 9; M.napP.color.copy(MAG).multiplyScalar(lv * (pb < 0.45 ? ((t * 23) % 1 < 0.5 ? 0.12 : 0.9) : 1));
+    M.nap.color.copy(MAG).multiplyScalar(lv); const pb = t % 9; M.napP.color.copy(MAG).multiplyScalar(lv * (pb < 0.45 && !(typeof options !== 'undefined' && options.reduceFlashing) ? ((t * 23) % 1 < 0.5 ? 0.12 : 0.9) : 1));   // (Reduce Flashing: no stutter)
     M.blade.color.copy(R.bladeLit ? BLADE_LIT : BLADE_DEAD).multiplyScalar(R.bladeLit ? burst(t, 5.5) : 1);
     M.reflect.color.setScalar(Math.min(1, 0.45 + lv * 0.75));
     M.lampHead.color.setRGB(1, 0.85, 0.69).multiplyScalar(0.5 + 0.5 * lv); M.pool.color.setScalar(0.7 + 0.5 * lv);

@@ -1634,7 +1634,7 @@ SETS.parade = (() => {
       if (R.strollers.visible) for (let i = 0; i < RIGS.strollers.length; i++) strollTick(RIGS.strollers[i], dt);
       // chip shop tube flicker, kiosk chime, LED, plate, keypad, lane bollards, door, tinsel, figures, palm
       const burst = Math.sin(t * 1.1) + Math.sin(t * 2.9 + 1) > 1.65;
-      M.chipLit.emissiveIntensity = R.chipOpen ? (burst && (t * 15) % 1 < 0.4 ? 0.35 : 0.85) : 0.05;
+      M.chipLit.emissiveIntensity = R.chipOpen ? (burst && (t * 15) % 1 < 0.4 && !(typeof options !== 'undefined' && options.reduceFlashing) ? 0.35 : 0.85) : 0.05;   // (Reduce Flashing: a steady tube)
       if (R.kioskT > 0) { R.kioskT -= dt; if (R.kioskT <= 0) { if (R.kiosk.userData.setLight) R.kiosk.userData.setLight('patrol'); R.kiosk.userData.show('Here for|you.'); } }
       R.led.visible = R.ledState === 'green' || (t * 0.5) % 1 < 0.6;
       const pt = R.plateHeld ? 1 : R.plateTo; R.plateU += (pt - R.plateU) * Math.min(1, dt * 10); R.plate.rotation.x = -1.9 * R.plateU;

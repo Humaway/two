@@ -314,6 +314,9 @@ body.calm #signal.full, body.calm #ar .arl { animation: none; }   /* Reduce Flas
 #menu .body table { border-collapse: collapse; width: 100%; font-size: 15px; }
 #menu .body td, #menu .body th { padding: 5px 12px; border-bottom: 1px solid rgba(255,255,255,.1); text-align: left; }
 #menu .body th { color: var(--yes); font-size: 13px; letter-spacing: .08em; }
+#menu .list button span { min-width: 0; } #menu .list button em { flex: none; white-space: nowrap; }
+@media (max-width: 600px) { #menu .panel { min-width: 0; padding: 14px 12px 12px; } #menu .list button { font-size: 17px; gap: 12px; padding: 8px 10px 8px 26px; }
+  #menu .list button.sel::before { left: 8px; } #menu .list button em { font-size: 15px; letter-spacing: 0; } }
 @media (max-width: 600px) { #menu .body table { font-size: 12px; } #menu .body td, #menu .body th { padding: 4px 4px; font-size: 11px; letter-spacing: 0; } #menu .body th { font-size: 10px; } }
 #menu .body canvas { display: block; margin: 0 auto; max-width: 100%; max-height: 60vh; }
 #menu .body p { margin: 0 0 12px; text-align: center; }

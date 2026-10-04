@@ -189,7 +189,7 @@ const input = (() => {
   let downEl = null;
   addEventListener('pointerdown', (e) => { downEl = e.target; }, true);
   addEventListener('click', (e) => {
-    const b = e.isTrusted && e.target.closest ? e.target.closest('button') : null;
+    const b = e.isTrusted && e.target.closest ? e.target.closest('button, #inv .slot') : null;
     if (b && !(downEl && b.contains(downEl))) { e.stopImmediatePropagation(); e.preventDefault(); }
   }, true);
   addEventListener('focusin', (e) => { if (e.target.tagName === 'BUTTON') e.target.blur(); }); // Enter/Space are YES, never a native click
