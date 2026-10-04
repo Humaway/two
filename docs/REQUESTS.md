@@ -17,6 +17,8 @@ Source reports are in `docs/reports/`.
 
 - [ ] **reddy40** — 1.6 address marks: `s16_addr_luka [0.9,-6.4]` is inside display table 2 → luka `[1.6,-6.55]`, chase `[2.25,-6.2]`, c40 `[2.85,-6.95]`; `s16_addr_jordan [3.6,-7.6]` overlaps a stool → `[3.8,-7.3]`; `s16_jordan_close` → `[3.35,-7.35]`; `s16_speaker [7.55,-8.0]` is 0.1 m from a stool (content uses its own coordinates).
 
+- [ ] **hq_roof** — from the Remote's screen the `s37_st_*` marks put Future Luka behind Luka; the `s37_crane_a`→`b` glide passes through the Yes letters; `s37_sorry_two` looks at the lift house, not the city.
+
 ## Engine
 
 - [ ] **systems** — a lured drone's collapsing cone sweeps a wide fan and can spot nearby actors: keep it narrow or skip detection until collapsed.
@@ -28,6 +30,11 @@ Source reports are in `docs/reports/`.
 - [ ] **art** — chip light renders as a fairly large bright square (engine C note).
 - [ ] **core** — `wait`/`waitUntil` resolve immediately while skipping, which traps autoplay code: document it and add a variant that keeps checking (1.6 uses its own per-tick `until()`).
 - [ ] **art** — hair-on-end for the 1.6 zap (uses soot mark + fingertip smoke); a card attachment (1.5's bonus card mesh lives in the content file).
+- [ ] **ui** — pop-ups sit under the letterbox bars (`#pops` z 5 < `.lb` z 6): on portrait phones cutscene pop-ups are mostly hidden. Raise `#pops` above `.lb` or limit bar height in portrait (3.7 slides the bars away while STORAGE FULL shows).
+- [ ] **art/world** — `idle`/upper-body anims don't clear `rig.seated`/`rig.floorSit`; a skipped walk leaves a floor-sitter sitting (3.7 resets on stand + flow:stop). Clear them on `idle`/`stand` and on despawn.
+- [ ] **world** — `eyePos` is stale in the same tick as `place()`: refresh matrices in `place()` (3.7 waits a tick).
+- [ ] **world/docs** — JARVIS shot with `on` re-aims at MID height every frame (faces at the top): document `size: 'CLOSE'`.
+- [ ] **art** — anims used in 3.7 registered content-side as `s37_*`: wiring, forearms on parapet, hand on shoulder, wiping face, hand on table, hurt walk, leaning back on parapet — promote to 04-art.js.
 - [ ] **world** — `{shot:'TWO'}` in a split's left half frames the whole room instead of the two subjects (1.3 uses explicit lenses).
 - [ ] **world** — orbits in tight rooms shrink to 20% radius → cramped, head-cropped frames (engine C note).
 - [ ] **systems** — drone floor cones are low-contrast on the bright 2026 store floor (engine C note).

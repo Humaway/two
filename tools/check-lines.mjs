@@ -11,7 +11,7 @@ const md = fs.readFileSync(path.join(root, 'docs/BUILD_PROMPT.md'), 'utf8').spli
 const norm = (s) => s.replace(/\\([_\[\]*])/g, '$1').replace(/[’‘]/g, "'").replace(/[“”]/g, '"').replace(/\s*\^\s*/g, ' ^ ')
   .replace(/\s+/g, ' ').trim();
 // prose quotes in the spec that are not lines
-const IGNORE = new Set(['best', 'two (2026)', 'two (2026–2040)', 'Hold this', 'modern', 'Quiet']);
+const IGNORE = new Set(['best', 'two (2026)', 'two (2026–2040)', 'Hold this', 'modern', 'Quiet', 'Keep.', 'Again.']);
 // ---- 1. collect segments from the spec
 const want = [];
 let sec = 0, scene = '?';
@@ -21,6 +21,7 @@ for (let i = 0; i < md.length; i++) {
   if (/^## 8 \(continued\)/.test(l)) sec = 8;
   if (sec < 8 || sec > 13) continue;
   const h3 = l.match(/^#{3,4} (?:ENDING [AB] — )?([A-Z0-9.]+|PROLOGUE|L\d\d)\b/); if (h3) { scene = h3[1] === 'PROLOGUE' ? 'P' : h3[1]; continue; }
+  if (/^\|/.test(l)) continue;   // tables (the endings comparison) quote lines that live in their own scenes
   if (/^#/.test(l) || /Cutscene\s+—\s+“/.test(l) && !/\*\*[A-Z]/.test(l.replace(/\*\*Cutscene[^*]*\*\*/, ''))) continue;
   const segs = [...l.matchAll(/“([^”]+)”/g)].map((m) => m[1]);
   for (const s of segs) {
