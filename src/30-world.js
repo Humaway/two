@@ -410,7 +410,7 @@ const { world, cam, frame, player } = (() => {
       } else m.face = o.face === false ? NaN : rot;
       const run = !!o.run;
       m.speed = o.speed || (a.heldBig ? CONFIG.carry : run ? CONFIG.run : CONFIG.walk);
-      m.loco = a.heldBig ? 'carry' : run ? 'run' : a.walkAnim;
+      m.loco = a.heldBig ? 'carry' : run ? 'run' : a.anim === 'climb' ? 'climb' : a.walkAnim;   // a move while climbing keeps climbing
       m.y0 = a.pos.y; m.d0 = Math.max(0.001, Math.hypot(m.to.x - a.pos.x, m.to.z - a.pos.z));
       m.collide = !!o.collide; m.stuck = 0;   // TWO: { collide: true } = pushed out of colliders/actors (AI), ends where it stalls
       if (skipping() || m.d0 < 0.02) {
