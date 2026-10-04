@@ -103,7 +103,7 @@ Source reports are in `docs/reports/`.
 ## From C/PC (third batch)
 
 - [x] **reddy26** — `floor_wreck_wide` doesn't show Luke at `pc_luke_desk` through the office door (PC uses pos [10.4,2.5,-1.7] → [6.4,1.0,-10.0], fov 52); `ladder` 'carried' has no side-carry offset (PC reorients it + `pc_ladder` anim); `pc_jordan_phone` (7.5,−8.05) sits beside the folded ladder (PC uses (7.15,−8.05)). — done (polish): `floor_wreck_wide` = PC's lens (from `[10.4, 2.5, -1.7]` → `[6.4, 1.0, -10.0]`, fov 52: the wreck, the counter, the Yes wall and Luke at his desk through the open door; nothing else used the anchor); `ladder.set('carried')` after `actor.hold(ladder)` lays it folded along the holder's right side (top rail at the right hand, 0.86 m; one-time maths per call); `pc_jordan_phone` → `[7.15, 0, -8.05, π − 0.22]`. PC drops its lens, its carry maths and its J_PHONE (keeps its `pc_ladder` arm pose). 1.1 / 1.2 re-run clean (1.1 never carries the ladder: it only uses `yes_wall`).
-- [ ] **art/world** — `climb` isn't an upper-body anim, so a `{move}` while climbing switches to walk (1.1's ladder; PC raises Jordan with a timed position change). (1.1 now sets `walkAnim = 'climb'` for its ladder moves.)
+- [x] **art/world** — `climb` isn't an upper-body anim, so a `{move}` while climbing switches to walk (1.1's ladder; PC raises Jordan with a timed position change). (1.1 now sets `walkAnim = 'climb'` for its ladder moves.) — done (lead): `actor.moveTo` keeps `climb` as the move anim when a move starts while climbing (30-world).
 
 ## Visual QA (integration pass)
 
@@ -111,8 +111,8 @@ Source reports are in `docs/reports/`.
 
 ## From the Act One polish (docs/reports/15-polish-act1.md)
 
-- [ ] **reddy26** — the ceiling dome camera (`cyl(0.12, …, 9.8, 3.12, -1.2)`, the static build) sits 0.85 m from the `counter` zone camera's lens (`[10.5, 2.7, -0.8]`): on portrait phones (`fitNarrow` widens the vertical FOV toward 100°) it is a big black blob in the top-left of every counter-zone frame (release QA: the 1.1 roam's first frame at 390×844). Move the dome clear of the lens (e.g. to (8.6, 3.12, −2.6)) or drop the lens a little (e.g. `[10.5, 2.45, -0.6]`); content can't compose around a zone camera.
-- [ ] **art** — `jordan40` has no `card` attachment (his look's `attach` is `['phone']`): add `'card'` so 1.5's bonus hand-over can use `rig.attach.card` + `hold_card` on both sides (62 still parents a small content card to Jordan's grip for the hand-over).
+- [x] **reddy26** — the ceiling dome camera (`cyl(0.12, …, 9.8, 3.12, -1.2)`, the static build) sits 0.85 m from the `counter` zone camera's lens (`[10.5, 2.7, -0.8]`): on portrait phones (`fitNarrow` widens the vertical FOV toward 100°) it is a big black blob in the top-left of every counter-zone frame (release QA: the 1.1 roam's first frame at 390×844). Move the dome clear of the lens (e.g. to (8.6, 3.12, −2.6)) or drop the lens a little (e.g. `[10.5, 2.45, -0.6]`); content can't compose around a zone camera. — done (lead): the dome moved mid-floor to (−1.2, 3.12, −6.8); checked the counter lens at 390×844 and reddy40's `st_floor` / `s16_floor_wide`.
+- [x] **art** — `jordan40` has no `card` attachment (his look's `attach` is `['phone']`): add `'card'` so 1.5's bonus hand-over can use `rig.attach.card` + `hold_card` on both sides (62 still parents a small content card to Jordan's grip for the hand-over). — kept as is (lead): with a `card` attachment, `bonusTo()` would paint it but leave it hidden, so the hand-over would lose its card; 1.5's content card works.
 
 ## Content cleanups now possible (final polish pass; optional, each must keep the scene working)
 
@@ -142,10 +142,16 @@ Sets (12 set commits):
 
 ## From the Act Two polish, 2.1–2.5 (docs/reports/19-polish-act2a.md) — optional, content works around all of them
 
-- [ ] **rue_house** — anchors 2.4 no longer uses (the frame was wrong with the scene's blocking): `s24_tea_wide` (behind Luka's seated head: a Santa-hat blob in the corner), `s24_verandah_wide` (inside Rue's hair at `s24_rue_watch`), `s24_hands` (sees Rue's back), `s24_louvre_pov` (the seated eyeline sees the gate only through the dowels). If they should be the reference lenses, take 2.4's: tea `[-4.2, 4.25, -4.7]` → `[-3.05, 3.1, -0.7]` fov 62; verandah `[-2.3, 4.45, 0.75]` → `[14.0, 1.6, 16.5]` fov 46; hands `[1.05, 2.0, 12.95]` → `[-0.15, 1.05, 13.22]` fov 30 (Rue at `[-0.15, 0, 12.7]`, Chase (2040) at `[-0.15, 0, 13.75]`); louvre `[-3.2, 4.35, -0.4]` → `[-0.35, 1.5, 13.95]` fov 14.
-- [ ] **bridge** — `s25_explain` frames Chase (2040)'s back at the start marks (and from the path's line the Norfolk pine at (20.5, −8) stands on his head): 2.5 uses `[7.4, 1.6, -44.9]` → `[9.7, 1.45, -40.9]`, fov 42, him turned to `[7.9, 0, -42.6]`.
-- [ ] **flat** — `s21_box` loses the kneeling Luka's head above the letterbox: 2.1 uses `[-2.2, 1.55, -3.95]` → `[-1.4, 0.88, -5.35]`, fov 50.
+- [x] **rue_house** — anchors 2.4 no longer uses (the frame was wrong with the scene's blocking): `s24_tea_wide` (behind Luka's seated head: a Santa-hat blob in the corner), `s24_verandah_wide` (inside Rue's hair at `s24_rue_watch`), `s24_hands` (sees Rue's back), `s24_louvre_pov` (the seated eyeline sees the gate only through the dowels). If they should be the reference lenses, take 2.4's: tea `[-4.2, 4.25, -4.7]` → `[-3.05, 3.1, -0.7]` fov 62; verandah `[-2.3, 4.45, 0.75]` → `[14.0, 1.6, 16.5]` fov 46; hands `[1.05, 2.0, 12.95]` → `[-0.15, 1.05, 13.22]` fov 30 (Rue at `[-0.15, 0, 12.7]`, Chase (2040) at `[-0.15, 0, 13.75]`); louvre `[-3.2, 4.35, -0.4]` → `[-0.35, 1.5, 13.95]` fov 14. — kept as is (optional): 2.4 uses its own lenses; the unused anchors do no harm.
+- [x] **bridge** — `s25_explain` frames Chase (2040)'s back at the start marks (and from the path's line the Norfolk pine at (20.5, −8) stands on his head): 2.5 uses `[7.4, 1.6, -44.9]` → `[9.7, 1.45, -40.9]`, fov 42, him turned to `[7.9, 0, -42.6]`. — kept as is (optional): 2.5 uses its own lens.
+- [x] **flat** — `s21_box` loses the kneeling Luka's head above the letterbox: 2.1 uses `[-2.2, 1.55, -3.95]` → `[-1.4, 0.88, -5.35]`, fov 50. — kept as is (optional): 2.1 uses its own lens.
 
 ## From the Act Two polish, 2.6–2.10 (docs/reports/20-polish-act2b.md) — optional, content works around it
 
-- [ ] **art** — `luke40` has no `card` attachment (his look's `attach` is `['food']`): add `'card'` so 2.6's invitation can be his own `rig.attach.card` (painted) with `hold_card { show }`; 2.6 keeps one content card mesh that passes from Luke's right grip to Chase's (same as the `jordan40` item above).
+- [x] **art** — `luke40` has no `card` attachment (his look's `attach` is `['food']`): add `'card'` so 2.6's invitation can be his own `rig.attach.card` (painted) with `hold_card { show }`; 2.6 keeps one content card mesh that passes from Luke's right grip to Chase's (same as the `jordan40` item above). — kept as is (lead): 2.6's one content card passing from Luke's hand to Chase's works; an attachment would need two cards kept in sync.
+
+
+## Final lead pass
+
+- [x] **art** — the 3.1 `desk` look was a man badged DEV; the script says "the woman at the desk". — done (lead): `fem: true`, long hair, badge PRIYA.
+- [ ] **hq_floors** — L30 too dark to read cover (M1 rack) and the private lift from the gameplay cams (Act 3 report). — in progress (set agent).
