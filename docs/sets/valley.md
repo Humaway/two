@@ -437,7 +437,7 @@ Named props (`world.prop(name)`); animated ones expose `userData` functions; all
 | `rain` | — | set-owned `makeRain({ box: [-12, -9, 12, 9], top: 14, count: 4500 })` | 2.9, 2.10, 3.6 | `at(x, z)` moves its group (the box follows); amount from the env's `rain` |
 | `stage_door` | S | steel door + push bar + wired-glass slit (`M.streak`) | 2.8, 2.9 | `open(u)` 0 … 1 = 1.6 rad outward about its east hinge, eased; the collider opens at u ≥ 0.8 |
 | `door_bulkhead` | M | the caged bulkhead lamp over the stage door outside | all | `on(bool)` (always on; flickers in rain) |
-| `window_light` | S | the high window's light: patch quads on the floor (x −40.5…−31.5, z −27…−19.5, y 0.012) and on the stage deck (x −39…−32, z −16…−13, y 0.912), each doubled with a rain-shadow quad | 2.8–2.10, C | `light(hex, k)` tints + scales the patches (night: pink/teal k 1; 2.10: teal k 0.5 → dawn `#8aa0c8` k 0.8); rain shadows scroll while the rain amount > 0.05 |
+| `window_light` | S | the high window's light: patch quads on the floor (x −40.5…−31.5, z −27…−19.5, y 0.012) and on the stage deck (x −39…−32, z −16…−13, y 0.912), each doubled with a rain-shadow quad | 2.8–2.10, C | `light(hex, k)` tints + scales the patches (night: pink/teal k 1; 2.10: teal k 0.5 → dawn `#8aa0c8` k 0.8); rain shadows scroll while the rain amount > 0.05; in `dawn` a grey-blue layer (`vl_patch_dawn`) fades in on the floor patch and the high window's glass gets a wash (`vl_dawn_glass`); the env window tint `ENV_WIN.dawn` is `0x6a7898 × 0.25` |
 | `window_glass` | S | the high window from inside (streaks) + the street-glow card behind it | all S | streak offset scrolls with rain amount |
 | `coats_sleep` | S | 3 draped coats (two polo-coloured jackets, one long tan trench) over the sleeper marks | 2.9, 2.10 | `show(mask)` bit 0 Chase, 1 Luka, 2 Chase (2040); `lift(i, u)` peels a coat back as someone sits up |
 | `coaster` | S | the beer coaster | 2.9 | `write()` swaps to the biro frame; `place(where)` (e.g. `'chest_chase'` → (−35.6, 0.24, −22.35) lying on the coat) |
@@ -575,9 +575,9 @@ riser). **Lying marks** are the hip point; the body must lie **head toward −Z*
 | `s28_crane_a` | [0.0, 112.0, −10.7] | [10.0, 118.0, 26.0] | 46 | CRANE start: the tower's countdown **QUIET IN 16:28:00** glowing in the storm (the drones circling) |
 | `s28_crane_b` | [−14.0, 2.0, 30.0] | [−10.0, 22.0, 6.0] | 52 | descending over Ann St: Chinatown's still lanterns screen-right, the mall screen-left, foam everywhere, shush drones below the lens |
 | `s28_crane_c` | [0.0, 1.4, 20.0] | [−1.5, 3.2, 8.5] | 48 | CRANE end over the mall-head bollards: NAP CLUB mid-distance right, whisperers, the three entering below |
-| `s28_track_a` / `s28_track_b` | [−0.4, 1.3, 15.0] / [−0.4, 1.3, 24.0] | [4.2, 1.5, 13.0] / [4.2, 1.5, 22.0] | 44 | TRACK alongside the three walking the mall (camera on the café side, moving +Z with them) |
+| `s28_track_a` / `s28_track_b` | [−0.5, 1.45, 13.9] / [−0.8, 1.45, 25.0] | [2.5, 1.62, 17.4] / [2.5, 1.62, 29.0] | 46 | TRACK alongside the three walking the mall (camera on the café side, moving +Z with them) |
 | `s28_mia_mid` | [−5.5, 0.95, 30.4] | [−2.6, 1.3, 31.6] | 40 | MID Mia on her bench (QR sign in frame) |
-| `s28_c40_close` | [−1.4, 1.62, 26.9] | [0.2, 1.62, 28.0] | 34 | CLOSE Chase (2040) stopping dead |
+| `s28_c40_close` | [−1.50, 1.62, 26.98] | [−2.21, 1.65, 27.97] | 34 | CLOSE Chase (2040) stopping dead |
 | `s28_confiscate` | [−4.0, 2.0, 29.2] | [3.8, 2.2, 22.5] | 50 | WIDE: the swoop, the claw, the box on the pole (frame reaches y 4) |
 | `s28_safebox` | [−3.6, 3.3, 28.2] | [−1.6, 2.6, 27.0] | 30 | the Safe Box with the ukulele neck behind its window |
 | `s28_db_meter` | [−3.5, 2.2, 28.2] | [−2.4, 2.0, 28.4] | 30 | the 40 dB meter |
@@ -601,7 +601,7 @@ riser). **Lying marks** are the hip point; the body must lie **head toward −Z*
 
 | id | at | from | fov | for |
 | --- | --- | --- | --- | --- |
-| `sl_wide_dusty` | [−37.0, 1.0, −17.0] | [−27.0, 4.6, −32.0] | 58 | establishing interior (torch beams) |
+| `sl_wide_dusty` | [−31.0, 1.0, −18.5] | [−38.5, 3.0, −29.5] | 50 | establishing interior (torch beams) |
 | `sl_posters` | [−43.65, 1.9, −23.5] | [−41.2, 1.7, −23.5] | 46 | examine the wall |
 | `sl_poster_hero` | [−43.65, 1.8, −22.6] | [−42.6, 1.75, −22.6] | 30 | one legible poster (THE SOFT CORNERS) |
 | `sl_desk` | [−34.7, 1.05, −26.5] | [−34.2, 1.75, −28.2] | 40 | examine the desk |
@@ -614,25 +614,25 @@ riser). **Lying marks** are the hip point; the body must lie **head toward −Z*
 | --- | --- | --- | --- | --- |
 | `s29_floor` | [−36.6, 0.42, −18.5] | [−36.9, 0.62, −25.4] | 50 | **the locked low floor setup** (2.9_floor and 2.9_lights_out): three heads toward the lens, bodies receding to the stage, the high window top of frame with pink/teal rain-shadows crawling over them. Screen-left → right: Chase, Luka, Chase (2040) |
 | `s29_floor_end` | [−36.6, 0.40, −18.5] | [−36.8, 0.60, −24.4] | 46 | the imperceptible push-in's end (Rue's `FLOOR_END` technique) |
-| `s29_c40_dark` | [−38.3, 0.2, −23.1] | [−39.2, 0.55, −23.7] | 36 | CLOSE Chase (2040) in the dark, eyes open (torch-free: lit by the patch spill only) |
+| `s29_c40_dark` | [−38.24, 0.24, −23.03] | [−37.99, 0.73, −22.72] | 40 | CLOSE Chase (2040) in the dark, eyes open (torch-free: lit by the patch spill only) |
 | `s29_coaster` | [−37.0, 1.11, −30.95] | [−37.0, 1.45, −30.5] | 28 | INSERT the coaster (CARD overlays) |
 | `s29_window` | [−35.5, 4.6, −11.35] | [−35.5, 1.2, −20.0] | 40 | cutaway: rain on the high window, neon through it |
 | `s29_door_out` | [−28.4, 1.4, −11.0] | [−28.0, 1.55, −6.8] | 38 | **MID the stage door from outside on Ann St, rain between camera and Luka** (rain box covers z −11…+7) |
-| `s29_reverse` | [−29.0, 1.4, −14.9] | [−28.3, 1.6, −11.5] | 40 | REVERSE: Chase in the dark of the wing, coaster in hand (EXIT green on him) |
-| `s29_luka_close` | [−28.4, 1.6, −11.4] | [−27.4, 1.6, −9.7] | 34 | CLOSE Luka in the doorway (hand to lanyard) |
-| `s29_hands` | [−28.5, 1.1, −12.2] | [−27.6, 1.3, −11.6] | 30 | INSERT the brick phone into Chase's hand |
+| `s29_reverse` | [−28.95, 1.42, −14.9] | [−27.7, 1.6, −11.8] | 34 | REVERSE: Chase in the dark of the wing, coaster in hand (EXIT green on him) |
+| `s29_luka_close` | [−28.40, 1.60, −11.73] | [−28.74, 1.63, −13.09] | 34 | CLOSE Luka in the doorway (hand to lanyard) |
+| `s29_hands` | [−28.5, 1.15, −12.1] | [−30.5, 1.4, −12.2] | 38 | INSERT the brick phone into Chase's hand |
 | `s29_door_wide` | [−28.4, 2.0, −11.0] | [−21.0, 1.4, 6.0] | 44 | optional WIDE from across Ann St (Chinatown lions in the foreground, the blade sign, the tower's base glowing at frame right) |
 
 **2.10**
 
 | id | at | from | fov | for |
 | --- | --- | --- | --- | --- |
-| `s210_wide_stage` | [−33.8, 1.0, −24.5] | [−39.5, 1.7, −29.5] | 50 | "[WIDE · the stage]": desk half-alive in the foreground, cables, Chase on the amp, the stage beyond |
+| `s210_wide_stage` | [−34.6, 0.7, −26.0] | [−30.4, 2.9, −20.2] | 54 | "[WIDE · the stage]": desk half-alive in the foreground, cables, Chase on the amp, the stage beyond |
 | `s210_desk_two` | [−34.0, 1.2, −26.8] | [−33.2, 1.5, −24.2] | 42 | two-shot from the stage side, faces lit by the slate; **also the Sequencer's background** |
 | `s210_slate` | [−34.4, 1.08, −26.6] | [−34.4, 1.55, −27.1] | 28 | INSERT the slate EXPORT (CARD overlays) |
 | `s210_chase_close` | [−32.7, 1.25, −26.4] | [−33.6, 1.35, −25.4] | 34 | CLOSE Chase lit by the slate (headphones on / off) |
 | `s210_c40_close` | [−34.7, 1.75, −27.1] | [−34.2, 1.75, −25.9] | 34 | CLOSE Chase (2040) ("…That's the bridge.") |
-| `s210_locked` | [−33.0, 0.8, −17.5] | [−42.6, 4.6, −31.6] | 58 | **WIDE · locked, the whole venue**: bar edge in the foreground, the two at the desk/amp, Luka asleep before the stage, the high window going grey-blue |
+| `s210_locked` | [−36.0, 1.5, −17.5] | [−28.2, 3.4, −31.0] | 58 | **WIDE · locked, the whole venue**: bar edge in the foreground, the two at the desk/amp, Luka asleep before the stage, the high window going grey-blue |
 | `sl_clock` | [−38.0, 3.4, −32.65] | [−38.0, 2.6, −30.0] | 26 | ONE MORE PASS time jumps (3:14 … 3:31 … 3:52) |
 
 **3.6 / credits**
