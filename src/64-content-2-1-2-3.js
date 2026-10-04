@@ -413,8 +413,9 @@
   // the table from the window side, as wide as the kitchen allows: all three faces and the toast inside the bars
   const PLAN_WIDE = glideCam([2.3, 1.8, -0.1], [2.25, 0.85, -1.55], 66, { pos: [2.3, 1.76, -0.17], look: [2.25, 0.86, -1.55], fov: 63 }, 8);
   const PLAN_TOP = glideCam([2.3, 1.5, -0.84], [2.3, 0.76, -0.97], 40, { pos: [2.3, 1.38, -0.88], look: [2.3, 0.76, -0.97], fov: 40 }, 6);
-  // from the foot of the bed, past the box: Luka's face as he kneels to it (the set's s21_box)
-  const BOX = aGlide('flat', 's21_box', { pos: [-2.1, 1.38, -4.15], look: [-1.45, 0.72, -5.35], fov: 44 }, 5);
+  // from the foot of the bed, past the box: Luka's face as he kneels to it, the box open below (the set's s21_box looks
+  // down at the box alone: the kneeling head is above the letterbox)
+  const BOX = glideCam([-2.2, 1.55, -3.95], [-1.4, 0.88, -5.35], 50, { pos: [-2.15, 1.5, -4.05], look: [-1.4, 0.86, -5.35], fov: 48 }, 5);
   const SANTA_MID = glideCam([0.35, 1.58, -4.3], [-1.05, 1.42, -5.4], 40, { pos: [0.1, 1.56, -4.5], look: [-1.05, 1.44, -5.4], fov: 38 }, 7);
 
   function reset21(c) {
@@ -1256,7 +1257,8 @@
   const PATH_WIDE = { shot: 'CAM', pos: [-304.0, 1.7, -30.0], look: [-306.0, 1.0, -8.0], fov: 22 };   // locked, long lens
   const BENCH_FRONT = glideCam([-299.65, 1.22, 3.1], [-300.0, 0.9, 0.05], 40, { pos: [-299.7, 1.18, 2.7], look: [-300.0, 0.9, 0.05], fov: 40 }, 8);
   const SIT_WIDE = glideCam([-295.6, 1.55, 4.8], [-300.6, 0.75, -2.2], 46, { pos: [-295.9, 1.5, 4.5], look: [-300.6, 0.75, -2.2], fov: 45 }, 9);
-  const BEHIND = { shot: 'CAM', pos: [-298.6, 1.62, -11.0], look: [-300.4, 0.8, 1.0], fov: 40 };   // locked, from behind the bench
+  // locked, from behind the bench and up the path: the two on the bench against the bay, Chase (2040) alone on the path
+  const BEHIND = { shot: 'CAM', pos: [-298.5, 2.0, -14.0], look: [-300.2, 0.9, 0.5], fov: 36 };
   const ELBOW = [-300.35, 0, -8.4, 0.1];           // Chase (2040) on the path, behind them
   const THREE_SHOT = glideCam([-300.0, 0.98, 3.6], [-300.0, 0.86, 0.05], 40, { pos: [-300.0, 0.97, 3.25], look: [-300.0, 0.86, 0.05], fov: 40 }, 12);
   // over the seat, down onto the top rail: his hand sliding along it, the shine, his head bowed behind
@@ -1358,7 +1360,7 @@
     { place: 'luka', at: 's23_luka_stop' }, { place: 'chase', at: 's23_chase_stop' },
     { face: 'luka', to: 'chase40', dur: 0.6 }, { face: 'chase', to: 'chase40', dur: 0.6 },
     { expr: [['chase40', 'still']] },
-    CLOSE('chase40', { yaw: -0.7, dist: 1.2, fov: 36, push: 0.1, dur: 8 }),
+    CLOSE('chase40', { yaw: -0.38, dist: 1.2, fov: 36, push: 0.1, dur: 8 }),   // (clear of the pines behind him)
     { wait: 0.6 },
     slow('chase40', "…I don't come here."),
     CLOSE('chase', { yaw: -0.4, dist: 1.1, fov: 36, push: 0.08, dur: 6 }),
@@ -1366,7 +1368,7 @@
     // (Chase (2040) nods at the bench. Doesn't move.)
     { face: 'chase40', to: [-300.0, 0, 0.0], dur: 0.6 },
     { act: [['chase40', 'nod', { dur: 0.9 }]] },
-    glideCam([-306.6, 1.6, -9.1], [-300.0, 0.6, 0.0], 30, { pos: [-306.5, 1.6, -8.9], look: [-300.0, 0.6, 0.0], fov: 28 }, 6),   // past them, the bench
+    glideCam([-307.6, 1.85, -10.2], [-300.0, 0.6, 0.0], 32, { pos: [-307.4, 1.82, -9.95], look: [-300.0, 0.6, 0.0], fov: 31 }, 6),   // past him (whole), the bench
     { wait: 2.4 },
     { face: 'luka', to: [-300.0, 0, 0.0], dur: 0.6 },
   ];

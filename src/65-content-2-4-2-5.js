@@ -619,7 +619,7 @@
     { par: [slow('rue', LINE16), onText(LINE16, 'Yous used', (cc) => closeOn(cc, 'rue', { yaw: 0.25, dist: 1.0, fov: 36, push: 0.12, dur: 12 }))] },
     // [CLOSE · Rue, to Luka]
     glance('rue', 'luka', 30),
-    CLOSE('rue', { yaw: -0.3, dist: 1.0, fov: 36, push: 0.16, dur: 24, ly: 0.05 }),
+    CLOSE('rue', { yaw: -0.3, dist: 1.0, fov: 36, push: 0.16, dur: 24, ly: -0.04 }),   // (his face clear of the three-line box)
     { expr: [['rue', 'still']] },
     { wait: 0.8 },
     slow('rue', "I promoted you, you know. 2031. Head of Network Safety. You made every part of this company safer than it had ever been. ^ You never once let anyone help you carry anything. I should have seen it. ^ That's the trouble with people who can, Luka. They think they have to."),
@@ -636,7 +636,10 @@
   // Cutscene — "2.4_gate."
   const YARD = aPush('rue_house', 's24_yard_wide', 0.6, 9);
   const GATE_TWO = aPush('rue_house', 's24_gate_two', 0.2, 8);
-  const HANDS = aPush('rue_house', 's24_hands', 0.05, 5);
+  // the hand-over across the gate, high from the north side (the gate post would sit between a side-on lens and the hands;
+  // the set's s24_hands sees Rue's back): the scarred hand under his, the brick between them
+  const HANDS = glideCam([1.05, 2.0, 12.95], [-0.15, 1.05, 13.22], 30, { pos: [0.98, 1.94, 12.97], look: [-0.15, 1.05, 13.22], fov: 29 }, 5);
+  const REACH = { sd: -1, z: 0.5, x: 0.02 };   // hand_rest: the right hand out over the gate's top rail
   // from behind Rue on the verandah, high under the roof: his back, his right hand on the rail, the three small on the
   // street going toward the water (the set's s24_verandah_wide sits at his head: a blur of white hair)
   const VERANDAH = glideCam([-2.3, 4.45, 0.75], [14.0, 1.6, 16.5], 46, { pos: [-2.15, 4.42, 0.9], look: [14.0, 1.6, 16.5], fov: 44 }, 14);
@@ -692,13 +695,20 @@
     CLOSE('chase40', { yaw: 0.0, dist: 0.95, fov: 34, push: 0.1, dur: 6 }),
     { expr: [['chase40', 'tearful']] },
     { wait: 2.6 },
-    // Rue holds out the brick phone and puts it in Chase (2040)'s scarred hand. Closes the fingers over it.
+    // Rue holds out the brick phone and puts it in Chase (2040)'s scarred hand. Closes the fingers over it. (Under the
+    // cut the two of them square up across the gate, close enough to reach: Rue's hand over his, the brick between.)
+    { place: 'rue', at: [-0.15, 0, 12.7, 0] }, { place: 'chase40', at: [-0.15, 0, 13.75, PI] },
     HANDS,
-    { act: [['rue', 'give', { dur: 1.6 }], ['chase40', 'give', { dur: 1.6 }]] },
+    { act: [['rue', 'hand_rest', Object.assign({ h: 1.12 }, REACH)]] },
+    { wait: 0.7 },
+    { act: [['chase40', 'hand_rest', Object.assign({ h: 1.04 }, REACH)]] },
     { wait: 0.8 },
     wear('rue', 'brick', false), wear('chase40', 'brick', true),
     { item: 'brick_phone' },
-    { wait: 1.2 },
+    { wait: 1.6 },
+    { act: [['rue', 'idle'], ['chase40', 'idle']] },
+    // (and back to where they stood, under the cut: the closes need the room)
+    { place: 'rue', at: 's24_rue_gate' }, { place: 'chase40', at: [-0.6, 0, 13.95, 2.83] },
     CLOSE('rue', { yaw: 0.2, dist: 1.05, fov: 36, push: 0.06, dur: 6 }),
     say('rue', 'Bring it back.'),
     CLOSE('chase40', { yaw: 0.0, dist: 1.0, fov: 36, push: 0.06, dur: 6 }),
@@ -966,10 +976,10 @@
     aPush('bridge', 's25_teddy_hatch', 0.2, 7),
     { expr: [['teddy', 'tired']] },
     slow('teddy', 'No. ^ Sorry.'),
-    // CHASE (2040) explains: turned to the two of them, over Chase's shoulder, the checkpoint behind (the set's s25_explain
-    // sees his back)
-    { face: 'luka', to: 'chase40', dur: 0.5 }, { face: 'chase', to: 'chase40', dur: 0.5 }, { face: 'chase40', to: [8.2, 0, -42.9], dur: 0.5 },
-    glideCam([8.75, 1.62, -44.6], [9.9, 1.45, -40.5], 40, { pos: [8.82, 1.62, -44.3], look: [9.9, 1.45, -40.5], fov: 38 }, 12),
+    // CHASE (2040) explains: turned to the two of them, past Chase's back and Luka's shoulder, the bay behind (the set's
+    // s25_explain sees his back; from the path's line a roadside pine stands on his head)
+    { face: 'luka', to: 'chase40', dur: 0.5 }, { face: 'chase', to: 'chase40', dur: 0.5 }, { face: 'chase40', to: [7.9, 0, -42.6], dur: 0.5 },
+    glideCam([7.4, 1.6, -44.9], [9.7, 1.45, -40.9], 42, { pos: [7.55, 1.6, -44.55], look: [9.7, 1.45, -40.9], fov: 40 }, 12),
     { wait: 0.5 },
     slow('chase40', "There's a bug. The system needs a human to say yes before anyone crosses. So they kept one human. ^ That's Teddy. ^ In a lockdown, Teddy has to say no to everyone."),
     { face: 'luka', to: 0, dur: 0.5 }, { face: 'chase', to: 0, dur: 0.5 }, { face: 'chase40', to: 0, dur: 0.5 },
@@ -986,12 +996,19 @@
     { wait: 1.0 },
     CLOSE('chase40', { yaw: 0.55, dist: 1.1, fov: 38, push: 0.06, dur: 6 }),
     { wait: 0.3 },
-    { popup: { style: 'safesense', title: 'SafeSense', msg: 'Switch chip off?', buttons: ['YES', 'NO'], icon: 'none', at: { actor: 'chase40' }, w: 240, ding: false,
+    { popup: { style: 'safesense', title: 'SafeSense', msg: 'Switch chip off?', buttons: ['YES', 'NO'], icon: 'none', get at() { return chipPopAt(); }, w: 240, ding: false,
       get dodge() { return FAIL25 && !state.flags.s25_said_no ? [0] : undefined; } }, wait: true },
     { do: (c) => { const a = act(c, 'chase40'); if (a) a.rig.chip('on'); } },
     { letterbox: false },
   ];
   const FAIL25 = TEST.auto && /[?&]s25fail=1/.test(location.search);
+  // the chip prompt floats beside his head, frame-left of the close above (over his head it hid his face)
+  function chipPopAt() {
+    const a = world.actor('chase40'); if (!a) return { actor: 'chase40' };
+    a.eyePos(V1);
+    const ry = a.rotY + 0.55, fx = -Math.sin(ry), fz = -Math.cos(ry);
+    return { pos: [V1.x + fz * 0.45, V1.y + 0.06, V1.z - fx * 0.45] };
+  }
   async function chipChoice(c) {
     if (c.flow.result !== 0) {   // NO: the towers hear him: the immediate soft-fail escort
       c.state.flags.s25_said_no = true;
@@ -1083,6 +1100,8 @@
     { sfx: 'sad_beep', vol: 0.35, at: [8.0, 2.6, -4.1] },
     { wait: 1.4 },
     { expr: [['luka', 'stunned']] },
+    // (under the cut the drone bobs up: its white cone would hang across his face in the close)
+    { do: () => { const d = DRONES.get('d25_scan'); if (d) d.hover = 3.6; } },
     CLOSE('luka', { yaw: -0.3, dist: 1.0, fov: 36, push: 0.06, dur: 7, ly: 0.12 }),
     slow('luka', "Error 4044. ^ That's the one where it forgets who you are, then forgets who it is."),
     // (The drone wobbles, turns in a slow circle and floats off, confused.)
@@ -1233,9 +1252,10 @@
     { wait: 1.2 },
     { do: (c) => { if (!sk(c) && c.AUDIO && c.AUDIO.laugh) c.AUDIO.laugh(); } },
     { wait: 1.6 },
-    // [WIDE] Chase (2040) is laughing and crying at the same time and doesn't care which. (A wide lens close to him: his
-    // face reads, Luka and Chase on the other scooter and the six drones behind)
-    { shot: 'WIDE', on: 'chase40', move: 'track', track: 'ahead', dist: 3.0, height: 0.35, offset: 0.6, fov: 50 },
+    // [WIDE] Chase (2040) is laughing and crying at the same time and doesn't care which. (A wide lens a couple of metres
+    // ahead of him: his face reads at frame-left, Luka and Chase laughing on the other scooter at frame-right, the bridge
+    // running away behind them)
+    { shot: 'MID', on: 'chase40', move: 'track', track: 'ahead', dist: 2.0, fov: 54, offset: 0.85 },
     { do: (c) => { const a = act(c, 'chase40'); if (a) a.play('scooter_laugh'); laughCry(c, 'chase40'); } },
     { wait: 3.4 },
   ];
