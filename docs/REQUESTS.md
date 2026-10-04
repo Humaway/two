@@ -27,6 +27,10 @@ Source reports are in `docs/reports/`.
 - [ ] **train** — `aisle_B_far`/`aisle_B_near` (and the A pair) face opposite ways but both `ease`: crossing z ±4.8 swoops through a 0.25 s top-down over the player — drop `ease` on those cams; `passenger_b` is a woman but the reindeer owner is a man (2.7 spawns `reindeer_man`, look local40_c); no `lean` anim.
 - [ ] **sandgate** — `h26_sizzle` sample spot sits inside the gazebo collider (2.6 uses its own spot at the table front).
 
+- [ ] **hq_floors** — no `reset()`; `bank.open(0)` eases 3 s outside a skip so on Continue the bank slides shut on arrival: add `SETS.hq_floors.reset()` or an instant option; `drones` data uses `y` + path names (3.2 maps them to `hover` + point arrays).
+- [ ] **hq_roof** — `roof_hatch` anchor sits south of the hatch so the lid fills the frame (3.2 uses a lens from the east).
+- [ ] **hq_atrium** — a hand prop for Luke's invitation (3.1 builds a card mesh at load).
+
 ## Engine
 
 - [ ] **systems** — a lured drone's collapsing cone sweeps a wide fan and can spot nearby actors: keep it narrow or skip detection until collapsed.
@@ -50,6 +54,8 @@ Source reports are in `docs/reports/`.
 - [ ] **flow** — hotspot `text` runs before `kettle`, so a kettle line can't get its own shot (2.4 runs line + ask + saveGame by hand).
 - [ ] **ui** — speaker `passenger` always shows the old-man portrait; per-actor portraits for generic speakers (2.7 uses passenger_c/passenger_d labelled PASSENGER).
 - [ ] **art** — a hand-held card prop (1.5 bonus card and 2.6 invitation are built content-side from `mat()`).
+- [ ] **BUG world** — `a.hold`: dropping/despawning an object that had no parent when picked up crashes (`h.parent.add` on null): guard `if (h.parent)`.
+- [ ] **BUG flow/ui** — the `{quiet}` step sets `state.quiet` before `hud.quiet()`, which then sees no change and never repaints: let `hud.quiet` assign it.
 - [ ] **world** — `{shot:'TWO'}` in a split's left half frames the whole room instead of the two subjects (1.3 uses explicit lenses).
 - [ ] **world** — orbits in tight rooms shrink to 20% radius → cramped, head-cropped frames (engine C note).
 - [ ] **systems** — drone floor cones are low-contrast on the bright 2026 store floor (engine C note).
