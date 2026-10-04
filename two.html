@@ -1893,7 +1893,7 @@ const { AUDIO, sfx, music } = (() => {
       noise(c, f, 0, 8.5, { v: 0.8 }); noise(c, d, 0, 8.5, { v: 0.25, brown: true, lp: 300 });
     } },
     // nature
-    cicadas: { len: 4, rms: 0.035, xf: 1, whole: (c, d) => {
+    cicadas: { len: 4, rms: 0.015, xf: 1, whole: (c, d) => {   // kept faint: a texture, not a hiss
       const g = gn(c, d, 0.6); lfo(c, g.gain, 0.5, 0.4);
       const tr = gn(c, g, 0.55); lfo(c, tr.gain, 40, 0.45); // the trill (160 cycles a loop)
       noise(c, tr, 0, 4.5, { v: 0.5, bp: 5200, q: 6 }); noise(c, tr, 0, 4.5, { v: 0.3, bp: 6100, q: 8 }); noise(c, g, 0, 4.5, { v: 0.08, bp: 4400, q: 4 });
@@ -2157,7 +2157,7 @@ const { AUDIO, sfx, music } = (() => {
       for (let s = 0; s < 16; s += 2) fmBell(c, d, s * st, ch[[0, 1, 2, 1][(s / 2) % 4]] + 24, 0.6, 0.016);
       for (const s of [4, 12]) noise(c, d, s * st, 0.05, { v: 0.04, a: 0.001, d: 0.015, bp: 3000, q: 1 });
     }] },
-    // 1.7, 2.2: sunny and slightly off-kilter (G Lydian, 3+3+2, a wobble in the tuning), the glassy 2040 layer, cicadas.
+    // 1.7, 2.2: sunny and slightly off-kilter (G Lydian, 3+3+2, a wobble in the tuning), the glassy 2040 layer.
     seaside: { len: dur(8, 100), rms: 0.1, rev: [1.4, 0.2, 0.5], bars: [8, (c, d, k) => {
       const st = 60 / 100 / 4, R = rng(k + 3), rt = [43, 48, 43, 42, 40, 48, 43, 38][k];
       const ch = [[59, 62, 67], [60, 64, 67, 73], [59, 62, 67], [57, 62, 66], [59, 64, 67], [60, 64, 67, 73], [59, 62, 67], [57, 62, 66]][k];
@@ -2168,7 +2168,7 @@ const { AUDIO, sfx, music } = (() => {
       for (const [s, m, l] of mel) { const det = (R() - 0.5) * 30; tone(c, d, s * st, mtof(m), l * st, { v: 0.07, det, a: 0.004, d: 0.3, s: 0.15, r: 0.15 }); tone(c, d, s * st, mtof(m) * 2, l * st, { v: 0.02, det, a: 0.004, d: 0.12, r: 0.1 }); }
       for (const s of [2, 10]) fmBell(c, d, s * st, ch[1] + 24, 0.7, 0.012);
       for (let s = 0; s < 16; s++) shaker(c, d, (s + (s % 2 ? 0.25 : 0)) * st, s % 2 ? 0.012 : 0.02);
-    }], whole: (c, d, len) => { const g = gn(c, d, 0.5); lfo(c, g.gain, 2 / len, 0.4); noise(c, g, 0, len, { v: 0.05, bp: 5200, q: 6, r: 0.01 }); } },
+    }] },   // (no cicada-noise bed under the cue: it hissed over the beach)
     // Drone scenes: a low filtered pulse. C minor, 84 bpm.
     stealth: { len: dur(8, 84), rms: 0.09, rev: [1.8, 0.25, 0.7], bars: [8, (c, d, k) => {
       const st = 60 / 84 / 4, rt = [36, 36, 32, 32, 36, 36, 31, 35][k];
@@ -11248,11 +11248,11 @@ SETS.parade = (() => {
   const AUTO = { '1.7': 'day17', '1.8': 'evening18', '2.2': 'lane22', '2.3': 'bench23', B2: 'xmas40', C: 'credits' };
   const REGION_OF = { day17: 'P', evening18: 'P', lane22: 'P', festival31: 'P', bench23: 'W', xmas40: 'W', sunset33: 'W', credits: 'W' };
   const AMB = {   // spec §10 (every name is a bed in 03-audio: AUDIO.loopNames())
-    day17: { loops: ['cicadas', 'surf', 'hover_far'], room: 'none' },
+    day17: { loops: ['surf', 'hover_far'], room: 'none' },   // (no cicadas on the beachfront: they hissed over the surf)
     dusk17: { loops: ['surf', 'hover_far', 'crickets'], room: 'none' },
     evening18: { loops: ['surf', 'hover_far', 'crickets'], room: 'none' },
     lane22: { loops: ['cicadas', 'hover_far'], room: 'lane' },
-    festival31: { loops: ['cicadas', 'surf', 'hover_far'], room: 'none' },
+    festival31: { loops: ['surf', 'hover_far'], room: 'none' },
     bench23: { loops: ['wind', 'water_lap', 'bell_buoy'], room: 'none' },
     xmas40: { loops: ['birds', 'water_lap', 'wind_soft'], room: 'none' },
     sunset33: { loops: ['water_lap', 'wind_soft'], room: 'none' },

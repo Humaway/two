@@ -1319,11 +1319,11 @@ SETS.parade = (() => {
   const AUTO = { '1.7': 'day17', '1.8': 'evening18', '2.2': 'lane22', '2.3': 'bench23', B2: 'xmas40', C: 'credits' };
   const REGION_OF = { day17: 'P', evening18: 'P', lane22: 'P', festival31: 'P', bench23: 'W', xmas40: 'W', sunset33: 'W', credits: 'W' };
   const AMB = {   // spec §10 (every name is a bed in 03-audio: AUDIO.loopNames())
-    day17: { loops: ['cicadas', 'surf', 'hover_far'], room: 'none' },
+    day17: { loops: ['surf', 'hover_far'], room: 'none' },   // (no cicadas on the beachfront: they hissed over the surf)
     dusk17: { loops: ['surf', 'hover_far', 'crickets'], room: 'none' },
     evening18: { loops: ['surf', 'hover_far', 'crickets'], room: 'none' },
     lane22: { loops: ['cicadas', 'hover_far'], room: 'lane' },
-    festival31: { loops: ['cicadas', 'surf', 'hover_far'], room: 'none' },
+    festival31: { loops: ['surf', 'hover_far'], room: 'none' },
     bench23: { loops: ['wind', 'water_lap', 'bell_buoy'], room: 'none' },
     xmas40: { loops: ['birds', 'water_lap', 'wind_soft'], room: 'none' },
     sunset33: { loops: ['water_lap', 'wind_soft'], room: 'none' },

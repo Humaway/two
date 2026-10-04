@@ -770,16 +770,16 @@ before the fire).
 
 ## 10. Ambience and `update(dt, ctx)`
 
-**Ambience** (`ambience: { loops: ['cicadas', 'surf', 'hover_far'], room: 'none' }` default; `dress()` switches with
+**Ambience** (`ambience: { loops: ['surf', 'hover_far'], room: 'none' }` default — no cicadas on the beachfront, they hissed over the surf; `dress()` switches with
 `AUDIO.ambience({ loops })` + `AUDIO.setRoom(room)` when it changes state, guarded by `typeof AUDIO !== 'undefined'`).
 Loop names are requests to the audio owner (`03-audio.js`).
 
 | State | Loops | Room |
 | --- | --- | --- |
-| `day17` | `cicadas`, `surf` (gentle waves + occasional pelican clack), `hover_far` (distant glassy hum) | `none` |
+| `day17` | `surf` (gentle waves + occasional pelican clack), `hover_far` (distant glassy hum) | `none` |
 | `day17` at `dusk` | `surf`, `hover_far`, `crickets` | `none` |
 | `evening18` | `surf`, `hover_far`, `crickets` | `none` |
-| `lane22` | `cicadas`, `hover_far` | `lane` (short slapback; until the audio owner adds it, it falls back to dry) |
+| `lane22` | `cicadas` (faint), `hover_far` | `lane` (short slapback; until the audio owner adds it, it falls back to dry) |
 | `bench23` | `wind`, `water_lap`, `bell_buoy` (one clank every 6–9 s) | `none` |
 | `xmas40` | `birds`, `water_lap`, `wind_soft` | `none` |
 
