@@ -29,3 +29,4 @@ Source reports are in `docs/reports/`.
 ## Mini-games
 
 - [ ] **keypad** — no keypad mini-game exists; `64-content-2-1-2-3.js` registers a port of Rue's alarm keypad as `MINIGAMES.keypad` if absent. Move it into a mini-game file (`54-mg-keypad.js`) and drop the content-side copy.
+- [ ] **world** — a per-set render hook (`def.render(alpha)`) called by `world.render` before drawing; `15-set-bridge.js` currently wraps `world.render` once to interpolate scooters/cars/pelicans between ticks.
