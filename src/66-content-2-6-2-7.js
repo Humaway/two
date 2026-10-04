@@ -969,8 +969,9 @@
     { do: (c) => closeOn(c, 'chase', { dist: 1.0, yaw: 0.3, fov: 34, dur: 4 }) },
     { expr: [['chase', 'worried']] },
     { wait: 1.6 },
-    // Luka dozing in B2 with the beard over his eyes: from the aisle in front of him, a little above his slumped head
-    { do: (c) => { if (!sk(c)) c.cam.shot(glideCam([-0.3, 1.42, 3.4], [-1.08, 1.05, 4.45], 42, [[-0.34, 1.41, 3.47], null, 40], 4)); } },
+    // Luka dozing in B2 with the beard over his eyes: low from the aisle, level with his slumped head (from above it the
+    // lens saw only the hat; from the facing seats it sits inside their passengers)
+    { do: (c) => { if (!sk(c)) c.cam.shot(glideCam([0.0, 1.05, 3.55], [-1.12, 0.92, 4.1], 40, [[-0.06, 1.04, 3.62], null, 38], 4)); } },
     { wait: 1.7 },
     { do: (c) => { if (!sk(c)) c.cam.shot(glideCam([0.3, 1.9, 1.4], [-0.3, 1.4, -8.0], 44, [[0.3, 1.85, 0.6], null, 42], 4)); } },
     { do: (c) => DRONES.face(DID, [-1.12, 0, -7.65]) },

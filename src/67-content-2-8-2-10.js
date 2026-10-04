@@ -1289,7 +1289,7 @@
   CUTSCENES['2.9_door'] = [
     { do: (c) => {
       c.state.flags.s29_door = true;
-      standA(act(c, 'luka'), [-28.4, 0, -11.5, 0]);   // inside, behind the shut door: it opens on him
+      standA(act(c, 'luka'), [-28.4, 0, -11.7, 0]);   // inside, behind the shut door (his pushing hands too): it opens on him
       const ch = act(c, 'chase');
       if (ch) { standA(ch, C_WING); ch.rig.show('coaster', true); ch.setExpr('neutral'); }
       const k = UD(c, 'coaster'); if (k) k.place([-28.0, -3.0, -14.0]);
@@ -1299,10 +1299,10 @@
     { env: 'annst' },
     aPush('s29_door_out', 0.3, 8),
     { act: [['luka', 'push', { dur: 1.2, loop: false }]] },
-    { wait: 0.5 },
+    { wait: 0.3 },
     { do: (c) => { const d = UD(c, 'stage_door'); if (d) d.open(1); } },
     { sfx: 'creak', vol: 0.4 },
-    { wait: 0.9 },
+    { wait: 1.0 },
     // into the doorway, the rain in front of him
     { move: 'luka', to: [-28.4, 0, -11.2], speed: 0.7 },
     { wait: 0.5 },
