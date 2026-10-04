@@ -24,7 +24,7 @@ Source reports are in `docs/reports/`.
 
 - [ ] **bridge** — the `ch_shoulder` camera ([-5.8, 0.5, 214]) has the west barrier filling ~⅓ of the frame during the chase.
 
-- [ ] **train** — `aisle_B_far`/`aisle_B_near` (and the A pair) face opposite ways but both `ease`: crossing z ±4.8 swoops through a 0.25 s top-down over the player — drop `ease` on those cams; `passenger_b` is a woman but the reindeer owner is a man (2.7 spawns `reindeer_man`, look local40_c); no `lean` anim.
+- [x] **train** — `aisle_B_far`/`aisle_B_near` (and the A pair) face opposite ways but both `ease`: crossing z ±4.8 swoops through a 0.25 s top-down over the player — drop `ease` on those cams; `passenger_b` is a woman but the reindeer owner is a man (2.7 spawns `reindeer_man`, look local40_c); no `lean` anim. **Done:** `ease` dropped on all four aisle cams (they cut); the set's cast (`castFor`) now names `reindeer_man` at `s27_reindeer_man` and `castLook('reindeer_man')` → `local40_c` (2.7's cast; nothing else read `passenger_b`); doc updated. **Declined (not a set item):** the `lean` anim belongs to `04-art.js` (engine).
 - [x] **sandgate** — `h26_sizzle` sample spot sits inside the gazebo collider (2.6 uses its own spot at the table front). **Done:** `s26_sample_sizzle` and `hotspots.h26_sizzle` moved to 2.6's spot at the table front `[-6.40, 0, -0.05]` (r 0.7); doc updated.
 
 - [ ] **hq_floors** — no `reset()`; `bank.open(0)` eases 3 s outside a skip so on Continue the bank slides shut on arrival: add `SETS.hq_floors.reset()` or an instant option; `drones` data uses `y` + path names (3.2 maps them to `hover` + point arrays).

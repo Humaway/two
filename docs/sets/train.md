@@ -236,7 +236,7 @@ e.g. `seat_B2Rbw` = [1.12, 0, 4.49, PI]. The named ones:
 | id | value | use |
 | --- | --- | --- |
 | `s27_chase_up` | [0.0, 0, 4.20, PI] | control: Chase stands into the aisle, facing the far end |
-| `s27_reindeer_man` | `seat_B3Lfw` [−1.12, 0, 5.11, 0] | `passenger_b` ("taking it to his grandkids") |
+| `s27_reindeer_man` | `seat_B3Lfw` [−1.12, 0, 5.11, 0] | actor `reindeer_man`, look `local40_c` ("taking it to his grandkids"; `castLook('reindeer_man')`) |
 | `rdeer_seat` | [−0.89, 0.45, 6.39, PI] | the reindeer's base on the B3Lb bench |
 | `rdeer_aisle_M` | [0.0, 0, 0.0, PI] | **the block**: the reindeer in the M-vestibule aisle (the drone waits at `d27_wait_M`) |
 | `rdeer_aisle_B1` | [0.0, 0, 1.95, PI] | alternative block point (drone waits at `d27_wait_B1`) |
@@ -285,15 +285,15 @@ e.g. `seat_B2Rbw` = [1.12, 0, 4.49, PI]. The named ones:
 
 "Fixed angles down the aisle": high in the corners just under the coving (ceiling height at |x| 0.95 is 2.22, at
 |x| 1.10 it is 2.15 — lenses sit ≥ 0.1 below it), chained along the carriage. Zone changes
-use the 0.25 s chained-camera ease (`ease: 0.25`, spec §11) if the engine supports it (04-world §15.4 item 1); otherwise
-they hard-cut.
+hard-cut: each aisle pair faces opposite ways, so the 0.25 s chained-camera ease (`ease: 0.25`) would swing through a
+top-down over the player at z ±4.8 (dropped in the set maintenance pass).
 
 ```js
 cams: {
-  aisle_B_far:  { type: 'fixed', pos: [0.95, 2.12, 10.25],  look: [-0.30, 0.55, 1.40],  fov: 46, ease: 0.25 },  // first = default (zone B1–B2)
-  aisle_B_near: { type: 'fixed', pos: [-0.95, 2.12, 1.20],  look: [0.30, 0.55, 8.90],   fov: 56, ease: 0.25 },  // B3–B4
-  aisle_A_far:  { type: 'fixed', pos: [-0.95, 2.12, -10.25],look: [0.30, 0.55, -1.40],  fov: 46, ease: 0.25 },  // A3–A4
-  aisle_A_near: { type: 'fixed', pos: [0.95, 2.12, -1.20],  look: [-0.30, 0.55, -8.90], fov: 56, ease: 0.25 },  // A1–A2
+  aisle_B_far:  { type: 'fixed', pos: [0.95, 2.12, 10.25],  look: [-0.30, 0.55, 1.40],  fov: 46 },  // first = default (zone B1–B2)
+  aisle_B_near: { type: 'fixed', pos: [-0.95, 2.12, 1.20],  look: [0.30, 0.55, 8.90],   fov: 56 },  // B3–B4
+  aisle_A_far:  { type: 'fixed', pos: [-0.95, 2.12, -10.25],look: [0.30, 0.55, -1.40],  fov: 46 },  // A3–A4
+  aisle_A_near: { type: 'fixed', pos: [0.95, 2.12, -1.20],  look: [-0.30, 0.55, -8.90], fov: 56 },  // A1–A2
   vest_M:       { type: 'fixed', pos: [1.10, 2.05, 0.85],   look: [-0.90, 0.70, -0.50], fov: 64 },
   vest_A:       { type: 'fixed', pos: [1.10, 2.05, -8.75],  look: [-0.80, 0.70, -10.30], fov: 64 },
   vest_B:       { type: 'fixed', pos: [-1.10, 2.05, 8.75],  look: [0.80, 0.70, 10.30],  fov: 64 },
@@ -361,7 +361,7 @@ free**: B1 L (the flop), B2Lba, B3Lfa, B3Rfa, B4Lfw.
 | `h27_luka` | actor `luka` | 1.1 | Talk | `only: 'chase'` | 2.7 PLAY | wake Luka (he pushes the beard up) → he moves to `s27_free_B4` |
 | `h27_pax_c` | actor `passenger_c` | 1.1 | Talk | `only: 'chase'` | 2.7 PLAY | "Only if you're sure" → swap seats with Chase |
 | `h27_pax_d` | actor `passenger_d` | 1.1 | Talk | `only: 'chase'` | 2.7 PLAY | swap seats with Chase (2040) (he moves when Chase asks; content) |
-| `h27_pax_b` | actor `passenger_b` | 1.1 | Talk | `only: 'chase'` | 2.7 PLAY | borrow the reindeer → `reindeer.state('held')` |
+| `h27_pax_b` | actor `reindeer_man` | 1.1 | Talk | `only: 'chase'` | 2.7 PLAY | borrow the reindeer → `reindeer.state('held')` |
 | `h27_reindeer_put` | [0.0, 0, 0.0] (`rdeer_aisle_M`) | 1.0 | Put it down | `only: 'chase'`, `when` Chase holds it | 2.7 PLAY | `reindeer.state('aisle')` at M (or `rdeer_aisle_B1` via a second spot at [0, 0, 1.95]) |
 | `h27_pax_a` | actor `passenger_a` | 1.1 | Talk | any | 2.7 | (no scripted line beyond `2.7_board`; optional) |
 | `h27_c40` | actor `chase40` | 1.1 | Talk | `only: 'chase'` | 2.7 | content |

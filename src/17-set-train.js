@@ -42,7 +42,7 @@
 // ANCHORS: s27_board_three s27_passenger_ots s27_platform_wide s27_doors_chime s27_drone_boards s27_luka_doze
 //   s27_reindeer s27_reindeer_block s27_chase_asleep s27_talk_two s27_window_storm s27_carriage_wide · tea_point
 //   s27_nameboard s27_pid
-// CAMS (fixed, high in the corners under the coving, chained aisle cams ease 0.25 s): aisle_B_far (first = default)
+// CAMS (fixed, high in the corners under the coving; they cut, never ease): aisle_B_far (first = default)
 //   aisle_B_near aisle_A_far aisle_A_near vest_M vest_A vest_B. ZONES tile the carriage (7 boxes).
 // PROPS (userData API; every call is instant while skipping, nothing allocates per tick):
 //   doors_L, doors_R open(u 0..1) (1.4 s ease; .u = now) · door_lamps blink while doors move · leds level(u),
@@ -53,7 +53,8 @@
 //   far (dome, band, clouds, flash) lightning(k)
 // EXTRAS on the entry: dress(state, o), seat(bay, side, row, pos), travel { cruise, speed, state, station, depart(),
 //   arrive(name, d = 110) -> s, stopNow(name), cruiseNow() }, doors(open, side = 'L'), chime(), lightning(k = 1),
-//   paths, stations, ar (nameboard AR specs), castFor(state) -> { actorId: mark }.
+//   paths, stations, ar (nameboard AR specs), castFor(state) -> { actorId: mark }, castLook(actorId) -> look
+//   (reindeer_man -> local40_c; the others' ids are their looks).
 // AMBIENCE (getter, by travel state): cruising rail_clack + train_hum + rain_roof; stopped train_idle + rain_roof +
 //   platform_murmur; talk27 / valley27 + rain_heavy; room 'carriage'. One-shots: train_chime, train_doors, thunder_far,
 //   thunder, glass_squeak (the reindeer).
@@ -1381,11 +1382,12 @@ SETS.train = (() => {
     valley27:  { env: 'dark27', travel: 'arrive', station: 'FORTITUDE VALLEY', doors: false, rd: 'flop', plat: 0, rain: 'heavy' },
   };
   const CAST = {
-    board27: { chase40: 's27_c40', chase: 's27_chase', luka: 's27_luka_doze', passenger_a: 's27_passenger', passenger_b: 's27_reindeer_man', passenger_c: 's27_pax_c', passenger_d: 's27_pax_d' },
-    inspect27: { chase40: 's27_c40', chase: 's27_chase_up', luka: 's27_luka_doze', passenger_a: 's27_passenger', passenger_b: 's27_reindeer_man', passenger_c: 's27_pax_c', passenger_d: 's27_pax_d' },
-    talk27: { luka: 's27_talk_luka', chase40: 's27_talk_c40', chase: 's27_talk_chase', passenger_a: 's27_passenger', passenger_b: 's27_reindeer_man', passenger_c: 'seat_B2Rba', passenger_d: 'seat_B2Rbw' },
+    board27: { chase40: 's27_c40', chase: 's27_chase', luka: 's27_luka_doze', passenger_a: 's27_passenger', reindeer_man: 's27_reindeer_man', passenger_c: 's27_pax_c', passenger_d: 's27_pax_d' },
+    inspect27: { chase40: 's27_c40', chase: 's27_chase_up', luka: 's27_luka_doze', passenger_a: 's27_passenger', reindeer_man: 's27_reindeer_man', passenger_c: 's27_pax_c', passenger_d: 's27_pax_d' },
+    talk27: { luka: 's27_talk_luka', chase40: 's27_talk_c40', chase: 's27_talk_chase', passenger_a: 's27_passenger', reindeer_man: 's27_reindeer_man', passenger_c: 'seat_B2Rba', passenger_d: 'seat_B2Rbw' },
   };
   CAST.run27 = CAST.board27; CAST.valley27 = CAST.talk27;
+  const CAST_LOOK = { reindeer_man: 'local40_c' };   // the reindeer's owner is a man (2.7: actor reindeer_man, look local40_c)
   function dressApply(st, build) {
     const D = DRESS[st]; if (!D) return;
     R.state = st;
@@ -1596,10 +1598,11 @@ SETS.train = (() => {
       s27_pid:           { at: [0.0, 2.17, 1.03], from: [0.25, 1.55, 3.2], fov: 36 },
     },
     cams: {
-      aisle_B_far:  { type: 'fixed', pos: [0.95, 2.12, 10.25],  look: [-0.30, 0.55, 1.40],  fov: 46, ease: 0.25 },
-      aisle_B_near: { type: 'fixed', pos: [-0.95, 2.12, 1.20],  look: [0.30, 0.55, 8.90],   fov: 56, ease: 0.25 },
-      aisle_A_far:  { type: 'fixed', pos: [-0.95, 2.12, -10.25], look: [0.30, 0.55, -1.40], fov: 46, ease: 0.25 },
-      aisle_A_near: { type: 'fixed', pos: [0.95, 2.12, -1.20],  look: [-0.30, 0.55, -8.90], fov: 56, ease: 0.25 },
+      // each pair faces opposite ways down the aisle: they cut (an ease would swing through a top-down over the player)
+      aisle_B_far:  { type: 'fixed', pos: [0.95, 2.12, 10.25],  look: [-0.30, 0.55, 1.40],  fov: 46 },
+      aisle_B_near: { type: 'fixed', pos: [-0.95, 2.12, 1.20],  look: [0.30, 0.55, 8.90],   fov: 56 },
+      aisle_A_far:  { type: 'fixed', pos: [-0.95, 2.12, -10.25], look: [0.30, 0.55, -1.40], fov: 46 },
+      aisle_A_near: { type: 'fixed', pos: [0.95, 2.12, -1.20],  look: [-0.30, 0.55, -8.90], fov: 56 },
       vest_M:       { type: 'fixed', pos: [1.10, 2.05, 0.85],   look: [-0.90, 0.70, -0.50], fov: 64 },
       vest_A:       { type: 'fixed', pos: [1.10, 2.05, -8.75],  look: [-0.80, 0.70, -10.30], fov: 64 },
       vest_B:       { type: 'fixed', pos: [-1.10, 2.05, 8.75],  look: [0.80, 0.70, 10.30],  fov: 64 },
@@ -1620,6 +1623,7 @@ SETS.train = (() => {
     update,
     dress, seat, travel, doors, chime, lightning,
     castFor: (st) => CAST[st] || CAST.board27,
+    castLook: (id) => CAST_LOOK[id] || id,
     get ar() {
       const label = (R.plat && R.plat.userData.label) || TR.station;
       return [{ id: 'ar_nameboard_a', kind: 'sign', text: label, prop: 'nameboard_a', w: 3.6 }, { id: 'ar_nameboard_b', kind: 'sign', text: label, prop: 'nameboard_b', w: 3.6 }];
