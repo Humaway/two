@@ -24,6 +24,9 @@ Source reports are in `docs/reports/`.
 
 - [ ] **bridge** — the `ch_shoulder` camera ([-5.8, 0.5, 214]) has the west barrier filling ~⅓ of the frame during the chase.
 
+- [ ] **train** — `aisle_B_far`/`aisle_B_near` (and the A pair) face opposite ways but both `ease`: crossing z ±4.8 swoops through a 0.25 s top-down over the player — drop `ease` on those cams; `passenger_b` is a woman but the reindeer owner is a man (2.7 spawns `reindeer_man`, look local40_c); no `lean` anim.
+- [ ] **sandgate** — `h26_sizzle` sample spot sits inside the gazebo collider (2.6 uses its own spot at the table front).
+
 ## Engine
 
 - [ ] **systems** — a lured drone's collapsing cone sweeps a wide fan and can spot nearby actors: keep it narrow or skip detection until collapsed.
@@ -45,6 +48,8 @@ Source reports are in `docs/reports/`.
 - [ ] **art** — a laughing-and-crying expression (2.5 uses `laugh` + `face.tears = 1`); a hand-on-rail descent for Rue (2.4).
 - [ ] **flow** — under autoplay, `move` steps on the leader don't make followers trail (2.5's autoplay walks them itself).
 - [ ] **flow** — hotspot `text` runs before `kettle`, so a kettle line can't get its own shot (2.4 runs line + ask + saveGame by hand).
+- [ ] **ui** — speaker `passenger` always shows the old-man portrait; per-actor portraits for generic speakers (2.7 uses passenger_c/passenger_d labelled PASSENGER).
+- [ ] **art** — a hand-held card prop (1.5 bonus card and 2.6 invitation are built content-side from `mat()`).
 - [ ] **world** — `{shot:'TWO'}` in a split's left half frames the whole room instead of the two subjects (1.3 uses explicit lenses).
 - [ ] **world** — orbits in tight rooms shrink to 20% radius → cramped, head-cropped frames (engine C note).
 - [ ] **systems** — drone floor cones are low-contrast on the bright 2026 store floor (engine C note).
