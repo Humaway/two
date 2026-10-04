@@ -33,6 +33,10 @@ Source reports are in `docs/reports/`.
 
 - [ ] **hq_top** — optional lamp preset near `mgr_turn` (the 3.3 badge insert is dark).
 
+- [ ] **parade** — a `coffees` prop in Region W for B2 (B2 builds two cups in its file, like foreshore26 has).
+- [ ] **reddy40** — an optional caption mode for the address canvas ("THE MANAGER" for the B1 2037 frame).
+- [ ] **sets (optional)** — a funeral frame for B1's 2035 (B1 builds a small hall at load, parked in reddy26 at (40, −60, −40)).
+
 ## Engine
 
 - [ ] **systems** — a lured drone's collapsing cone sweeps a wide fan and can spot nearby actors: keep it narrow or skip detection until collapsed.
@@ -78,3 +82,7 @@ Source reports are in `docs/reports/`.
 
 - [ ] **keypad** — no keypad mini-game exists; `64-content-2-1-2-3.js` registers a port of Rue's alarm keypad as `MINIGAMES.keypad` if absent. Move it into a mini-game file (`54-mg-keypad.js`) and drop the content-side copy.
 - [ ] **world** — a per-set render hook (`def.render(alpha)`) called by `world.render` before drawing; `15-set-bridge.js` currently wraps `world.render` once to interpolate scooters/cars/pelicans between ticks.
+
+## Visual QA (integration pass)
+
+- [ ] **B1** — real-time screenshot pass of the montage (2029 → match cut) and the post-screenshot framing fixes; **B2** entirely (fast autoplay passes; frames unviewed).
