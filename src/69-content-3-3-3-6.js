@@ -79,21 +79,17 @@
       to: { pos: [V1.x + sx * (d - pu), y + (o.rise || 0), V1.z + sz * (d - pu)], look: [lx, ly + (o.tilt || 0), lz], fov: o.fovTo || f }, dur: o.dur || 7, ease: o.ease || 'linear' });
   }
   const CLOSE = (id, o) => ({ do: (c) => closeOn(c, id, o) });
-  // his gloved right hand at his side, from the room side so the lit glass is behind it (the flicker reads against it)
+  // his gloved right hand held out at his side, from low on the room side looking up past it at the glass: the black
+  // glove sits over the pop-up's [YES] (and the clock above it), so it reads as a silhouette, and when it fades the YES
+  // shows through it
   function handLens(c, push) {
     const a = act(c, 'luka40');
     if (!a || sk(c)) return;
     c.ui.card(null);
     a.rig.parts.handR.getWorldPosition(V1);
-    // (s35_hand_out holds it out from his side.) The black glove reads only as an outline against the lit glass: look
-    // across his front, perpendicular to the arm, toward the glass, so his body sits beside the hand and not behind it
-    let sx = V1.x - a.pos.x, sz = V1.z - a.pos.z;
-    const L = Math.hypot(sx, sz) || 1; sx /= L; sz /= L;
-    let nx = -sz, nz = sx;
-    if (nz < 0) { nx = -nx; nz = -nz; }
-    const p = [V1.x - nx * 0.95, V1.y + 0.24, V1.z - nz * 0.95], lk = [V1.x, V1.y + 0.06, V1.z];
-    c.cam.shot({ shot: 'CAM', pos: p, look: lk, fov: 34,
-      to: { pos: [p[0] + (lk[0] - p[0]) * push, p[1] + (lk[1] - p[1]) * push, p[2] + (lk[2] - p[2]) * push], look: lk, fov: 32 }, dur: 4, ease: 'linear' });
+    const p = [V1.x + 0.15, V1.y - 0.5, V1.z - 1.2], lk = [V1.x, V1.y + 0.25, V1.z];
+    c.cam.shot({ shot: 'CAM', pos: p, look: lk, fov: 40,
+      to: { pos: [p[0] + (lk[0] - p[0]) * push, p[1] + (lk[1] - p[1]) * push, p[2] + (lk[2] - p[2]) * push], look: lk, fov: 38 }, dur: 4, ease: 'linear' });
   }
   // over `from`'s shoulder onto `to`'s face (long lenses across the room)
   function otsOn(c, from, to, o = {}) {
@@ -138,10 +134,6 @@
 
   // ---------------------------------------------------------- anims this file owns (guarded; no allocation per tick)
   function anim(name, fn, upper) { if (!ANIMS[name]) { ANIMS[name] = fn; if (upper) fn.upper = true; } }
-  // the stillness and the hurt stance without their built-in faces (ANIMS.still / hurt_stand set 'still' / 'hurt' on
-  // their first pose, which would undo an expression set in the same tick): the scenes set the faces themselves
-  anim('s3_still', (r, t, p) => ANIMS.still(r, t, p));
-  anim('s3_hurt', (r, t, p) => ANIMS.hurt_stand(r, t, p), true);
   // 3.3: Future Luka turned round; under the open coat his badge swings out and flips over: biro, 1158 (p.dur)
   anim('s33_badge', (r, t, p) => {
     const k = K();
@@ -310,20 +302,6 @@
     k.towards(r, t, p, mouthPose, e);
     r.parts.armL.position.y += sob; r.parts.armR.position.y += sob; r.parts.torso.rotation.x += 0.02 * sob / 0.014;
   });
-  // 3.6: he takes the headphones off: both hands to his ears, up and away, down out of the frame (one-shot ~2.2 s)
-  const earsPose = (r, t, p) => {
-    const k = K(), d = r.d, b = p.lift || 0;
-    k.arm(r, 1, 0.12 * d.hs + 0.03 * b, d.headC - 0.01 + 0.1 * b, 0.0 + 0.08 * b, 1, -0.4, -0.2);
-    k.arm(r, -1, 0.12 * d.hs + 0.03 * b, d.headC - 0.01 + 0.1 * b, 0.0 + 0.08 * b, 1, -0.4, -0.2);
-    r.parts.handL.rotation.set(0, 0, 1.0); r.parts.handR.rotation.set(0, 0, -1.0);
-  };
-  anim('s36_phones_off', (r, t, p) => {
-    const k = K();
-    if (!k) return ANIMS.still(r, t, p);
-    const u = k.once(t, p, 2.2), up = u < 0.3 ? k.ez(u / 0.3) : u > 0.62 ? k.ez((1 - u) / 0.38) : 1;
-    p.lift = u < 0.3 ? 0 : k.ez(Math.min(1, (u - 0.3) / 0.25));
-    k.towards(r, t, p, earsPose, up);
-  });
   // 3.6: Luka at the console's east end: reaches down for the dangling phone (right hand), pulls it free, brings it up
   // to his chest; the left hand (the lanyard in his fist) goes to his ribs (one-shot ~2.6 s, then 's36_hold_phone')
   const phoneChest = (r, t, p) => {
@@ -479,12 +457,12 @@
   }, { size: [460, 820] });
 
   // ---------------------------------------------------------- cleanup: anything this file leaves on shared objects
-  const LIVE = { hand: null, photo: null, photoHome: null, chip: false };
-  function handScale(a, s) { if (a && a.rig && a.rig.parts.handR) a.rig.parts.handR.scale.setScalar(s); }
+  const LIVE = { hand: null, photo: null, photoHome: null, chip: false, limp: null };
   function cleanup() {
     songStop();
-    if (LIVE.hand) { handScale(LIVE.hand, 1); LIVE.hand = null; }
+    if (LIVE.hand) { LIVE.hand.rig.ghost(null, 1); LIVE.hand = null; }
     removeUpdate(flickerTick);
+    if (LIVE.limp) { LIVE.limp.walkAnim = 'walk'; LIVE.limp = null; }
     photoFollow(null);
     if (LIVE.chip && typeof ui !== 'undefined' && ui.chipView) ui.chipView(false);
     LIVE.chip = false;
@@ -521,20 +499,31 @@
   }
 
   // ---------------------------------------------------------- 3.5: the translucent hand (he's being erased; it solidifies)
-  const FL = { t: 0, n: 0 };
+  // rig.ghost dithers the gloved right hand and forearm away: see-through and flickering (two ticks in three faint, with
+  // longer drop-outs; Reduce Flashing: a slow pulse); erase(c, false) lets it solidify over 0.8 s. ghost() writes the
+  // rig's vertex attribute, so it only runs when the level changes.
+  const GH = ['handR', 'foreR'];
+  const FL = { t: 0, n: 0, k: -1, solid: 0 };
+  function ghostAt(a, k) { if (FL.k !== k) { FL.k = k; a.rig.ghost(GH, k); } }
   function flickerTick(dt) {
     const a = LIVE.hand;
     if (!a) return;
     FL.t += dt; FL.n++;
-    // two frames in three gone, with longer drop-outs: it reads as see-through and flickering (Reduce Flashing: slower)
-    const slowF = options.reduceFlashing, ph = slowF ? Math.floor(FL.t * 5) : FL.n, gap = Math.sin(FL.t * 3.7) > 0.55;
-    handScale(a, gap || (ph % 3 !== 0) ? 0.001 : 1);
+    if (FL.solid > 0) {
+      FL.solid = Math.min(1, FL.solid + dt / 0.8);
+      ghostAt(a, FL.solid >= 1 ? 1 : Math.round((0.4 + 0.6 * FL.solid * FL.solid) * 10) / 10);
+      if (FL.solid >= 1) { removeUpdate(flickerTick); a.rig.ghost(null, 1); LIVE.hand = null; }
+      return;
+    }
+    if (options.reduceFlashing) { ghostAt(a, Math.round((0.45 + 0.15 * Math.sin(FL.t * 2.2)) * 20) / 20); return; }
+    ghostAt(a, Math.sin(FL.t * 3.7) > 0.55 ? 0.15 : FL.n % 3 === 0 ? 0.7 : 0.38);
   }
   function erase(c, on) {
     const a = act(c, 'luka40');
-    if (on && a && !sk(c)) { LIVE.hand = a; FL.t = 0; FL.n = 0; removeUpdate(flickerTick); addUpdate(flickerTick); return; }
+    if (on && a && !sk(c)) { LIVE.hand = a; FL.t = 0; FL.n = 0; FL.k = -1; FL.solid = 0; removeUpdate(flickerTick); addUpdate(flickerTick); return; }
+    if (!on && LIVE.hand && !sk(c)) { FL.solid = 0.001; return; }   // it solidifies (the updater finishes it)
     removeUpdate(flickerTick);
-    if (LIVE.hand) handScale(LIVE.hand, 1);
+    if (LIVE.hand) LIVE.hand.rig.ghost(null, 1);
     LIVE.hand = null;
   }
 
@@ -622,7 +611,7 @@
     const a = act(c, 'luka40');
     if (!a) return;
     a.rig.show('hood', !!hood); a.rig.show('gloves', true); a.rig.show('headphones_head', false);
-    a.play('s3_still'); a.setExpr('still');
+    a.play('still'); a.setExpr('still');
   }
 
   // ==================================================================== 3.3 — "The Manager"
@@ -741,7 +730,7 @@
     // [INSERT · slow] His chest. Under the open coat: a faded blue lanyard, paler than Luka's. As he turns, the badge
     // swings and flips over. Biro on the back: 1158.
     put('luka40', 'mgr_turn'),
-    { do: (c) => { const a = act(c, 'luka40'); if (a) a.rig.badgeFlip(true); } },
+    { do: (c) => { const a = act(c, 'luka40'); if (a) a.rig.badgeFlip(true); if (SETS.hq_top.lamp) SETS.hq_top.lamp('mgr'); } },   // (the spot on his chest: the biro reads)
     play('luka40', 's33_badge', { dur: 2.6 }),
     { do: (c) => {   // framed on the badge itself (its height follows the rig), the lanyard and the open coat round it
       const a = act(c, 'luka40'), L = a && a.rig.attach && a.rig.attach.lanyard;
@@ -753,7 +742,8 @@
         to: { pos: [V1.x + sx * 0.52 + lx * 0.1, V1.y + 0.03, V1.z + sz * 0.52 + lz * 0.1], look: [V1.x, V1.y - 0.04, V1.z], fov: 31 }, dur: 4.5, ease: 'linear' });
     } },
     { wait: 3.6 },
-    play('luka40', 's3_still'),
+    play('luka40', 'still'),
+    { do: () => { if (SETS.hq_top.lamp) SETS.hq_top.lamp('console'); } },
     // [CLOSE · Chase] He sees it first. His face.
     CLOSE('chase', { dist: 0.8, push: 0.08, dur: 5 }),
     expr('chase', 'stunned'),
@@ -1024,7 +1014,26 @@
 
   // ==================================================================== 3.5 — "99%"
   const BY_LUKA = 's35_l40_by_luka', DESK_AT = [-10.1, 0, -15.06, H];
-  const S35_LOOK_L40 = [-4.0, 0, -11.95, 2.35];      // at the glass, turned toward his past self at the console
+  const S35_LOOK_L40 = [-5.6, 0, -11.95, 2.2];       // at the glass (west of the pop-up's glare), turned toward the console
+  // the spot as a lamp at his desk (the set's 'desk' lamp is straight down: a bowed head would be a dark crown): storm
+  // light from the room side onto his face while he holds the photo; the set's own lamp comes back with lamp(name)
+  function deskLight(c) {
+    if (SETS.hq_top.lamp) SETS.hq_top.lamp('off');
+    const s = c.world.torch;
+    if (!s) return;
+    c.world.torchAuto = false;
+    s.position.set(-7.8, 2.4, -13.8); s.target.position.set(-10.0, 1.5, -15.0); s.target.updateMatrixWorld();
+    s.angle = 0.4; s.penumbra = 0.7; s.distance = 7; s.color.setHex(0xdfe8ff); s.intensity = 6;
+  }
+  // the same on his past self's face against the wall, for the ECU of his eye (soft, from in front and below)
+  function eyeLight(c) {
+    if (SETS.hq_top.lamp) SETS.hq_top.lamp('off');
+    const s = c.world.torch;
+    if (!s) return;
+    c.world.torchAuto = false;
+    s.position.set(2.6, 0.75, -21.3); s.target.position.set(2.8, 0.75, -22.5); s.target.updateMatrixWorld();
+    s.angle = 0.35; s.penumbra = 0.7; s.distance = 7; s.color.setHex(0xdfe8ff); s.intensity = 3;
+  }
   function hackAt(c, pct) {
     const cn = ud(c, 'console'), ph = ud(c, 'luka_phone');
     if (cn) cn.screen('hack', pct);
@@ -1107,7 +1116,7 @@
     { wait: 1.6 },
     // [WIDE · locked, low] Future Luka walks among them in his long coat. Rain hammers the glass.
     { do: (c) => { const r = ud(c, 'glass_rain'); if (r) r.boost(1.6); } },
-    { shot: 'CAM', pos: [-11.4, 0.45, -18.4], look: [0.5, 1.0, -15.6], fov: 52 },
+    { shot: 'CAM', pos: [9.0, 0.45, -12.2], look: [-6.0, 0.9, -15.0], fov: 50 },
     expr('luka40', 'still'),
     { move: 'luka40', to: [-6.0, 0, -15.0], nowait: true },
     { wait: 3.6 },
@@ -1117,7 +1126,7 @@
     { face: 'chase', to: 's35_l40_by_chase', dur: 0 },
     play('chase', 's35_held', { v: 1, look: 0.8 }),
     expr('chase', 'determined'),
-    CLOSE('chase', { dist: 0.85, push: 0.25, dur: 16, dy: -0.05, ly: 0.06 }),
+    CLOSE('chase', { dist: 0.85, push: 0.25, dur: 16, dy: -0.05, ly: 0.06, yaw: 0.4 }),   // (from his left: the arm the foam caught mid-swing stays behind him)
     { wait: 0.5 },
     cue(say('chase', "Look at him. ^ Six years. He stopped. Everything. He stopped playing. He stopped ringing Rue. He stopped— ^ You did that. ^ Not the fire. You."), 'Look at him.',
       (c) => glanceNow(c, 'chase', 'chase40', 1.8)),
@@ -1148,7 +1157,9 @@
     glide([-0.8, 1.68, -18.7], [-0.8, 1.42, -16.3], 46, { pos: [-0.8, 1.66, -18.45], look: [-0.8, 1.42, -16.3], fov: 45 }, 5),
     { wait: 2.2 },
     CLOSE('luka', { dist: 0.85, push: 0.3, dur: 22, ly: 0.02 }),
-    say('luka', "I know why you did it. I nearly did it. Last night. I had the phone in my hand and a note that said 'I'll do it.' ^ He was awake. He said I don't get to decide that for him. ^ You don't get to decide it for everyone."),
+    expr('luka', 'sad'),
+    cue(say('luka', "I know why you did it. I nearly did it. Last night. I had the phone in my hand and a note that said 'I'll do it.' ^ He was awake. He said I don't get to decide that for him. ^ You don't get to decide it for everyone."),
+      "You don't get to decide it", (c) => { const a = act(c, 'luka'); if (a) a.setExpr('determined'); }),
     CLOSE('luka40', { dist: 0.95, push: 0.08, dur: 4 }),
     { wait: 2.0 },
     // [INSERT · the hack] HACK 94%.
@@ -1162,7 +1173,7 @@
     // [MID · Future Luka] He walks to his desk. Stops. He picks up the face-down frame and turns it over.
     put('luka40', [-10.6, 0, -18.4, 0.1]),
     expr('luka40', 'still'),
-    { do: () => { if (SETS.hq_top.lamp) SETS.hq_top.lamp('desk'); } },
+    { do: (c) => deskLight(c) },
     anchor('desk_photo_turn', { push: 0.1, dur: 10 }),
     { move: 'luka40', to: DESK_AT },
     { wait: 0.4 },
@@ -1184,15 +1195,15 @@
       a.eyePos(V1);
       if (o) V2.copy(o.position); else a.rig.parts.handR.getWorldPosition(V2);
       const ry = a.rotY, sx = Math.sin(ry), sz = Math.cos(ry), rx = -sz, rz = sx;
-      // from beside his right ear, down onto the frame and his gloved hands
-      const px = V1.x - sx * 0.12 + rx * 0.3, py = V1.y + 0.08, pz = V1.z - sz * 0.12 + rz * 0.3;
+      // over his bowed head, down onto the frame in his gloved hands (as he sees it)
+      const px = V1.x - sx * 0.1 + rx * 0.08, py = V1.y + 0.1, pz = V1.z - sz * 0.1 + rz * 0.08;
       c.cam.shot({ shot: 'CAM', pos: [px, py, pz], look: [V2.x, V2.y - 0.02, V2.z], fov: 34,
         to: { pos: [px + (V2.x - px) * 0.12, py + (V2.y - py) * 0.12, pz + (V2.z - pz) * 0.12], look: [V2.x, V2.y - 0.02, V2.z], fov: 32 }, dur: 4, ease: 'linear' });
     } },
     { wait: 2.6 },
     // [ECU · the pop-up on the glass] OPT OUT ALL USERS? [YES] — and for a single frame, in the empty space, a [NO]
     // button flickers into existence. Then it's gone.
-    glide([-3.0, 2.1, -13.45], [-3.0, 2.08, -11.24], 34, { pos: [-3.0, 2.1, -13.3], look: [-3.0, 2.08, -11.24], fov: 34 }, 4),
+    anchor('glass_popup_ecu', { push: 0.06, dur: 4 }),
     { wait: 1.4 },
     { do: (c) => {
       const g = ud(c, 'glass_ui');
@@ -1217,7 +1228,7 @@
     slow('chase40', 'Luka.', { tag: 'softly' }),
     // [CLOSE · Future Luka, eyes closed] Hold 3 s. We believe he's going to stop.
     expr('luka40', 'sleep'),
-    CLOSE('luka40', { dist: 0.9, push: 0.1, dur: 5, dy: 0.04, ly: 0.12 }),
+    CLOSE('luka40', { dist: 0.9, push: 0.1, dur: 5, dy: -0.22, ly: -0.05, yaw: 0.3 }),
     { wait: 3.0 },
     // [INSERT · the countdown on the glass] 11:57. Thunder.
     { do: (c) => { const g = ud(c, 'glass_ui'); if (g) { g.clock({ h: 11, m: 57, s: 0, sec: false, quiet: '00:01:00' }); g.clockRun(0); } c.hud.quiet('00:01:00'); } },
@@ -1226,7 +1237,7 @@
     { sfx: 'thunder', vol: 0.75 },
     { wait: 2.0 },
     // [CLOSE · Future Luka] His eyes open, and something in them closes.
-    CLOSE('luka40', { dist: 0.85, push: 0.05, dur: 6, dy: 0.04, ly: 0.12 }),
+    CLOSE('luka40', { dist: 0.85, push: 0.05, dur: 6, dy: -0.22, ly: -0.05, yaw: 0.3 }),
     { wait: 0.6 },
     expr('luka40', 'still'),
     { wait: 1.2 },
@@ -1238,7 +1249,7 @@
     { do: (c) => { photoFollow(null); const pf = ud(c, 'photo_frame'); if (pf) pf.state('down'); } },
     { sfx: 'card_slide', vol: 0.15, rate: 0.7 },
     { wait: 0.8 },
-    play('luka40', 's3_still'),
+    play('luka40', 'still'),
     { do: (c) => { const f = ud(c, 'foam'); if (f) f.harden(); if (SETS.hq_top.lamp) SETS.hq_top.lamp('console'); } },
     play('chase', 's35_held', { v: 1, look: 0.2 }),
     { sfx: 'foam', vol: 0.3, rate: 1.3 },
@@ -1251,16 +1262,18 @@
     // [CLOSE · Future Luka looking at his past self] "I'm sorry." He flicks two fingers.
     put('luka40', 's35_l40_end'),
     { face: 'luka40', to: 'luka', dur: 0 },
-    CLOSE('luka40', { dist: 0.95, push: 0.08, dur: 6 }),
+    CLOSE('luka40', { dist: 0.95, push: 0.08, dur: 6, yaw: -0.5 }),
     { wait: 0.8 },
     say('luka40', "I'm sorry.", { tag: 'barely', speed: 'slow' }),
     { wait: 0.4 },
-    { do: (c) => {
+    { do: (c) => {   // low, in front of him: the black glove against the glowing pop-up, [YES] and the empty slot behind it
       const a = act(c, 'luka40'), l = act(c, 'luka');
       if (!a || !l || sk(c)) return;
-      const ry = a.rotY, sx = Math.sin(ry), sz = Math.cos(ry), rx = -sz, rz = sx;
-      l.eyePos(V2);
-      c.cam.shot({ shot: 'CAM', pos: [a.pos.x - sx * 0.7 + rx * 0.55, 1.12, a.pos.z - sz * 0.7 + rz * 0.55], look: [V2.x, V2.y - 0.35, V2.z], fov: 40 });
+      a.rig.parts.handR.getWorldPosition(V1);
+      let fx = l.pos.x - a.pos.x, fz = l.pos.z - a.pos.z;
+      const n = Math.hypot(fx, fz) || 1; fx /= n; fz /= n;
+      const rx = -fz, rz = fx;
+      c.cam.shot({ shot: 'CAM', pos: [V1.x + fx * 1.1 - rx * 0.3, V1.y - 0.2, V1.z + fz * 1.1 - rz * 0.3], look: [V1.x, V1.y + 0.12, V1.z], fov: 40 });
     } },
     play('luka40', 's35_flick', { dur: 1.2 }),
     { wait: 1.3 },
@@ -1324,7 +1337,7 @@
     { wait: 0.15 },
     // [WIDE · locked, low, across the floor] Luka slides down the wall and lies still against it. His lanyard has snapped.
     // The badge lies face down beside his open hand. His 2026 phone dangles from the console, the screen cracked, lit.
-    { shot: 'CAM', pos: [-5.6, 0.35, -14.6], look: [2.4, 0.55, -21.6], fov: 34 },
+    { shot: 'CAM', pos: [-0.8, 0.3, -16.6], look: [2.75, 0.55, -22.3], fov: 38 },
     { do: (c) => {
       const a = act(c, 'luka');
       if (!a) return;
@@ -1340,7 +1353,7 @@
     { do: (c) => { if (!sk(c)) { AUDIO.ringing(true, { vol: 0.32, fade: 0.25 }); AUDIO.muffle(380, 1.0); } } },
     { wait: 2.6 },
     // [CLOSE · Chase] Frozen. His mouth opens and nothing comes out.
-    play('chase', 's3_still'), play('chase40', 's3_still'),
+    play('chase', 'still'), play('chase40', 'still'),
     { face: 'chase', to: WALL, dur: 0 }, { face: 'chase40', to: WALL, dur: 0 },
     expr('chase', 'stunned'),
     CLOSE('chase', { dist: 0.8, push: 0.04, dur: 4 }),
@@ -1361,7 +1374,7 @@
     HACK(99),
     { wait: 2.0 },
     // [WIDE · locked] Both Chases staring across the floor at Luka's body. He doesn't move. Hold 4 s.
-    { shot: 'CAM', pos: [-11.0, 2.3, -11.8], look: [-1.0, 0.6, -19.5], fov: 54 },
+    { shot: 'CAM', pos: [-10.5, 1.5, -14.5], look: [2.8, 0.5, -22.4], fov: 44 },
     { wait: 4.0 },
     // CHASE: (a whisper) "…Luka?" (Nothing.)
     say('chase', '…Luka?', { tag: 'whisper' }),
@@ -1373,8 +1386,8 @@
     { do: (c) => erase(c, true) },
     { wait: 2.8 },
     // [CLOSE · Future Luka] "He's an inferior version of myself; he lets himself be ruled by fear."
-    play('luka40', 's3_still'),
-    CLOSE('luka40', { dist: 0.95, push: 0.06, dur: 7 }),
+    play('luka40', 'still'),
+    CLOSE('luka40', { dist: 0.95, push: 0.06, dur: 7, yaw: -0.5 }),
     say('luka40', "He's an inferior version of myself; he lets himself be ruled by fear."),
     // [INSERT · the cracked phone] HACK 100%.
     glide([1.62, 0.52, -15.75], [1.24, 0.45, -15.4], 26, { pos: [1.55, 0.5, -15.68], look: [1.24, 0.45, -15.4], fov: 24 }, 4),
@@ -1383,10 +1396,11 @@
     // Silence. 2 s.
     { do: (c) => { if (!sk(c)) AUDIO.ringing(false, { fade: 1.4 }); } },
     { wait: 2.0 },
-    // [ECU · Luka's eye] It opens.
+    // [ECU · Luka's eye] It opens. (a soft light from in front of him: the wall lamp only finds the crown of his head)
     { do: (c) => {
       const a = act(c, 'luka');
       if (!a || sk(c)) return;
+      eyeLight(c);
       a.eyePos(V1);
       const ry = a.rotY, sx = Math.sin(ry), sz = Math.cos(ry);
       const ex = V1.x - Math.cos(ry) * 0.032, ez2 = V1.z + Math.sin(ry) * 0.032;   // his right eye
@@ -1399,13 +1413,13 @@
     slow('luka', 'No…', { tag: 'barely audible' }),
     // [WIDE · locked, low] Luka gets up. Slowly. It takes a long time. One hand on the wall, then a knee, then up. His
     // polo is torn. Blood at his hairline. He holds his ribs. He picks up the snapped lanyard and closes his fist round it.
-    { shot: 'CAM', pos: [-5.6, 0.35, -14.6], look: [2.5, 0.75, -21.7], fov: 32 },
-    { do: (c) => { if (!sk(c)) AUDIO.muffle(null, 6); } },
+    { shot: 'CAM', pos: [-0.8, 0.3, -16.6], look: [2.75, 0.62, -22.3], fov: 38 },
+    { do: (c) => { if (SETS.hq_top.lamp) SETS.hq_top.lamp('wall'); if (!sk(c)) AUDIO.muffle(null, 6); } },
     { do: (c) => {
       const a = act(c, 'luka'), up = SETS.hq_top.marks.s35_luka_up;
       if (!a) return;
       a.setExpr('hurt');
-      if (sk(c)) { a.place('s35_luka_up'); a.play('s3_hurt'); const b = c.world.prop('luka_badge'); if (b) b.visible = false; return; }
+      if (sk(c)) { a.place('s35_luka_up'); a.play('hurt_stand'); const b = c.world.prop('luka_badge'); if (b) b.visible = false; return; }
       a.play('s35_getup', { dur: 10 });
       const z0 = WALL[2];
       const sid = c.flow.sceneId;
@@ -1413,7 +1427,7 @@
       return c.wait(6.6).then(() => tween(c, 3.4, (u) => { const k = ez(u); a.pos.z = z0 + (up[2] - z0) * k; a.rotY = up[3] * k; }));
     } },
     { wait: 0.4 },
-    { do: (c) => { const b = c.world.prop('luka_badge'); if (b) b.visible = false; const a = act(c, 'luka'); if (a) { a.place('s35_luka_up'); a.play('s3_hurt'); } } },
+    { do: (c) => { const b = c.world.prop('luka_badge'); if (b) b.visible = false; const a = act(c, 'luka'); if (a) { a.place('s35_luka_up'); a.play('hurt_stand'); } } },
     // [CLOSE · Future Luka's hand] It solidifies.
     play('luka40', 's35_hand_out', { dur: 0.01 }),
     { wait: 0.1 },
@@ -1423,10 +1437,10 @@
     { sfx: 'chip_on', vol: 0.08, rate: 0.6 },
     { wait: 1.4 },
     // [TWO-SHOT · the two Lukas, the room between them] Past Luka, wrecked and upright. Future Luka, untouched.
-    play('luka40', 's3_still'),
+    play('luka40', 'still'),
     { face: 'luka40', to: 'luka', dur: 0 },
     expr('luka', 'determined'),
-    anchor('s35_lukas_two', { push: 0.05, dur: 8 }),
+    glide([-5.9, 1.5, -22.0], [-0.1, 1.25, -18.1], 56, { pos: [-5.6, 1.48, -21.75], look: [-0.1, 1.25, -18.1], fov: 54 }, 8),
     { wait: 2.0 },
     slow('luka', "You're the one who's ruled by fear."),
     // [LOW · Luka, the sincere low angle from Rue's Torchlight] He raises his arm and waves it, once.
@@ -1437,7 +1451,7 @@
     // [WIDE] Every drone in the room turns, as one, away from the Chases. Over the nearest, a small pop-up flickers:
     // IDENTITY CONFIRMED: MANAGER. They drift across the office and form a ring around Future Luka, facing him. Red →
     // blue → a warm Yes yellow.
-    anchor('s35_ring_wide', { push: 0.05, dur: 9 }),
+    anchor('far_corner', { push: 0.04, dur: 9 }),
     DRONE_WATCH(2.8, 1.6, -22.45, 0.6),
     { sfx: 'drone_scan', vol: 0.4, rate: 0.8 },
     { wait: 0.8 },
@@ -1445,11 +1459,20 @@
       if (sk(c)) return;
       const g = ud(c, 'galaxy');
       if (!g) return;
-      // the nearest drone to the lens
-      const cp = c.cam.camera ? c.cam.camera.position : V3.set(3.6, 3.2, -20.8);
-      let bi = 0, bd = 1e9; const o = [0, 0, 0];
-      for (let i = 0; i < 24; i++) { g.pos(i, o); const dd = (o[0] - cp.x) ** 2 + (o[1] - cp.y) ** 2 + (o[2] - cp.z) ** 2; if (dd > 4 && dd < bd) { bd = dd; bi = i; } }
-      g.pos(bi, o);
+      // the nearest drone in view (4-14 m out, closest to the middle of the picture; else the nearest to the lens)
+      const lf = AN('far_corner').from, o = [0, 0, 0];
+      let bi = -1, bs = 1e9, ni = 0, nd = 1e9;
+      for (let i = 0; i < 24; i++) {
+        g.pos(i, o); V3.set(o[0], o[1], o[2]);
+        const d = Math.hypot(o[0] - lf[0], o[1] - lf[1], o[2] - lf[2]);
+        if (d > 2 && d < nd) { nd = d; ni = i; }
+        if (d < 4 || d > 14 || !c.cam.project) continue;
+        const pr = c.cam.project(V3);
+        if (!pr.visible) continue;
+        const dx = pr.x - innerWidth / 2, dy = pr.y - innerHeight * 0.45, sc = dx * dx + dy * dy;
+        if (sc < bs) { bs = sc; bi = i; }
+      }
+      g.pos(bi >= 0 ? bi : ni, o);
       const spec = { style: 'safesense', msg: 'IDENTITY CONFIRMED: MANAGER', buttons: [], at: { pos: [o[0], o[1] + 0.42, o[2]] }, w: 230, dur: 0.12, ding: false };
       c.popup(spec);
       await c.wait(0.2);
@@ -1460,6 +1483,8 @@
     } },
     { wait: 1.6 },
     { do: (c) => { const g = ud(c, 'galaxy'); if (g) { g.ring(-3.0, -13.8, 2.3, 1.9, 3.0); g.color('blue', 0.8); } } },
+    // (from behind the console: they settle round him like a halo, the pop-up on the glass behind him)
+    glide([-3.0, 2.8, -21.0], [-3.0, 1.5, -13.6], 50, { pos: [-3.0, 2.7, -20.2], look: [-3.0, 1.55, -13.6], fov: 48 }, 7.5),
     { sfx: 'drone_ok', vol: 0.35 },
     { wait: 1.6 },
     { do: (c) => { const g = ud(c, 'galaxy'); if (g) g.color('yellow', 1.2); if (SETS.hq_top.lamp) SETS.hq_top.lamp('ring'); } },
@@ -1481,9 +1506,9 @@
     redress(c, ['luka', 'chase', 'chase40', 'luka40']);
     l40Look(c, false);
     const l = act(c, 'luka40'); if (l) { l.place('s35_l40_end'); l.setExpr('still'); }
-    const lk = act(c, 'luka'); if (lk) { lk.place('s35_luka_up'); lk.play('s3_hurt'); lk.setExpr('hurt'); lk.walkAnim = 'walk'; }
+    const lk = act(c, 'luka'); if (lk) { lk.place('s35_luka_up'); lk.play('hurt_stand'); lk.setExpr('hurt'); lk.walkAnim = 'limp'; LIVE.limp = lk; }   // (he limps to the console)
     const ch = act(c, 'chase'); if (ch) { ch.place('s35_chase'); ch.play('kneel'); ch.setExpr('stunned'); ch.rig.show('headphones_neck', true); }
-    const c4 = act(c, 'chase40'); if (c4) { c4.place('s36_c40'); c4.play('s3_still'); c4.setExpr('sad'); }
+    const c4 = act(c, 'chase40'); if (c4) { c4.place('s36_c40'); c4.play('still'); c4.setExpr('sad'); }
     const g = ud(c, 'galaxy'); if (g) g.color('yellow', 0);
     const gl = ud(c, 'glass_ui'); if (gl) { gl.popup('yes_only', { sched: false }); gl.cursor(null); gl.clock({ h: 11, m: 57, s: 30, sec: true, paused: true }); gl.clockRun(0); }
     const ph = ud(c, 'luka_phone'); if (ph) { ph.state('dangling'); ph.screen('cracked', 100); ph.swing(0.3); }
@@ -1539,7 +1564,16 @@
     { wait: 0.8 },
     // [TWO-SHOT · Chase and Future Luka] Future Luka looks at him and doesn't stop him.
     { face: 'luka40', to: 'chase', dur: 0.8 },
-    OTS('chase', 'luka40', { side: 0.32, back: 0.75, dur: 12, push: 0.15, fov: 34 }),
+    { do: (c) => {   // side on from the room: Future Luka frame-left against the glass and its pop-up, Chase frame-right
+      const a = act(c, 'chase'), b = act(c, 'luka40');
+      if (!a || !b || sk(c)) return;
+      const mx = (a.pos.x + b.pos.x) / 2, mz = (a.pos.z + b.pos.z) / 2;
+      let dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z;
+      const n = Math.hypot(dx, dz) || 1; dx /= n; dz /= n;
+      const px = dz * 0.866 - dx * 0.5, pz = -dx * 0.866 - dz * 0.5;   // 30° round toward his face: the [YES] and the empty slot behind him
+      c.cam.shot({ shot: 'CAM', pos: [mx + px * 2.05, 1.6, mz + pz * 2.05], look: [mx, 1.55, mz], fov: 40,
+        to: { pos: [mx + px * 1.85, 1.6, mz + pz * 1.85], look: [mx, 1.56, mz], fov: 40 }, dur: 12, ease: 'linear' });
+    } },
     { wait: 1.6 },
     say('chase', 'I said not yet.'),
     // (He lifts the headphones over Future Luka's head and settles them over his ears, the way Luka once put a lanyard
@@ -1603,7 +1637,7 @@
     { wait: 0.6 },
     play('chase40', 'hands_rise', { stop: true, dur: 2.8 }),
     atBar(31),
-    play('chase40', 's3_still'),
+    play('chase40', 'still'), expr('chase40', 'tearful'),
     // [MID · Luka] Holding his ribs against the wall, watching his future self cry.
     expr('luka', 'sad'),
     { do: (c) => closeOn(c, 'luka', { dist: 1.7, push: 0.25, dur: 10, dy: -0.15, yaw: 0.25 }) },
@@ -1611,7 +1645,7 @@
     // The last chorus lifts from B minor into D major and quotes the 1987 Pudding melody, the hold music.
     // [WIDE · the ring of yellow drones, Future Luka crying in the middle, Chase beside him, the city through the glass]
     put('chase', 's36_chase_side'),
-    anchor('s36_ring_wide', { push: 0.06, dur: 8 }),
+    glide([-3.6, 3.2, -20.4], [-3.0, 1.5, -12.8], 46, { pos: [-3.55, 3.1, -19.9], look: [-3.0, 1.5, -12.8], fov: 46 }, 8),
     { do: (c) => { const a = act(c, 'luka'); if (a && !sk(c)) a.moveTo([0.95, 0, -16.12, 0.36], { speed: 0.95 }); } },
     { wait: 3.6 },
     // [INSERT · the glass] OPT OUT ALL USERS? [YES]
@@ -1638,11 +1672,11 @@
     // LUKA: "Your call." (He gives the choice back. The opposite of deciding for people.)
     { face: 'luka', to: 'luka40', dur: 0.7 },
     expr('luka', 'tired'),
-    CLOSE('luka', { dist: 1.0, push: 0.06, dur: 5, yaw: -0.3, dy: -0.06, ly: -0.04 }),
+    CLOSE('luka', { dist: 1.1, push: 0.06, dur: 5, yaw: -0.3, dy: 0.04 }),
     say('luka', 'Your call.'),
     { wait: 0.6 },
     // Future Luka turns to the glass and steps up to it; Chase beside him
-    play('luka40', 's3_still'),
+    play('luka40', 'still'),
     expr('luka40', 'tearful'),
     anchor('s36_ring_wide', { push: 0.1, dur: 5 }),
     { move: 'luka40', to: 's36_l40_glass' },
@@ -1704,7 +1738,7 @@
       { do: (c) => { c.ui.chipView(false); LIVE.chip = false; } },
       // [WIDE · the mall from above] Somewhere a phone rings, and someone answers. The storm breaks properly: rain pours
       // down, and people in the street don't run. They laugh.
-      { shot: 'CAM', pos: [0.0, 30.0, 4.0], look: [0.0, 0.0, 34.0], fov: 55, to: { pos: [0.0, 27.5, 6.5], look: [0.0, 0.0, 34.0], fov: 54 }, dur: 16 },
+      { shot: 'CAM', pos: [3.0, 11.0, 17.0], look: [0.0, 0.5, 36.0], fov: 52, to: { pos: [2.6, 9.4, 18.6], look: [0.0, 0.6, 36.0], fov: 50 }, dur: 16 },
       { do: () => songOutro(3.2) },   // the outro comes in at the end of the next phrase that leaves this shot 3 s
       { sfx: 'phone_ring', vol: 0.4, at: [-2.2, 1.0, 38.0] },
       { sfx: 'thunder', vol: 0.6 },
@@ -1731,12 +1765,12 @@
     { wait: 0.7 },
     // [CLOSE · Future Luka] He takes the headphones off. The song finishes. (The last chord rings; the 1987 melody's final D.)
     { face: 'luka40', to: 'chase40', dur: 0 },
-    play('luka40', 's3_still'),
+    play('luka40', 'still'),
     expr('luka40', 'tearful'),
     CLOSE('luka40', { dist: 1.0, push: 0.1, dur: 6 }),
-    play('luka40', 's36_phones_off', { dur: 2.2, loop: false }),
+    play('luka40', 'phones_off'),
     { wait: 1.0 },
-    { do: (c) => { const a = act(c, 'luka40'); if (a) a.rig.show('headphones_head', false); } },
+    { do: (c) => { const a = act(c, 'luka40'); if (a) a.rig.show('headphones_head', false); } },   // (the anim hides them; a skip plays no anim)
     { do: (c) => { if (sk(c)) songStop(); } },
     { do: (c) => { const t0 = clock.t; return waitUntil(() => c.flow.skipping || !SG.on || clock.t - t0 > 4 * spd()); } },
     { do: () => songStop() },
@@ -1749,7 +1783,7 @@
     CLOSE('luka40', { dist: 1.0, push: 0.05, dur: 5 }),
     say('luka40', 'You finished it.'),
     // (inside the ring: the hovering drones stay behind them)
-    CLOSE('chase40', { dist: 1.0, push: 0.06, dur: 5, yaw: -0.5 }),
+    CLOSE('chase40', { dist: 1.0, push: 0.06, dur: 5, yaw: 0.35 }),
     glanceAt('chase40', 'chase', 1.6),
     play('chase40', 'nod', { dur: 0.9 }),
     say('chase40', 'He did.', { tag: 'nodding at his younger self' }),
