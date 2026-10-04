@@ -2205,13 +2205,13 @@ SETS.reddy26 = (() => {
       split_b:        { at: [6.4, 1.3, -27.5], from: [4.0, 1.6, -24.4], fov: 52 },
       floor_wreck_wide: { at: [6.4, 1.0, -10.0], from: [10.4, 2.5, -1.7], fov: 52 },   // PC: the wreck, the counter, the Yes wall, Luke at his desk through the open office door
       // PC, endings
-      counter_phone:  { at: [7.55, 1.05, -9.3], from: [7.5, 1.64, -8.5], fov: 34 },    // over the counter, steep (the A coda's lens)
+      counter_phone:  { at: [7.55, 1.03, -9.24], from: [7.52, 1.9, -8.72], fov: 34 },   // over the counter, steep: hands in from both sides (the A coda's lens; PC's HOLD insert)
       a1_split_store: { at: [5.86, 1.1, -8.45], from: [8.2, 2.0, -0.8], fov: 50 },   // the split's right half: the wrapped table left, Luke at the till right
       home_door:      { at: [6.4, 1.35, -24.0], from: [7.4, 1.25, -28.9], fov: 46 },
       b1_night_floor: { at: [6.0, 1.1, -8.0], from: [2.0, 1.55, -2.4], fov: 46 },
       table_downlight:{ at: [5.6, 0.95, -5.3], from: [5.6, 3.1, -5.0] },
       a2_polish:      { at: [5.7, 0.95, -5.6], from: [3.4, 1.5, -3.3], fov: 40 },
-      a2_ladder:      { at: [4.05, 1.9, -11.9], from: [6.7, 1.6, -9.9], fov: 50 },
+      a2_ladder:      { at: [4.1, 2.25, -11.9], from: [6.7, 1.55, -9.9], fov: 54 },   // A2 frame 2 / B1 2027: the man up the ladder head to toe, the one holding it
       a2_wall:        { at: [5.42, 1.8, -19.8], from: [6.7, 1.75, -19.75], fov: 40 },
     };
     const CAMS = {

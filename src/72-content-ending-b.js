@@ -135,10 +135,18 @@
       const k = K(); if (!k) return ANIMS.idle(r, t, p);
       k.base(r, t); const Pt = r.parts, w = t * 2.6;
       Pt.torso.rotation.x = 0.26;
-      if (p.type) { reach(r, k, -1, 0.0, 1.05 - 0.012 * Math.max(0, Math.sin(t * 11)), 0.6, 0.4, -1, -0.5); Pt.handR.rotation.set(0.8, 0, 0); }
+      if (p.type) { reach(r, k, -1, 0.075, 1.06 - 0.012 * Math.max(0, Math.sin(t * 11)), 0.6, 0.4, -1, -0.5); Pt.handR.rotation.set(0.8, 0, 0); }   // (from the screen's right edge: the INSERT sees past it)
       else reach(r, k, -1, 0.1 + 0.03 * Math.sin(w), 0.98, 0.46, 0.5, -1, -0.4);
       reach(r, k, 1, 0.14 + 0.02 * Math.cos(w * 0.7), 0.97, 0.44 + 0.02 * Math.sin(w * 1.3), 0.5, -1, -0.4);
       Pt.head.rotation.x = p.type ? 0.18 : 0.32;
+    });
+    // 46: he stops polishing at the smudge: the cloth hand resting on the glass beside it, head down over it
+    def('b1_stop', (r, t, p) => {
+      const k = K(); if (!k) return ANIMS.idle(r, t, p);
+      k.base(r, t); const Pt = r.parts;
+      Pt.torso.rotation.x = 0.42 + 0.006 * Math.sin(t * 1.1);
+      reach(r, k, -1, 0.14, 0.97, 0.44, 0.5, -1, -0.4); reach(r, k, 1, 0.24, 0.95, 0.4, 0.5, -1, -0.4);
+      Pt.handL.rotation.x = 1.0; Pt.handR.rotation.x = 1.0; Pt.head.rotation.x = 0.55; Pt.head.rotation.y = 0.12;
     });
     // B2: seated on the bench, the brick phone (shows 'brick') in his scarred right hand, turning over
     def('b2_turn', (r, t, p) => {
@@ -782,13 +790,13 @@
   const FROM_DOOR = glide([6.88, 1.92, -24.12], [6.3, 0.15, -27.3], 46, [6.86, 1.9, -24.2], [6.3, 0.15, -27.3], 44, 6);
   // from the floor up at Luke in the doorway: on his right, so his mug hand is the far one
   const UP_AT_LUKE = glide([6.62, 0.45, -26.4], [6.4, 1.6, -24.55], 40, [6.6, 0.45, -26.2], [6.4, 1.6, -24.55], 38, 6);
-  // [CLOSE · Luka's hand] on his chest: the lanyard, snapped and knotted back together (aimed at the knot, read at step
-  // time: from above and a little toward his feet, his hand and the badge in frame)
+  // [CLOSE · Luka's hand] on his chest: the lanyard, snapped and knotted back together (straight down over the knot,
+  // read at step time; his head at the top of the frame, his hand and the badge in it)
   const HAND_CHEST = { do: (c) => {
     if (sk(c) || !KIT.knot || !KIT.knot.parent) return;
     KIT.knot.getWorldPosition(V1);
-    c.cam.shot({ shot: 'CAM', pos: [V1.x + 0.1, V1.y + 0.62, V1.z + 0.34], look: [V1.x, V1.y - 0.02, V1.z + 0.04], fov: 38,
-      to: { pos: [V1.x + 0.09, V1.y + 0.52, V1.z + 0.29], look: [V1.x, V1.y - 0.02, V1.z + 0.04], fov: 36 }, dur: 6, ease: 'linear' });
+    c.cam.shot({ shot: 'CAM', pos: [V1.x - 0.02, V1.y + 0.6, V1.z + 0.07], look: [V1.x - 0.02, V1.y, V1.z - 0.05], fov: 36,
+      to: { pos: [V1.x - 0.02, V1.y + 0.5, V1.z + 0.06], look: [V1.x - 0.02, V1.y, V1.z - 0.05], fov: 34 }, dur: 6, ease: 'linear' });
   } };
   function dressHome(c) {
     const S = SETS.reddy26;
@@ -980,7 +988,7 @@
     lensPush('a2_polish', 0.86, 9),
     { do: shine },
     { wait: 3.4 },
-    { act: [['luka', 'look_down']] },
+    { act: [['luka', 'b1_stop']] },
     { expr: [['luka', 'neutral']] },
     SMUDGE,
     { wait: 3.0 },
@@ -1100,7 +1108,9 @@
   }
   // 56. 2040, Saturday 22 December — Chase, older, in the Redcliffe backroom, wiring four display chips into a machine.
   // The kettle's screen asks him to name it. He thinks. Types DES.
-  const DES_SIDE = glide([4.98, 1.86, -25.78], [4.24, 1.06, -24.45], 36, [4.92, 1.82, -25.68], [4.24, 1.06, -24.45], 34, 6);
+  const DES_SIDE = glide([4.9, 1.8, -25.7], [4.25, 1.07, -24.45], 30, [4.84, 1.76, -25.6], [4.25, 1.07, -24.45], 27, 6);
+  // [INSERT] the kettle's screen as he types (just left of his typing hand)
+  const DES_TYPE = { shot: 'CAM', pos: [4.29, 1.09, -24.8], look: [4.25, 1.075, -24.47], fov: 24, to: { pos: [4.285, 1.088, -24.76], look: [4.25, 1.075, -24.47], fov: 23 }, dur: 3, ease: 'linear' };
   // the match: LOW, up past the edge of the bench at his face (the angle 1.2 opens on, a lifetime earlier)
   const LOW40 = glide([4.0, 1.0, -24.62], [4.25, 1.62, -25.12], 43, [4.0, 1.02, -24.66], [4.25, 1.64, -25.12], 41, 3);
   function f2040(c) {
@@ -1235,6 +1245,7 @@
     { act: [['chase40', 'think']] },
     { wait: 1.0 },
     { act: [['chase40', 'b1_wire', { type: true }]] },
+    DES_TYPE,
     { do: (c) => { const d = ud(c, 'des', 'reddy40'); if (d && d.type) d.type('DES', 0.9); } },
     sfx('key_beep', { vol: 0.2, at: [4.25, 1.05, -24.38] }), { wait: 0.3 }, sfx('key_beep', { vol: 0.2, rate: 1.1, at: [4.25, 1.05, -24.38] }), { wait: 0.3 },
     sfx('key_beep', { vol: 0.2, rate: 0.95, at: [4.25, 1.05, -24.38] }),

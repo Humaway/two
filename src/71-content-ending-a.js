@@ -267,6 +267,7 @@
     if (HELD.p) { try { HELD.p.close(); } catch (e) { /* gone */ } HELD.p = null; }
     try { const cf = world.prop('coffees', 'foreshore26'); if (cf && cf.userData.home) cf.userData.home(); } catch (e) { /* not live */ }
     try { if (typeof ui !== 'undefined' && ui.meter) ui.meter(null, null); } catch (e) { /* ui gone */ }
+    lampOff();
   }
   if (typeof on === 'function') on('flow:stop', cleanup);
   const begin = (c) => { cleanup(); dirty = true; };
@@ -1318,6 +1319,16 @@
   const PHONE_L = { shot: 'INSERT', at: 'a2_phone_luka' };
   const TWO_FRONT = lensPush('a2_two_front', 0.86, 12);
   const card = (kind, data) => ({ do: (c) => { if (!sk(c)) c.ui.card(kind, data); } });
+  // [TOP-DOWN] straight down over his head (his front at the top of the frame), close enough that the hands rising
+  // toward it read; a slow rise away (read at step time)
+  function topDownChase(c) {
+    if (sk(c)) return;
+    const a = act(c, 'chase'); if (!a) return;
+    a.eyePos(V1);
+    const fx = Math.sin(a.rotY), fz = Math.cos(a.rotY), x = V1.x + fx * 0.12, z = V1.z + fz * 0.12;
+    c.cam.shot({ shot: 'CAM', pos: [x - fx * 0.03, V1.y + 1.25, z - fz * 0.03], look: [x, V1.y - 0.4, z], fov: 52,
+      to: { pos: [x - fx * 0.03, V1.y + 1.45, z - fz * 0.03], look: [x, V1.y - 0.4, z], fov: 52 }, dur: 6, ease: 'linear' });
+  }
   async function typeEmail(c) {
     const sid = c.flow.sceneId, msg = 'Sorry for the wait.';
     if (sk(c)) return;
@@ -1367,7 +1378,7 @@
     Object.assign({ card: ['a2_phone', { mode: 'upload' }] }, PHONE_C),
     { wait: 3.0 },
     // 3. [TOP-DOWN · Chase] His hands start to rise toward his head. They stop halfway. He laughs instead, and presses POST.
-    { shot: 'INSERT', at: 'a2_topdown' },
+    { do: topDownChase },
     { expr: [['chase', 'worried']] },
     { act: [['chase', 'a2_halt', { dur: 2.6 }]] },
     { wait: 2.7 },
@@ -1438,7 +1449,7 @@
     { wait: 0.4 },
     slow('chase', 'Then I\'ll be awake.'),
     // 15. (Luka looks at him. Nods.)
-    CLOSE('luka', { yaw: 0.85, dist: 1.2, push: 0.1, dur: 5, fov: 34, dy: 0.04 }),
+    CLOSE('luka', { yaw: 0.6, dist: 1.15, push: 0.1, dur: 5, fov: 34, dy: -0.1, ly: -0.04 }),
     { do: (c) => { glanceAt(c, 'luka', 'chase', 2.4); } },
     { expr: [['luka', 'fond']] },
     { wait: 1.4 },
@@ -1550,7 +1561,8 @@
   // VOICE 1 / VOICE 2. (Both laugh. We never see their faces.) Black. — Self-contained: it starts black, loads reddy26
   // (prebuild it during the credits: world.prebuild('reddy26')), dresses it for the night, and ends on black.
   const CODA_L = [7.84, 0, -9.74, -0.48], CODA_C = [7.25, 0, -9.74, 0.52];
-  const CODA_REACH_L = { sd: -1, go: false, x: 0.0, h: 1.07, z: 0.6 }, CODA_REACH_C = { sd: 1, go: false, x: 0.0, h: 1.07, z: 0.6 };
+  // the two hands land side by side on the handset (about a hand's width apart), not one on top of the other
+  const CODA_REACH_L = { sd: -1, go: false, x: 0.0, h: 1.07, z: 0.53 }, CODA_REACH_C = { sd: 1, go: false, x: 0.0, h: 1.07, z: 0.53 };
   const CODA_SHOT = { shot: 'INSERT', at: 'counter_phone', locked: true };   // over the counter, steep: hands, no faces
   function codaDress(c) {
     begin(c);
@@ -1577,7 +1589,16 @@
       o.visible = true;
     }
     touch(c, ['luka', 'chase']);
+    // one warm light over the counter (the spot as a lamp; the rest of the store stays in the dark)
+    const sp = c.world.torch;
+    if (sp) {
+      c.world.torchAuto = false; sp.intensity = 3.2; sp.color.set(0xffe2b8); sp.angle = 0.55; sp.penumbra = 0.7; sp.distance = 12;
+      sp.position.set(7.4, 3.0, -8.7); sp.target.position.set(7.55, 1.0, -9.25); sp.target.updateMatrixWorld();
+      LAMP.on = true;
+    }
   }
+  const LAMP = { on: false };
+  function lampOff() { if (!LAMP.on || typeof world === 'undefined') return; const sp = world.torch; if (sp) sp.intensity = 0; world.torchAuto = true; LAMP.on = false; }
   CUTSCENES.A_coda = [
     { fade: 'out', dur: 0 },
     { music: null, cut: true },
@@ -1603,7 +1624,7 @@
     { wait: 2.6 },
     // Black.
     { fade: 'out', dur: 1.4 },
-    { do: () => { borrowHome(); } },
+    { do: () => { borrowHome(); lampOff(); } },
     { wait: 0.5 },
   ];
 })();
