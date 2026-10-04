@@ -57,6 +57,13 @@
     }
   }
   const setClock = (h, m) => ({ prop: 'clock_hands', fn: (o) => { if (o.userData.set) o.userData.set(h, m); } });
+  // a set anchor's lens (SETS.reddy26.anchors: from → at, fov) gliding by (dpos, dlook) to fov `f` over `dur` s
+  const add3 = (a, d) => [a[0] + d[0], a[1] + d[1], a[2] + d[2]];
+  function glideA(n, dpos, dlook, f, dur) {
+    const a = SETS.reddy26 && SETS.reddy26.anchors && SETS.reddy26.anchors[n];
+    if (!a) { console.warn('TWO 1.2: no anchor ' + n); return { wait: 0 }; }
+    return { shot: 'CAM', pos: a.from.slice(), look: a.at.slice(), fov: a.fov, to: { pos: add3(a.from, dpos), look: add3(a.at, dlook), fov: f }, dur, ease: 'linear' };
+  }
 
   // ---------------------------------------------------------- anims this file owns (guarded; no allocation per tick)
   // Luka blown backwards off his feet (1.2 step 16-18): the root faces the way he flies (−Z), the hips turn round to
@@ -193,14 +200,14 @@
   const FIG_AT = [5.6, 0, -5.3, PI], FIG_OUT = [5.85, 0, -6.15, 2.81];   // out of the wreck, facing Chase at the phone
   const LUKA_OVER = [5.4, 0, -7.9, 0], C40_BRUSH = [5.5, 0, -7.25, PI], C40_GAP = [5.75, 0, -6.55, 2.91];
 
-  // [LOW · heroic, up past the glittering edge of the Hero Table]
-  // (the lens just above the glass top, y 0.95: below it the top's underside hides his face)
-  const HEROIC = { shot: 'CAM', pos: [5.3, 1.02, -4.48], look: [5.6, 1.56, -7.05], fov: 43, to: { pos: [5.33, 1.05, -4.62], look: [5.6, 1.6, -7.05], fov: 40 }, dur: 6, ease: 'linear' };
+  // [LOW · heroic, up past the glittering edge of the Hero Table] (anchor s12_heroic: the lens just above the glass top,
+  // y 0.95: below it the top's underside hides his face). Ending B match-cuts back to this frame.
+  const HEROIC = glideA('s12_heroic', [0.03, 0.03, -0.14], [0, 0.04, 0], 40, 6);
   // the phone ringing on the counter
   const RING = { shot: 'CAM', pos: [7.25, 1.42, -8.55], look: [7.55, 1.03, -9.22], fov: 32, to: { pos: [7.28, 1.38, -8.65], look: [7.55, 1.03, -9.22], fov: 30 }, dur: 3, ease: 'linear' };
-  // [TWO-SHOT · Luka in the foreground, admiring the table, back to Chase]: from the table's right end, so the JARVIS
-  // monitor (x 6.4) isn't between the lens and Chase at the phone
-  const TWOSHOT = { shot: 'CAM', pos: [6.95, 1.45, -5.3], look: [6.1, 1.4, -8.4], fov: 46, to: { pos: [6.9, 1.45, -5.45], look: [6.1, 1.41, -8.4], fov: 45 }, dur: 8, ease: 'linear' };
+  // [TWO-SHOT · Luka in the foreground, admiring the table, back to Chase] (anchor s12_twoshot: from the table's right
+  // end, so the JARVIS monitor (x 6.4) isn't between the lens and Chase at the phone)
+  const TWOSHOT = glideA('s12_twoshot', [-0.05, 0, -0.15], [0, 0.01, 0], 45, 8);
   // [CLOSE · Luka] looking down at his reflection: from just past the glass edge, below his face, looking up
   const REFLECT = { shot: 'CAM', pos: [5.48, 1.08, -6.08], look: [5.6, 1.56, -7.05], fov: 34, to: { pos: [5.5, 1.1, -6.18], look: [5.6, 1.56, -7.05], fov: 33 }, dur: 4, ease: 'linear' };
   // [WIDE · locked, the whole floor] (anchor floor_locked)
@@ -225,6 +232,10 @@
   const WIDE_35 = { shot: 'CAM', pos: [9.9, 2.1, -3.3], look: [6.0, 1.15, -8.4], fov: 50, to: { pos: [9.75, 2.05, -3.55], look: [6.0, 1.15, -8.4], fov: 48 }, dur: 6, ease: 'linear' };
   // WHAT WAS THAT? — the office door (LUKE — MANAGER / KNOCK / PLEASE / ESPECIALLY YOU TWO), whipped to
   // "So you came to the gap.": Chase (behind the counter) and Chase (2040), side-on from past the end of the counter
+  // [TWO-SHOT · Luka and Chase] across the counter's corner: both three-quarter on, the same size, Luka frame-left
+  // (Chase (2040) just out of frame-left)
+  const TWO_LC = { shot: 'CAM', pos: [8.3, 1.62, -7.1], look: [6.3, 1.45, -8.9], fov: 44, to: { pos: [8.15, 1.61, -7.25], look: [6.3, 1.45, -8.9], fov: 42 }, dur: 12, ease: 'linear' };
+  const TWO_LC2 = { shot: 'CAM', pos: [8.15, 1.61, -7.25], look: [6.3, 1.45, -8.9], fov: 42, to: { pos: [7.95, 1.6, -7.45], look: [6.3, 1.45, -8.9], fov: 40 }, dur: 16, ease: 'linear' };   // (picked up again, a little closer)
   const TWO_HC = { shot: 'CAM', pos: [9.3, 1.65, -7.0], look: [6.45, 1.4, -8.25], fov: 46, to: { pos: [9.2, 1.65, -7.05], look: [6.45, 1.4, -8.25], fov: 44 }, dur: 6, ease: 'linear' };
   const OFFICE = { shot: 'CAM', pos: [9.7, 1.55, -10.3], look: [9.9, 1.4, -12.6], fov: 42, move: 'whip' };
   // Backroom. Now.: low on the staff-side floor, the loose tether in the foreground, Chase's feet arriving
@@ -250,24 +261,12 @@
     const x0 = LUKA_START[0], z0 = LUKA_START[2], z1 = LUKA_ADMIRE[2];
     tween(c, 0.9, (k) => { a.pos.x = x0; a.pos.z = z0 + (z1 - z0) * k; });
   }
-  // the phone rings (a 2026 landline: the double trill), every 1.2 s until he answers or the scene moves on
-  function ringPhone(c) {
-    if (sk(c)) return;
-    const ph = P(c, 'store_phone'); if (ph) ph.userData.ring(true);
-    let t = 0, n = 0;
-    const sid = c.flow.sceneId;
-    const f = (dt) => {
-      t -= dt;
-      if (flow.sceneId !== sid || flow.skipping || !ringing) { removeUpdate(f); if (ph) ph.userData.ring(false); return; }
-      if (t <= 0 && n < 4) { t = 1.6; n++; sfx('trill', RING_O); }
-    };
-    ringing = true; addUpdate(f);
-  }
-  let ringing = false;
-  const RING_O = { vol: 0.55 };
+  // the phone rings (a 2026 landline: the double trill at the handset, every 1.6 s, four at most) until he answers
+  const RING_O = { sfx: 'trill', every: 1.6, vol: 0.55, max: 4 };
+  const ring = (on) => ({ prop: 'store_phone', fn: (o) => { if (o.userData.ring) { if (on && !flow.skipping) o.userData.ring(true, RING_O); else o.userData.ring(false); } } });
   // BAM (1.2 step 16): the table goes, the flash, Luka launched, the alarms
   function bam(c) {
-    const t = P(c, 'hero_table'); if (t) t.userData.blast({ instant: sk(c) });
+    const t = P(c, 'hero_table'); if (t) t.userData.blast({ instant: sk(c), tree: false });   // (the tree goes over at the real-time wide)
     const ra = P(c, 'store_radio'); if (ra) ra.userData.playing = true;   // the radio keeps playing
     const lo = P(c, 'tether_loose'); if (lo) lo.visible = true;           // one tether lands behind the counter
     const j = act(c, 'jordan'); if (j) { j.face([5.6, 0, -5.3], 0); j.play('duck'); j.setExpr('scared'); }
@@ -376,9 +375,9 @@
     { wait: 1.8 },
     // The store phone on the counter rings. Chase answers.
     RING,
-    { do: (c) => ringPhone(c) },
+    ring(true),
     { wait: 2.2 },
-    { do: () => { ringing = false; } },
+    ring(false),
     { place: 'chase', at: 's11_chase_phone' },
     { hold: 'chase', prop: 'store_phone', hand: 'R' },
     play('chase', 'phone'),
@@ -432,7 +431,7 @@
     // Christmas tree falls over. Smoke fills the floor. Four empty tethers swing from what's left of the table. The radio
     // keeps playing.
     WIDE_RT,
-    // (the set felled the tree under the close, out of shot: it goes over again here, in real time, where it's seen)
+    // (the blast left the tree up: it goes over here, in real time, where it's seen)
     { prop: 'xmas_tree', fn: (o) => { if (o.userData.fall) o.userData.fall(); } },
     { wait: 0.8 },
     { do: (c) => land(c, false) },
@@ -552,14 +551,14 @@
     say('chase40', 'Nobody knows his name. Took over Optus three years ago. Everyone just calls him the Manager.'),
     // [TWO-SHOT · Luka and Chase] They look at each other.
     turn('luka', 'chase'), turn('chase', 'luka'),
-    { shot: 'TWO', on: ['luka', 'chase'] },
+    TWO_LC,
     { wait: 1.0 },
     say('luka', '…Should we call the manager?'),
     expr('chase40', 'worried'),
     CLOSE('chase40', { dist: 1.0, fov: 36, push: 0.05, dur: 5, yaw: -0.5 }),
     say('chase40', 'No. He IS the— no.'),
     expr('chase', 'determined'),
-    { shot: 'TWO', on: ['luka', 'chase'] },
+    TWO_LC2,
     say('chase', 'It\'s Luke.'),
     say('chase40', 'Nobody knows who—'),
     say('chase', 'It\'s obviously Luke.'),
@@ -776,7 +775,7 @@
     else c.state.flags.s13_wire2 = true;
     sfx('plug_click', { vol: 0.5 });
     duties13();
-    return c.cam.release();
+    return c.cam.release(0);   // (a cut: the box's lens is in front of Chase, a glide home would pass through him)
   }
   // during the roam: Luke's suspicion drifts on its own while you're with Chase (a meter, until rounds 4–5 are done);
   // the record prompt at the door window reads as the script has it. Allocation-free; gone with the scene.

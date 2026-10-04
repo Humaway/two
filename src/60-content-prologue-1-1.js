@@ -46,6 +46,8 @@
   const turn = (id, to) => ({ do: (c) => { const a = act(c, id); if (a) a.face(to, 0); } });
   const turnSlow = (id, to, dur = 0.4) => ({ face: id, to, dur });
   const play = (id, anim, o) => ({ act: [[id, anim, o || {}]] });
+  // on the ladder a move climbs (the walk anim swapped for 'climb' while it lasts; a {move} would otherwise walk)
+  const climbing = (id, on) => ({ do: (c) => { const a = act(c, id); if (a) a.walkAnim = on ? 'climb' : 'walk'; } });
   const expr = (id, e) => ({ expr: [[id, e]] });
   const glide = (pos, look, fov, to, dur, ease = 'linear') => ({ shot: 'CAM', pos, look, fov, to, dur, ease });
   // walk the active character through waypoints (autoplay solves the roam on foot, through the real hotspots)
@@ -127,7 +129,9 @@
   // hq_top: the west end is the Manager's (the desk x −10…−9.1, the face-down photo (−9.55, 0.75, −15.0), the empty
   // chair (−8.5, −13.6), his spot at the glass mgr_glass (−9.6, −12.0) facing the glass (+Z); his left is east, +X).
   const DESK_AT = [-10.1, 0, -15.06, H];                     // at the desk's west edge: the right hand reaches the frame
-  const C_FROM = [0.85, 0.85], C_TO = [0.47, 0.73];      // the cursor (u, v over the 400 × 236 pop-up): stops just short of YES
+  // the cursor (u, v over the pop-up): in from the right under the empty slot where NO should be, clear of the
+  // schedule line (11:58 stays readable), and stops just short of YES
+  const C_FROM = [0.92, 0.71], C_TO = [0.47, 0.73];
   function glass(c) { return P(c, 'glass_ui'); }
   function dressP(c) {
     const a = act(c, 'luka40');
@@ -160,12 +164,12 @@
     { wait: 2.0 },
     // [ECU · locked] The pop-up on the glass: OPT OUT ALL USERS? [YES] and the empty, button-shaped space where NO
     // should be; Scheduled: Monday 24 December 2040 · 11:58. A cursor drifts toward YES and stops just short. Hold 3 s.
-    { shot: 'CAM', pos: [-3.0, 2.15, -14.7], look: [-3.0, 2.15, -11.24], fov: 40 },
+    { shot: 'INSERT', at: 'glass_popup' },
     { fade: 'in', dur: 1.4 },
     { wait: 0.9 },
     { do: (c) => cursorDrift(c) },
     { wait: 1.5 },
-    { shot: 'CAM', pos: [-3.04, 1.935, -12.95], look: [-3.04, 1.915, -11.24], fov: 31 },
+    { shot: 'INSERT', at: 'glass_popup_ecu' },
     { wait: 1.0 },
     { do: (c) => { const g = glass(c); if (g && g.userData.cursor) g.userData.cursor(C_TO[0], C_TO[1]); } },
     { wait: 3.0 },
@@ -196,7 +200,9 @@
     aide(false),
     // [MID · from behind, his shoulder and the empty chair in frame] (Hint 1.) He turns his head a few degrees to the
     // left, toward the empty chair, as if checking with someone. Then back to the glass. No music marks it.
-    glide([-11.0, 1.95, -14.9], [-9.0, 1.2, -12.5], 46, { pos: [-10.9, 1.93, -14.8], look: [-9.0, 1.2, -12.5], fov: 45 }, 8),
+    // (from just behind the desk, a little to his left: his hood against the sky between two mullions, so the turn reads
+    // in silhouette; the chair at the left of frame, the aide drone at his right shoulder)
+    glide([-10.05, 1.95, -15.5], [-9.25, 1.1, -12.2], 49, { pos: [-10.0, 1.93, -15.3], look: [-9.25, 1.1, -12.2], fov: 48 }, 8),
     { wait: 0.9 },
     play('luka40', 'glance', { yaw: 0.45, dur: 1.8 }),
     { wait: 2.2 },
@@ -207,7 +213,7 @@
     { wait: 2.0 },
     say('manager', 'No. ^ He never finishes anything.'),
     // [ECU] The pop-up on the glass. In its corner a small moon icon switches on: Do Not Disturb.
-    { shot: 'CAM', pos: [-3.77, 2.69, -12.94], look: [-3.8, 2.72, -11.24], fov: 30 },
+    { shot: 'INSERT', at: 'glass_moon' },
     { wait: 1.0 },
     { do: (c) => { const g = glass(c); if (g && g.userData.popup) g.userData.popup('dnd', { sched: true }); } },
     { sfx: 'ss_chirp', vol: 0.18, rate: 0.85 },
@@ -235,10 +241,9 @@
     lukaLadder: [4.05, 0, -11.15, PI], lukaTop: [4.05, 1.26, -11.7, PI],
     lukaCounter: [7.25, 0, -7.75, PI - 0.5], lukaFront: [6.95, 0, -6.5, PI],
   };
-  // hero_smudge1 (1.1 only) moved and scaled ×2.4 about the table's centre (its quad sits at (0.45, 0.2) from it): just
-  // past Luka's hands at (5.65, −5.46), then under Chase's finger at (6.08, −5.67)
-  const SMUDGE_L = [-1.03, 0, -0.64], SMUDGE_C = [-0.6, 0, -0.85];
-  const DOOR_BOX = [5.95, -24.05, 6.85, -23.7];   // the shut backroom door (a live collider until it opens)
+  // the opening's fingerprint (hero_smudge1 at ×3: a 7 cm print reads as a smudge from a metre and a half), world
+  // (x, z): just past Luka's hands, then under Chase's finger
+  const SMUDGE_L = [5.65, -5.46], SMUDGE_C = [6.08, -5.67];
   const O11 = { line: 'Get the store ready for Christmas.', polish: 'Polish the Hero Table', tinsel: 'Hang the tinsel', hold: 'Get Chase off hold' };
   function duties() {
     const f = state.flags;
@@ -260,41 +265,33 @@
     o.scale.setScalar(0.42); o.visible = true;
     const a = act(c, who); if (a) a.hold(o, 'R');
   }
-  // the opening's fingerprint (hero_smudge1 moved under Luka's hands; put back when the scene ends)
   function smudge(c, on, at = SMUDGE_L) {
-    const o = P(c, 'hero_smudge1'); if (!o) return;
-    o.position.set(at[0], at[1], at[2]); o.visible = !!on;
-    o.scale.set(2.4, 1, 2.4);   // (a 7 cm print reads as a smudge from a metre and a half)
-    watchOn(c);
+    const t = P(c, 'hero_table'); if (!t || !t.userData.smudge1At) return;
+    t.userData.smudge1At(at[0], at[1], 3.0); t.userData.smudge1(on);
+    watchOn();
   }
-  // scene watcher (allocation-free): the moved fingerprint goes home and the door collider goes when the scene ends;
-  // the door collider goes once the door has opened (its nine-second spinner, request())
-  let watching = false, doorCl = null, doorWas = false;
+  // scene watcher (allocation-free): the fingerprint goes home when the scene ends; the backroom door (shut, the set's
+  // doorway collider keeps the player out) creaks open after its nine-second spinner and stays open (flag s11_door)
+  let watching = false, doorWas = true;
   function watch11() {
-    const here = flow.sceneId === '1.1' && world.setId === 'reddy26';
+    if (flow.sceneId !== '1.1' || world.setId !== 'reddy26') {
+      const t = world.prop('hero_table', 'reddy26'); if (t && t.userData.smudge1At) t.userData.smudge1At(null);
+      watching = false; removeUpdate(watch11); return;
+    }
     const d = world.prop('backroom_door', 'reddy26');
-    if (doorCl && (!here || (d && (d.userData.open || d.rotation.y > 0.9)))) {
-      const i = doorCl.indexOf(DOOR_BOX); if (i >= 0) doorCl.splice(i, 1);
-      doorCl = null;
-      if (here && !flow.skipping && !doorWas) sfx('creak', DOOR_SFX);
-      if (here) state.flags.s11_door = true;
-    }
-    doorWas = !doorCl;
-    if (!here) {
-      const s = world.prop('hero_smudge1', 'reddy26'); if (s) { s.position.set(0, 0, 0); s.scale.set(1, 1, 1); }
-      watching = false; removeUpdate(watch11);
-    }
+    const open = !!d && (!!d.userData.open || d.rotation.y > 0.9);
+    if (open && !doorWas) { if (!flow.skipping) sfx('creak', DOOR_SFX); state.flags.s11_door = true; }
+    doorWas = open;
   }
   const DOOR_SFX = { vol: 0.3 };
   function watchOn() { if (!watching) { watching = true; addUpdate(watch11); } }
   function doorShut(c) {
     const d = P(c, 'backroom_door'); if (!d) return;
     if (c.state.flags.s11_door_asked) c.state.flags.s11_door = true;   // (saved during the nine seconds)
-    if (c.state.flags.s11_door) { d.userData.open = true; d.rotation.y = 1.5; return; }
-    d.userData.open = false; d.rotation.y = 0;
-    const cl = c.world.colliders;
-    if (cl && cl.indexOf(DOOR_BOX) < 0) { cl.push(DOOR_BOX); doorCl = cl; doorWas = false; }
-    watchOn(c);
+    if (c.state.flags.s11_door) { d.userData.open = true; d.rotation.y = 1.5; doorWas = true; return; }
+    d.userData.open = false; d.rotation.y = 0; doorWas = false;
+    if (d.userData.solid) d.userData.solid(true);
+    watchOn();
   }
   // everyone and everything where the flags say (the opening's own blocking comes after, under the crane)
   function dress11(c) {
@@ -317,6 +314,7 @@
       else { ch.hold(null); ch.place(M11.chaseTill); ch.play('idle'); ch.setExpr(f.s11_offhold ? 'neutral' : 'tired'); }
     }
     if (j) {
+      j.walkAnim = 'walk';
       if (!f.s11_jordan_down) { j.place(M11.jordanTop); j.play('reach_up'); coil(c, 'jordan'); }
       else { if (j.held) coil(c, null); j.place(M11.jordanDown); j.play('idle'); }
     }
@@ -328,7 +326,7 @@
     return c.runSteps([HOLD_OFF, ...(f.s11_offhold ? [] : [f.s11_hold1 ? HOLD_BASE : HOLD_EAR])]);
   }
   // Luka steps behind the lens of an examine (so he is never in front of it) and turns to the thing
-  // (world.anchor() gives Vector3s; LENS entries are arrays)
+  // (world.anchor() gives Vector3s)
   const xyz = (v) => (Array.isArray(v) ? v : [v.x, v.y, v.z]);
   function behind(c, f, at) {
     const a = act(c, 'luka'); if (!a) return;
@@ -339,9 +337,8 @@
     a.play('idle');
   }
   // an examine: the anchor's lens with a slow push (a card over it if given), the line, then the card away
-  const LENS = { monitor: { at: [4.3, 1.3, -9.03], from: [4.3, 1.33, -9.75], fov: 34 }, plant: { at: [10.3, 0.85, -0.85], from: [10.0, 1.35, -2.35], fov: 36 } };
   function look(c, name, card, push = 0.12) {
-    const an = LENS[name] || c.world.anchor(name);
+    const an = c.world.anchor(name);
     if (!an || !an.from) return;
     const f = xyz(an.from), a = xyz(an.at), fov = an.fov || 36;
     behind(c, f, a);
@@ -351,7 +348,10 @@
       to: { pos: [f[0] + (a[0] - f[0]) * push, f[1] + (a[1] - f[1]) * push, f[2] + (a[2] - f[2]) * push], look: [a[0], a[1], a[2]], fov }, dur: 7, ease: 'linear' });
     if (card) c.ui.card(card[0], card[1]);
   }
-  const ex = (name, line, card, push) => [{ do: (c) => look(c, name, card, push) }, { wait: card ? 0.9 : 0.4 }, say('luka', line), { do: (c) => c.ui.card(null) }];
+  // (every roam interaction cuts back to the zone camera: Luka stands just behind an examine's lens, and a glide home
+  // from a close-up would pass through somebody's head)
+  const CUT = { do: (c) => c.cam.release(0) };
+  const ex = (name, line, card, push) => [{ do: (c) => look(c, name, card, push) }, { wait: card ? 0.9 : 0.4 }, say('luka', line), { do: (c) => c.ui.card(null) }, CUT];
 
   // ---------------------------------------------------------- CARDS (readable INSERTs this file owns)
   const KIT = () => CARDS._kit;
@@ -429,7 +429,8 @@
     if (!f.s11_table_seen) {
       await c.runSteps([
         { do: (cc) => { if (l) { l.place('s11_polish'); l.play('idle'); } } },
-        { do: (cc) => { if (!sk(cc)) cc.cam.shot({ shot: 'CAM', pos: [6.55, 1.32, -4.15], look: [5.55, 1.22, -6.3], fov: 42, to: { pos: [6.45, 1.3, -4.3], look: [5.55, 1.24, -6.3], fov: 40 }, dur: 9, ease: 'linear' }); } },
+        // (on the four phones, tilting up across the glass to his face as he talks)
+        { do: (cc) => { if (!sk(cc)) cc.cam.shot({ shot: 'CAM', pos: [6.45, 1.36, -4.2], look: [5.6, 1.0, -5.3], fov: 40, to: { pos: [6.4, 1.4, -4.32], look: [5.6, 1.48, -6.35], fov: 40 }, dur: 4.5 }); } },
         say('luka', 'Four new phones. First display Luke\'s let us have since October. ^ If anything happens to it, it comes out of my pay.'),
         { flag: 's11_table_seen' },
       ]);
@@ -444,7 +445,7 @@
     if (l) { l.play('idle'); l.setExpr('happy'); }
     roamPlace(c);
     duties(); if (!sk(c)) sfx('pop', { vol: 0.5 });
-    return c.cam.release();
+    return c.cam.release(0);
   }
 
   // the first talk: still on hold (a finger), then the calc at the register
@@ -452,7 +453,8 @@
   const CALC_THREE = { shot: 'CAM', pos: [9.5, 1.7, -8.6], look: [6.6, 1.4, -8.65], fov: 48, to: { pos: [9.3, 1.68, -8.62], look: [6.6, 1.4, -8.65], fov: 46 }, dur: 9, ease: 'linear' };
   const TALK1 = [
     { do: (c) => { const l = act(c, 'luka'), ch = act(c, 'chase'); if (l) { l.place(M11.lukaFront); l.face('chase', 0); l.play('idle'); } if (ch) ch.face('luka', 0); } },
-    { shot: 'TWO', on: ['luka', 'chase'] },
+    // (side-on along the counter's front: both in profile, Luka frame-left, Chase frame-right with his finger up)
+    { shot: 'CAM', pos: [8.7, 1.58, -7.25], look: [6.85, 1.45, -7.22], fov: 44, to: { pos: [8.55, 1.57, -7.24], look: [6.85, 1.45, -7.22], fov: 43 }, dur: 7, ease: 'linear' },
     // He holds up a finger: still on hold.
     play('chase', 's11_finger'), expr('chase', 'tired'),
     { wait: 1.2 },
@@ -527,7 +529,7 @@
     say('chase', 'When it\'s good.'),
     // (A beat. Chase fiddles with his new lanyard.)
     play('chase', 'lanyard'), expr('chase', 'sad'),
-    CLOSE('chase', { dist: 1.05, fov: 36, push: 0.12, dur: 14, yaw: 0.45 }),
+    CLOSE('chase', { dist: 1.35, fov: 38, ly: -0.16, push: 0.32, dur: 14, yaw: 0.45 }),
     { wait: 1.2 },
     say('chase', 'You said I changed a person. On the tape. So now there\'s, like, proof. That I could be something. ^ And I\'m doing screen protectors.'),
     play('chase', 'idle'),
@@ -552,7 +554,7 @@
     return c.runSteps(!f.s11_hold1 ? TALK1 : !f.s11_offhold ? TALK2 : TALK3).then(() => {
       if (flow.sceneId !== '1.1') return;
       roamPlace(c); holdBed(c); duties();
-      return c.cam.release();
+      return c.cam.release(0);
     });
   }
 
@@ -562,9 +564,9 @@
     { do: (c) => { const l = act(c, 'luka'); if (l) { l.place([4.75, 0, -10.2, -2.6]); l.face('jordan', 0); l.play('idle'); } } },
     LADDER_MID,
     { wait: 0.5 },
-    play('jordan', 'climb', { speed: 1.2 }),
+    climbing('jordan', true), play('jordan', 'climb', { speed: 1.2 }),
     { move: 'jordan', to: M11.jordanFoot, speed: 0.75, face: false },
-    play('jordan', 'idle'),
+    climbing('jordan', false), play('jordan', 'idle'),
     { move: 'jordan', to: M11.jordanDown },
     { face: 'jordan', to: 'luka', dur: 0.3 },
     { flag: 's11_jordan_down' },
@@ -572,7 +574,8 @@
   ];
   const J_ASIDE = [3.35, 0, -10.8, 2.48];
   const LADDER_UP = [
-    { do: (c) => { const l = act(c, 'luka'), j = act(c, 'jordan'); if (l) { l.place(M11.lukaLadder); l.play('idle'); } if (j) { j.place(M11.jordanDown); j.face('luka', 0); } } },
+    // (Jordan on the far side of him from the lens, so neither hides the other; they face each other for the hand-off)
+    { do: (c) => { const l = act(c, 'luka'), j = act(c, 'jordan'); if (j) { j.place([3.45, 0, -10.7]); j.play('idle'); } if (l) { l.place(M11.lukaLadder); l.play('idle'); l.face('jordan', 0); } if (j) j.face('luka', 0); } },
     // Jordan hands him the tinsel
     { shot: 'CAM', pos: [5.75, 1.62, -10.3], look: [4.4, 1.35, -11.1], fov: 46, to: { pos: [5.7, 1.61, -10.35], look: [4.4, 1.35, -11.1], fov: 45 }, dur: 6, ease: 'linear' },
     play('jordan', 'give', { dur: 1.2, loop: false }),
@@ -583,9 +586,9 @@
     // up, slowly, both hands (Jordan stands back, the other side of the ladder)
     { place: 'jordan', at: J_ASIDE },
     LADDER_MID,
-    play('luka', 'climb', { speed: 0.6 }),
+    climbing('luka', true), play('luka', 'climb', { speed: 0.6 }),
     { move: 'luka', to: M11.lukaTop, speed: 0.45, face: false },
-    play('luka', 's11_grip'), expr('luka', 'scared'),
+    climbing('luka', false), play('luka', 's11_grip'), expr('luka', 'scared'),
     // [OTS · from below] the ladder wobbles once. Luka holds very still.
     { shot: 'CAM', pos: [4.78, 0.55, -10.1], look: [4.05, 2.55, -12.0], fov: 52, to: { pos: [4.76, 0.57, -10.15], look: [4.05, 2.6, -12.0], fov: 51 }, dur: 4, ease: 'linear' },
     { wait: 0.6 },
@@ -605,9 +608,9 @@
     { wait: 0.6 },
     // and down
     LADDER_MID,
-    play('luka', 'climb', { speed: 0.7 }),
+    climbing('luka', true), play('luka', 'climb', { speed: 0.7 }),
     { move: 'luka', to: M11.lukaLadder, speed: 0.6, face: false },
-    play('luka', 'idle'), expr('luka', 'neutral'),
+    climbing('luka', false), play('luka', 'idle'), expr('luka', 'neutral'),
     ...tick('s11_tinsel'),
     { place: 'jordan', at: M11.jordanDown },
     { face: 'luka', to: 'jordan', dur: 0.3 }, { face: 'jordan', to: 'luka', dur: 0.3 },
@@ -634,19 +637,19 @@
       { id: 'h11_chase_f', at: 'chase', r: 1.5, verb: 'Talk', when: (s) => !s.flags.s11_hold1, do: (c) => talkChase(c) },
       { id: 'h11_chase_b', at: 'chase', r: 2.5, verb: 'Talk', when: (s) => !!s.flags.s11_hold1, do: (c) => talkChase(c) },
       { id: 'h11_jordan', at: 'jordan', r: 1.5, verb: 'Talk',
-        do: (c) => c.runSteps(c.state.flags.s11_jordan_down ? JORDAN_TALK : JORDAN_DOWN).then(() => { if (flow.sceneId === '1.1') { roamPlace(c); return c.cam.release(); } }) },
+        do: (c) => c.runSteps(c.state.flags.s11_jordan_down ? JORDAN_TALK : JORDAN_DOWN).then(() => { if (flow.sceneId === '1.1') { roamPlace(c); return c.cam.release(0); } }) },
       { id: 'h11_ladder', at: M11.lukaLadder, r: 0.8, verb: 'Climb', when: (s) => !!s.flags.s11_jordan_down && !s.flags.s11_tinsel,
-        do: (c) => c.runSteps(LADDER_UP).then(() => { if (flow.sceneId === '1.1') { roamPlace(c); return c.cam.release(); } }) },
+        do: (c) => c.runSteps(LADDER_UP).then(() => { if (flow.sceneId === '1.1') { roamPlace(c); return c.cam.release(0); } }) },
       // --- the examine list (Luka)
       { id: 'h11_phones', at: [5.6, 0, -4.45], r: 0.7, steps: ex('hero_phones', '3%. They come out of the box tired.') },
       { id: 'h11_tree', at: [8.7, 0, -1.6], r: 0.8, steps: ex('xmas_tree', 'It\'s plastic. It\'s dying. It caught it off the plant.') },
-      { id: 'h11_plant', at: [9.7, 0, -1.5], r: 0.7, steps: ex('plant', 'Still dying. Bit festive about it.') },
+      { id: 'h11_plant', at: [9.7, 0, -1.5], r: 0.7, steps: ex('pot_plant', 'Still dying. Bit festive about it.') },
       { id: 'h11_queue', at: [0.2, 0, -1.9], r: 0.75, steps: ex('queue_machine', 'Now serving: 000.') },
       { id: 'h11_notice', at: [9.4, 0, -11.55], r: 0.8, steps: ex('noticeboard', 'LANYARD REQUESTS: please allow 6–8 weeks. ^ Chase\'s took eight months. He tells customers.', C_NOTICE) },
       { id: 'h11_office', at: [9.9, 0, -11.5], r: 0.7, steps: ex('office_door_sign', 'LUKE — MANAGER. Under it: KNOCK. Under that: PLEASE. ^ Under that, new: ESPECIALLY YOU TWO.', ['s11_door', {}]) },
       { id: 'h11_monitor', at: [4.3, 0, -10.1], r: 0.7,
-        steps: [{ do: (c) => look(c, 'monitor', null, 0.1) }, { wait: 0.5 },
-          { popup: { title: 'JARVIS', msg: 'JARVIS wishes you a Merry Christmas! Are you sure?', icon: 'info', buttons: ['YES', 'YES'] }, wait: true }] },
+        steps: [{ do: (c) => look(c, 'monitor2', null, 0.1) }, { wait: 0.5 },
+          { popup: { title: 'JARVIS', msg: 'JARVIS wishes you a Merry Christmas! Are you sure?', icon: 'info', buttons: ['YES', 'YES'] }, wait: true }, CUT] },
       { id: 'h11_polaroid', at: [6.6, 0, -19.55], r: 0.45, steps: ex('wall_polaroid', 'Us and Rue. 1987. ^ Don\'t remember it. It\'s still my favourite photo.', ['polaroid', { front: true }]) },
       { id: 'h11_cassette', at: [6.6, 0, -20.05], r: 0.45, steps: ex('wall_cassette', 'The first song Chase ever finished. It\'s got a kettle in it. He doesn\'t remember writing it.', ['label', { text: 'PUDDING' }]) },
       { id: 'h11_note', at: [6.6, 0, -20.45], r: 0.4, steps: ex('wall_note', '\'Sorry for the wait. — R.\' Came with his lanyard.', ['s11_note', {}]) },
@@ -658,7 +661,7 @@
       { id: 'h11_mug', at: [9.2, 0, -28.75], r: 0.55, steps: ex('rue_mug', 'He\'s on mugs.', null, 0.15) },
       { id: 'h11_ceiling', at: [6.0, 0, -26.3], r: 0.9, steps: ex('ceiling_scorch', 'Two scorch marks. One for leaving, one for coming back. DO NOT PAINT. ^ I wrote that.') },
       { id: 'h11_tv', at: [8.9, 0, -26.2], r: 0.8,
-        steps: [{ do: (c) => look(c, 'tv', null, 0.1) }, { wait: 1.6 }, say('luka', 'Every year.')] },   // (the TV's own screen: the card and the pop-up)
+        steps: [{ do: (c) => look(c, 'tv', null, 0.1) }, { wait: 1.6 }, say('luka', 'Every year.'), CUT] },   // (the TV's own screen: the card and the pop-up)
       { id: 'h11_laptop', at: [3.95, 0, -28.6], r: 0.6, steps: ex('laptop', 'He\'ll finish it.', ['s11_folder', {}]) },
       { id: 'h11_kettle', at: 'kettle', r: 0.85, verb: 'Use', kettle: true },
     ],
@@ -715,10 +718,12 @@
   ];
   // [MID · through the glass] (anchor s11_mid_glass, through the clear patch in the snow spray)
   const MID_GLASS = glide([5.6, 1.45, 2.6], [5.6, 1.15, -8.5], 34, { pos: [5.6, 1.38, 0.55], look: [5.75, 1.12, -8.5], fov: 29 }, 6.5);
-  // [CLOSE · the glass] the fingerprint under Luka's hands, Chase's hand coming in from the right
-  const GLASS = glide([5.8, 1.78, -4.5], [5.7, 0.98, -5.72], 40, { pos: [5.8, 1.72, -4.62], look: [5.7, 0.98, -5.72], fov: 38 }, 9);
+  // [CLOSE · the glass] steeply down onto the glass between the 3% phones: the fingerprint in the middle, his cloth
+  // coming in from the top; room on the right for Chase's finger
+  const GLASS = glide([5.66, 1.62, -5.02], [5.74, 0.95, -5.53], 42, { pos: [5.67, 1.55, -5.08], look: [5.75, 0.95, -5.54], fov: 40 }, 9);
   // Luka (not looking up), low across the glass; Chase leaning in over him
-  const NOT_UP = glide([4.72, 1.22, -5.15], [5.55, 1.18, -6.1], 46, { pos: [4.76, 1.21, -5.22], look: [5.55, 1.19, -6.1], fov: 44 }, 6);
+  // (a step further back and up than his eye line: Chase's head, bent over him, stays under the top bar)
+  const NOT_UP = glide([4.45, 1.32, -4.85], [5.65, 1.3, -6.1], 48, { pos: [4.5, 1.31, -4.92], look: [5.65, 1.3, -6.1], fov: 46 }, 6);
   // [TWO-SHOT · the counter] Luka at the glass foreground, Chase back on the counter with the phone
   const COUNTER2 = glide([5.85, 1.64, -4.3], [6.1, 1.25, -7.2], 46, { pos: [5.87, 1.63, -4.45], look: [6.1, 1.25, -7.2], fov: 45 }, 20);
   // [WIDE] the floor, the radio swinging into its chorus
@@ -810,17 +815,17 @@
       expr('chase', 'wince'),
       CLOSE('chase', { dist: 1.0, fov: 38, push: 0.05, dur: 6, yaw: 0.35 }),
       say('chase', 'Can we change the playlist?'),
-      CLOSE('luka', { dist: 0.95, fov: 38, push: 0.05, dur: 9, yaw: 0.55, ly: -0.05 }),
+      CLOSE('luka', { dist: 0.95, fov: 38, push: 0.05, dur: 9, yaw: 0.55, ly: 0.03 }),
       say('luka', 'It\'s Christmas.'),
       CLOSE('chase', { dist: 1.0, fov: 38, push: 0.05, dur: 6, yaw: 0.35 }),
       say('chase', 'It\'s been Bon Jovi since November.'),
-      CLOSE('luka', { dist: 0.95, fov: 38, push: 0.05, dur: 6, yaw: 0.55, ly: -0.05 }),
+      CLOSE('luka', { dist: 0.95, fov: 38, push: 0.05, dur: 6, yaw: 0.55, ly: 0.03 }),
       say('luka', 'Bon Jovi\'s better than Kanye West.'),
       expr('chase', 'suspicious'),
       CLOSE('chase', { dist: 0.95, fov: 37, push: 0.06, dur: 6, yaw: 0.35 }),
       { wait: 0.3 },
       say('chase', '…Nobody said Kanye.'),
-      CLOSE('luka', { dist: 0.95, fov: 38, push: 0.04, dur: 6, yaw: 0.55, ly: -0.05 }),
+      CLOSE('luka', { dist: 0.95, fov: 38, push: 0.04, dur: 6, yaw: 0.55, ly: 0.03 }),
       say('luka', 'Just getting ahead of it.'),
       expr('chase', 'wince'),
       // [LOW · Jordan up the ladder, reaching] The ladder wobbles slightly.
@@ -850,8 +855,10 @@
       { wait: 0.4 },
       expr('luka', 'neutral'),
     ] },
-    // (both ways: the roam's blocking; control passes to Luka)
+    // (both ways: the roam's blocking; control passes to Luka: a cut to the floor's camera as the bars slide away (a
+    // glide out of his close-up would pass through his head))
     { do: (c) => { const l = act(c, 'luka'); if (l) l.play('idle'); roamPlace(c); } },
+    CUT,
   ];
   const BREATH = { n: 5, color: 0xf2f6fa, speed: 0.08, life: 0.7, gravity: -0.05 };
 
