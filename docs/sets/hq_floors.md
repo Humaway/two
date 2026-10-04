@@ -177,11 +177,11 @@ lift ride content preloads `hq_roof` under the black (liveMax 3); `hq_floors` re
 | --- | --- | --- |
 | Floor | walkable x 33.0…60.4, z −37.0…−13.0; dark epoxy, mirror-polished, white dashed lane lines down the middle of L1/L2 | ceiling 3.9, exposed steel beams, cable trays, rows of tiny blue status lights |
 | **Static racks** (open steel frames 2.9 h, charging cradles at y 0.55 / 1.35 / 2.15 on both faces, slot every 0.62 m) | **R1** x 40.4…41.3 with crossings z −34.6…−33.0 and −20.4…−18.8; **R2** x 47.0…47.9 with a **bay** z −35.2…−34.0 (the rail runs through) and a crossing z −27.0…−25.4; **R3** x 53.0…53.9 with crossings z −35.0…−33.4 and −27.0…−25.4; **R0** single face along the south glass x 33…60.4, z −12.6…−11.8 (2 tiers); **R5** single face along the north wall z −37.6…−37.0 (2 tiers) | rows of docked drones, blue lights |
-| **Mobile rack M1** | 2.6 (x) × 0.9 (z) × 2.9 h, 24 docked drones on its faces; on a floor rail along **z −34.6** from x 44.9 to 51.75; **parked** x 44.9…47.5 (centre 46.2, half in R2's bay); **pushed** x 49.15…51.75 (centre 50.45), directly in front of the sentinel | Luka pushes east (4.25 m) |
+| **Mobile rack M1** | 2.6 (x) × 0.9 (z) × 2.9 h, 24 docked drones on its faces; on a floor rail along **z −34.6** from x 44.9 to 51.75; **parked** x 44.9…47.5 (centre 46.2, half in R2's bay); **pushed** x 49.15…51.75 (centre 50.45), directly in front of the sentinel | Luka pushes east (4.25 m). Reads as the cover at a glance: an amber outline (corner posts, base bumper, top edges) and an amber charge glow on the floor round it (moves with it); the rail carries a dim amber dashed push path with lit end stops |
 | **Arrival floor hatch** | (36.2, 0, −16.6), 0.9 × 0.9, lid hinged on its west edge, two steel grab rails 1.0 m up | the L21 ladder comes up here |
 | Speaker S1 | wall PA unit on R1's west face (40.3, 1.5, −31.0), facing −X, a jack panel | lure point A |
 | Dropped phones | P1 (45.4, 0.01, −15.6) lane L1 south; P2 (55.0, 0.01, −22.0) band C, against R3's east face | confiscated phones lying where a drone dropped them; screens dark until played |
-| **Private lift** | lobby x 57.6…60.4, z −23.6…−17.6; doors in the east wall **x 60.4, z −21.5…−19.9** (two black leaves); plate **MANAGER ONLY** (60.38, 2.55, −20.7); card reader (60.38, 1.2, −19.35) **red/green**; **side panel** (SafeSense screen 0.5 × 0.36) at (60.38, 1.45, −22.4): **ROOF ACCESS — SANTA PHOTO 11:30 — AUTHORISED: SANTA**; car x 60.6…62.8, z −21.8…−19.6: black mirror walls, a warm strip light, one button **ROOF** | shaft VG x 12.4…15.0 |
+| **Private lift** | lobby x 57.6…60.4, z −23.6…−17.6; doors in the east wall **x 60.4, z −21.5…−19.9** (two black leaves); plate **MANAGER ONLY** (60.38, 2.55, −20.7); card reader (60.38, 1.2, −19.35) **red/green**; **side panel** (SafeSense screen 0.5 × 0.36) at (60.38, 1.45, −22.4): **ROOF ACCESS — SANTA PHOTO 11:30 — AUTHORISED: SANTA**; car x 60.6…62.8, z −21.8…−19.6: black mirror walls, a warm strip light, one button **ROOF** | shaft VG x 12.4…15.0. The way out reads from across the floor: cool light lines down the surround's edges (with its top strip) and round the doorway, light spilling under the doors, runway studs along z −20.7 from band C (x 54.6…59.9), a soft pool on the floor in front |
 | South glass | z −11.0, x 30…66: storm city panorama card behind (`t_storm_l30`), rain-free, the occasional distant flash | |
 | PA grille | (37.0, 3.85, −18.4) | |
 
@@ -228,7 +228,8 @@ L30  outer      W [32.8,-37.2,33.0,-12.8]  N [33.0,-37.6,60.6,-37.0]  S [33.0,-1
 | L21 racks / aisle floor / cold LED | `#1a2433` / `#0e1622` (gloss `#3a5a78`) / `#6fd0ff` |
 | L21 1987 brick / beige jack and cable | `#d8c8a0` / `#cdbb94` |
 | Cooling pipes / valve wheels | `#2a6aa8` / steel `#b8bec6` with a `#bfe6ff` hub |
-| L30 floor / racks / beams | `#0f141c` (gloss `#2a3a50`) / `#3a424c` / `#20262e` |
+| L30 floor / racks / beams | `#18202c` (mirror tint 1.6) / `#56606e` (spines `#242c38`) / `#2a3038`; walls `#4a5668`; ceiling deck unlit `#101824` |
+| L30 light accents | lane floor light `#0a1220` (additive, under the ceiling strips); M1 amber `#d08a30`; private lift cool `#8ab8e0` (doorway) / `#a8c8e8` (surround), its floor pool `#2a3c58` |
 | Drones (shell / light) | `#eef2f6` / docked blue `#8fd8ff`, awake brighter `#bfe6ff`; amber `#ffb040`; red `#ff4040` |
 | Cleaning drones | white disc `#e8ecf0`, a soft cyan underglow `#9fe8ff` |
 | SafeSense panels | glass `#f4f8fc` @ 0.85, glow `#bfe6ff`, deep `#4a8ab8` |
@@ -248,6 +249,8 @@ L30  outer      W [32.8,-37.2,33.0,-12.8]  N [33.0,-37.6,60.6,-37.0]  S [33.0,-1
 - `M.glow` — Basic: light strips, lamps (valve hubs, hatch lock, beacons, reader), PA rings.
 - `M.glass` — Basic, transparent 0.25 (L30 south glass), and `M.sky30` — Basic, fog false, `t_storm_l30`.
 - `M.fog` — Basic, additive, `depthWrite: false`, `t_fog` (L21 fog cards).
+- `M.pool` — Basic, vertex colours, additive, `depthWrite: false`, no fog, never reflected: soft Gouraud pools of light
+  on L30's floor (the mirror shader is unlit), 1 draw call for the floor's (`pools30`) + 1 for M1's (`m1_pool`).
 - Drones (docked, cleaning, M1's) — the shared drone geometry from art; one white shell material + one unlit
   instanceColor light material per IM (`setColorAt` at build).
 - **Floors — `makeMirror(w, d, opts)`** (exported as `SETS.hq_floors.makeMirror`, used by every floor here and by
@@ -693,7 +696,7 @@ functions; only the visible floor's blocks run).
 | Static: `M.vc` 1, `M.atlas` 1, `M.labels` 1, `M.lit` 1, `M.glow` 1, floor 1 (+ baked mirror copy 3) | 6–9 |
 | L12 extras: bank 12 groups × 2 = 24, lift 2, ctrls 2, bins IM 3, headphones 1, bin 1, robots 1 | ~34 |
 | L21 extras: `M.leds` 1, tea point 2, jack 2, valves 2, fog 1, hatch 2, landing 2 | ~12 |
-| L30 extras: docked 2, M1 3, hatch 1, lure props 3, lift + car 4, sky strip 2 | ~15 |
+| L30 extras: docked 2, M1 3 (+ its floor light 1), hatch 1, lure props 3, lift + car 4, sky strip 2, floor light 1 | ~17 |
 | Cleaning drones 2, PA 1 | 3 |
 | Rigs: 3 actors (≈ 3 each) | ~9 |
 | Content drones (≤ 5 × 2) + cones (systems) | ~15 |

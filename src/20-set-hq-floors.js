@@ -61,7 +61,7 @@
 // EXTRAS: reset() (every eased prop finishes its move now: call after re-dressing on Continue), spawnDrones(floor)
 //   (DRONES.spawn for drones[floor], y -> hover, path names -> points).
 // Draw calls: one Builder per floor (vc + atlas + labels + glow + a few textured), the bank's 12 units (2 each), every
-// repeat instanced (docked 2, M1 2, cleaners 2, headphones 1, ...); the live mirror re-renders the visible floor once
+// repeat instanced (docked 2, M1 2, cleaners 2, headphones 1, ...), L30's floor light (pools30 1, m1_pool 1); the live mirror re-renders the visible floor once
 // (max 94 calls from any camera or anchor (l12_gap); L30 ≈ 530k tris live with the reflected fleet, ≈ 330k baked).
 // DEVIATIONS from the spec (all for the picture or for robustness):
 //   · env: hemi/dir raised (three's physically-based lights made the spec's L12 mid-grey and L21/L30 near-black; L12 now
@@ -82,6 +82,12 @@
 //     (they blocked the 3.6 m lenses); the baked (phone) mirror copies the fleet's lights, not its shells; the private
 //     car's black walls carry faint warm streaks of the strip light (part of car.light). The dropped L21 ladder adds a
 //     dynamic collider (rails at z -17.0) so nobody walks through it.
+//   · L30 readable from the gameplay cams (it read near-black; hemi/dir alone barely move the unlit mirror floor): racks,
+//     spines and walls a notch lighter, the ceiling deck unlit slate, the epoxy bluer (#18202c, mirror tint 1.6), hemi
+//     2.2 / dir 1.25; soft additive floor light (POOLM: a band under each ceiling strip and a pool in front of the private
+//     lift = pools30; M1's amber charge glow = m1_pool, moving with it); M1 outlined in amber (corner posts, base bumper,
+//     top edges) with a dim amber dashed push path on its rail and lit end stops; the lift framed in cool light (the
+//     surround's edges, the doorway lining, light spilling under the doors, runway studs along z -20.7 from band C).
 //   · ambience: positional only where fixed (shelf_servo); cleaner_swish is a plain bed (AUDIO.ambience keeps one handle
 //     per loop name, so per-drone handles would outlive the set).
 SETS.hq_floors = (() => {
@@ -89,15 +95,16 @@ SETS.hq_floors = (() => {
   // ---------------------------------------------------------- palette (spec §3.1)
   const W12 = 0xf2f4f6, W12S = 0xd4d8de, BIN = 0x9aa2aa, PLATE = 0xf8f8f8, INK = 0x1a1a1a,
     RACK21 = 0x1e2a3a, WALL21 = 0x2c3a4e, CEIL21 = 0x1a2738, LED = 0x6fd0ff, BRICK = 0xd8c8a0, BEIGE = 0xcdbb94,
-    PIPE = 0x2a6aa8, STEEL = 0xb8bec6, STEELD = 0x7a8088, HUB = 0xbfe6ff, RACK30 = 0x4a525c, BEAM = 0x2a3038, WALL30 = 0x3a4450,
-    SHELL = 0xe8ecf0, UNDER = 0x9fe8ff, GLOWB = 0xbfe6ff, DEEP = 0x4a8ab8, CONC = 0x3a3f46, RUBBER = 0x2a2c30, BLACK = 0x0a0c10;
+    PIPE = 0x2a6aa8, STEEL = 0xb8bec6, STEELD = 0x7a8088, HUB = 0xbfe6ff, RACK30 = 0x56606e, BEAM = 0x2a3038, WALL30 = 0x4a5668,
+    SHELL = 0xe8ecf0, UNDER = 0x9fe8ff, GLOWB = 0xbfe6ff, DEEP = 0x4a8ab8, CONC = 0x3a3f46, RUBBER = 0x2a2c30, BLACK = 0x0a0c10,
+    SPINE30 = 0x242c38, TIER30 = 0x3a4250, TRAY30 = 0x2e3640, FOOT30 = 0x323a46, CEIL30 = 0x101824, M1AMB = 0xd08a30, LIFTW = 0x8ab8e0;
   const T12 = [1, 1, 1], T21 = [0.86, 0.93, 1.06], T30 = [0.9, 0.95, 1.05], ONE = [1, 1, 1];
   const COL = [];                                         // colliders (filled by build; dynamic boxes mutated in place)
   const R = { state: 'l12', scene: null, env: null, lamp: 'gap', mode: 'live', forced: null };   // live refs + state (survives rebuilds)
   const tc = new THREE.Color(), tc2 = new THREE.Color(), m4 = new THREE.Matrix4(), m5 = new THREE.Matrix4();
   const qv = new THREE.Quaternion(), ev = new THREE.Euler(), pv = new THREE.Vector3(), sv = new THREE.Vector3(), yUp = new THREE.Vector3(0, 1, 0);
   const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
-  let b = null, GL = null, tint = T12, XF = null, T = null, M = null, GLOWM = null, GLASSM = null, SKYM = null, FOGM = null, BEACM = null, RINGM = null, PHONEM = null;
+  let b = null, GL = null, tint = T12, XF = null, T = null, M = null, GLOWM = null, GLASSM = null, SKYM = null, FOGM = null, BEACM = null, RINGM = null, PHONEM = null, POOLM = null;
   const skipping = () => typeof flow !== 'undefined' && !!flow && !!flow.skipping;
   const reduceFx = () => typeof options !== 'undefined' && !!options && !!options.reduceFlashing;
   const smooth = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
@@ -182,6 +189,52 @@ SETS.hq_floors = (() => {
     if (GL.length) st.add(glowMesh(GL));
     group.add(st); b = new Builder(); GL = [];
     return st;
+  }
+  // soft light on the floor (the mirror floor is unlit, so this is how a lamp or a strip lights it): additive Gouraud
+  // pools, one Mesh per call (POOLM: Basic, vertex colours, additive, no depth write, no fog; never reflected).
+  //   fan(cx, cz, rx, rz, a0, a1, hex): an elliptical pool (angles from +X toward +Z), hex at the centre -> black rim;
+  //   band(x0, z0, x1, z1, hex, fade): a strip along its long side, hex down the middle -> black at the sides, ends
+  //   faded over `fade` m.
+  function pools(fn, y = 0.006) {
+    const P = [], C = [];
+    const v = (x, z, k, c) => { P.push(x, y, z); C.push(c.r * k, c.g * k, c.b * k); };
+    const tri = (ax, az, ak, bx, bz, bk, cx, cz, ck, c) => {   // always facing +Y
+      v(ax, az, ak, c);
+      if ((bz - az) * (cx - ax) - (bx - ax) * (cz - az) < 0) { v(cx, cz, ck, c); v(bx, bz, bk, c); } else { v(bx, bz, bk, c); v(cx, cz, ck, c); }
+    };
+    const RINGS = [[0, 1], [0.5, 0.55], [1, 0]];
+    const fan = (cx, cz, rx, rz, a0, a1, hex, seg = 20) => {
+      const c = tc2.set(hex);
+      for (let i = 0; i < seg; i++) {
+        const t0 = a0 + (a1 - a0) * i / seg, t1 = a0 + (a1 - a0) * (i + 1) / seg, c0 = Math.cos(t0), s0 = Math.sin(t0), c1 = Math.cos(t1), s1 = Math.sin(t1);
+        for (let r = 0; r < 2; r++) {
+          const [f0, k0] = RINGS[r], [f1, k1] = RINGS[r + 1];
+          const p = (f, cs, sn) => [cx + rx * f * cs, cz + rz * f * sn];
+          const a = p(f0, c0, s0), b2 = p(f1, c0, s0), d = p(f1, c1, s1), e = p(f0, c1, s1);
+          tri(a[0], a[1], k0, b2[0], b2[1], k1, d[0], d[1], k1, c);
+          if (r) tri(a[0], a[1], k0, d[0], d[1], k1, e[0], e[1], k0, c);
+        }
+      }
+    };
+    const ACROSS = [[0, 0], [0.3, 0.7], [0.5, 1], [0.7, 0.7], [1, 0]];
+    const band = (x0, z0, x1, z1, hex, fade = 1.5) => {
+      const c = tc2.set(hex), alongX = Math.abs(x1 - x0) >= Math.abs(z1 - z0);
+      const a0 = alongX ? x0 : z0, a1 = alongX ? x1 : z1, b0 = alongX ? z0 : x0, b1 = alongX ? z1 : x1;
+      const AL = [[a0, 0], [a0 + fade, 1], [a1 - fade, 1], [a1, 0]];
+      const pt = (i, j) => { const a = AL[i][0], bq = b0 + (b1 - b0) * ACROSS[j][0]; return alongX ? [a, bq] : [bq, a]; };
+      const kk = (i, j) => AL[i][1] * ACROSS[j][1];
+      for (let i = 0; i < 3; i++) for (let j = 0; j < 4; j++) {
+        const p00 = pt(i, j), p10 = pt(i + 1, j), p01 = pt(i, j + 1), p11 = pt(i + 1, j + 1);
+        tri(p00[0], p00[1], kk(i, j), p10[0], p10[1], kk(i + 1, j), p11[0], p11[1], kk(i + 1, j + 1), c);
+        tri(p00[0], p00[1], kk(i, j), p11[0], p11[1], kk(i + 1, j + 1), p01[0], p01[1], kk(i, j + 1), c);
+      }
+    };
+    fn({ fan, band });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+    const m = new THREE.Mesh(g, POOLM); m.name = 'pools'; m.userData.noOcclude = true; m.userData.noReflect = true; R.noRef.push(m);
+    return m;
   }
 
   // ---------------------------------------------------------- painted textures (64–256 px, nearest where text must read)
@@ -364,8 +417,8 @@ SETS.hq_floors = (() => {
       c.fillStyle = '#0a1018'; c.fillRect(x + 2, y + 61, 60, 1); c.fillRect(x + 61, y + 2, 1, 60);
     }
   }
-  function paintFloor30(c) {   // dark epoxy, faint mottle
-    c.fillStyle = '#10151d'; c.fillRect(0, 0, 128, 128);
+  function paintFloor30(c) {   // dark blue epoxy, faint mottle
+    c.fillStyle = '#18202c'; c.fillRect(0, 0, 128, 128);
     seed = 17; for (let i = 0; i < 120; i++) { c.fillStyle = rnd() > 0.5 ? 'rgba(42,58,80,0.35)' : 'rgba(0,0,0,0.25)'; c.fillRect(rnd() * 128, rnd() * 128, 2 + rnd() * 6, 1 + rnd() * 3); }
   }
   function paintStorm(c) {   // 256 × 64: green-grey storm over the city, dimmed neon dots, a far river glint
@@ -1191,14 +1244,14 @@ SETS.hq_floors = (() => {
   }
   function rackSeg(x0, x1, z0, z1, faces, tiers, h) {   // a docking rack segment along z (faces: -1 west, 1 east, 0 both)
     const len = z1 - z0, cz = (z0 + z1) / 2;
-    bb(x0, 0, z0, x1, 0.1, z1, 0x2a3038);
-    bb((x0 + x1) / 2 - 0.03, 0.1, z0, (x0 + x1) / 2 + 0.03, h - 0.1, z1, 0x1a1f26);
+    bb(x0, 0, z0, x1, 0.1, z1, FOOT30);
+    bb((x0 + x1) / 2 - 0.03, 0.1, z0, (x0 + x1) / 2 + 0.03, h - 0.1, z1, SPINE30);
     for (const x of [x0, x1 - 0.06]) {
       for (let z = z0; z <= z1 + 0.01; z += 1.24) bb(x, 0, Math.min(z, z1 - 0.06), x + 0.06, h, Math.min(z, z1 - 0.06) + 0.06, RACK30);
       bb(x, h - 0.08, z0, x + 0.06, h, z1, RACK30);
-      for (const y of tiers) bb(x, y - 0.32, z0, x + 0.06, y - 0.27, z1, 0x2e353e);
+      for (const y of tiers) bb(x, y - 0.32, z0, x + 0.06, y - 0.27, z1, TIER30);
     }
-    for (const y of tiers) bb(x0 + 0.06, y - 0.3, z0, x1 - 0.06, y - 0.28, z1, 0x262c34);
+    for (const y of tiers) bb(x0 + 0.06, y - 0.3, z0, x1 - 0.06, y - 0.28, z1, TRAY30);
     for (const y of tiers) {
       if (faces <= 0) tquad(len, 0.12, M.cradle, x0 - 0.005, y - 0.24, cz, -H, 0, [0.62, 0.12], 0xffffff, (z0 + 37) / 0.62);
       if (faces >= 0) tquad(len, 0.12, M.cradle, x1 + 0.005, y - 0.24, cz, H, 0, [0.62, 0.12], 0xffffff, (-z1 - 37) / 0.62);
@@ -1207,11 +1260,11 @@ SETS.hq_floors = (() => {
   }
   function rackRowX(x0, x1, zf, dir, tiers, h) {   // a single-faced docking rack along x (R0 / R5); dir = facing (+1 south, -1 north)
     const zb = zf - dir * 0.8, za = Math.min(zf, zb), zc = Math.max(zf, zb), len = x1 - x0, cx = (x0 + x1) / 2;
-    bb(x0, 0, za, x1, 0.1, zc, 0x2a3038); bb(x0, 0.1, dir > 0 ? za : zc - 0.05, x1, h, dir > 0 ? za + 0.05 : zc, 0x1a1f26);
+    bb(x0, 0, za, x1, 0.1, zc, FOOT30); bb(x0, 0.1, dir > 0 ? za : zc - 0.05, x1, h, dir > 0 ? za + 0.05 : zc, SPINE30);
     for (let x = x0; x <= x1 + 0.01; x += 1.24) bb(Math.min(x, x1 - 0.06), 0, dir > 0 ? zf - 0.06 : zf, Math.min(x, x1 - 0.06) + 0.06, h, dir > 0 ? zf : zf + 0.06, RACK30);
     bb(x0, h - 0.08, za, x1, h, zc, RACK30);
     for (const y of tiers) {
-      bb(x0, y - 0.32, dir > 0 ? zf - 0.06 : zf, x1, y - 0.27, dir > 0 ? zf : zf + 0.06, 0x2e353e);
+      bb(x0, y - 0.32, dir > 0 ? zf - 0.06 : zf, x1, y - 0.27, dir > 0 ? zf : zf + 0.06, TIER30);
       if (dir > 0) tquad(len, 0.12, M.cradle, cx, y - 0.24, zf + 0.005, 0, 0, [0.62, 0.12], 0xffffff, (x0 - 33) / 0.62);
       else tquad(len, 0.12, M.cradle, cx, y - 0.24, zf - 0.005, PI, 0, [0.62, 0.12], 0xffffff, (33 - x1) / 0.62);
     }
@@ -1228,8 +1281,15 @@ SETS.hq_floors = (() => {
     bb(60.36, 0, -23.0, 60.4, 3.1, -18.4, 0x4a5260); bb(60.355, 2.95, -23.0, 60.36, 3.0, -18.4, 0xbfd8f0, M.glow);
     bb(60.33, 0, -21.62, 60.37, 2.52, -21.5, 0xc8ccd2); bb(60.33, 0, -19.9, 60.37, 2.52, -19.78, 0xc8ccd2); bb(60.33, 2.45, -21.62, 60.37, 2.52, -19.78, 0xc8ccd2);
     sign(SIG.manager, 1.2, 0.15, 60.355, 2.75, -20.7, -H, true);
+    // the way out reads from across the floor: cool light lines down the surround's edges and round the doorway, light
+    // spilling under the doors, runway studs along z -20.7 from band C (the pool in front of the doors: propsL30)
+    for (const z of [-23.0, -18.44]) bb(60.355, 0, z, 60.36, 2.95, z + 0.04, 0xa8c8e8, M.glow);
+    for (const z of [-21.59, -19.84]) bb(60.324, 0, z, 60.33, 2.49, z + 0.035, LIFTW, M.glow);
+    bb(60.324, 2.465, -21.59, 60.33, 2.49, -19.805, LIFTW, M.glow);
+    bb(60.18, 0, -21.5, 60.4, 0.008, -19.9, 0x34506c, M.glow);
+    for (let x = 54.6; x < 60.0; x += 0.75) bb(x - 0.12, 0, -20.74, x + 0.12, 0.008, -20.66, 0x5a82a8, M.glow);
     // ---- ceiling (3.9): dark deck, E–W steel beams, N–S girders over the racks, tiny blue status lights, dim strips
-    quad(27.6, 26.9, M.vc, 46.8, 3.9, -24.45, 0, H, 0x2a323e);
+    quad(27.6, 26.9, M.glow, 46.8, 3.9, -24.45, 0, H, CEIL30);   // unlit slate (a down-facing deck gets no light from the rig: it read pure black)
     for (let z = -36.0; z <= -12.0; z += 3.0) { bb(33.0, 3.74, z - 0.08, 60.4, 3.9, z + 0.08, BEAM); bb(33.0, 3.72, z - 0.15, 60.4, 3.745, z + 0.15, 0x2a3038); for (let x = 34.5; x < 60; x += 2.0) bb(x - 0.02, 3.70, z - 0.02, x + 0.02, 3.72, z + 0.02, 0x6fc8ff, M.glow); }
     for (const x of [40.85, 47.45, 53.45]) bb(x - 0.1, 3.76, -37.6, x + 0.1, 3.9, -11.8, BEAM);
     for (const x of [36.7, 44.15, 50.45, 57.15]) ledStrip(x, -36.5, x, -13.5, 3.72, 0x8fb8e8, 0.08);
@@ -1237,6 +1297,8 @@ SETS.hq_floors = (() => {
     for (const x of [44.15, 50.45]) for (let z = -36.6; z < -13.4; z += 1.8) bb(x - 0.04, 0, z, x + 0.04, 0.005, Math.min(z + 1.0, -13.4), 0xd8e0e8);
     for (const z of [-34.85, -34.35]) bb(44.7, 0, z - 0.03, 51.95, 0.025, z + 0.03, 0x8a929c);
     bb(44.55, 0, -34.95, 44.7, 0.06, -34.25, 0x5a6068); bb(51.95, 0, -34.95, 52.1, 0.06, -34.25, 0x5a6068);
+    for (let x = 44.85; x < 51.8; x += 0.5) bb(x, 0, -34.63, x + 0.25, 0.006, -34.57, 0x6a4418, M.glow);   // M1's push path
+    for (const x of [44.55, 51.95]) bb(x, 0.06, -34.95, x + 0.15, 0.07, -34.25, M1AMB, M.glow);
     bb(35.7, 0, -17.1, 36.7, 0.015, -17.05, STEELD); bb(35.7, 0, -16.15, 36.7, 0.015, -16.1, STEELD); bb(35.7, 0, -17.05, 35.75, 0.015, -16.15, STEELD); bb(36.65, 0, -17.05, 36.7, 0.015, -16.15, STEELD);
     for (const z of [-17.15, -16.0]) bb(35.6, 0, z - 0.04, 36.8, 0.006, z + 0.04, 0xb8bec6);
     tint = [0.45, 0.47, 0.5];
@@ -1272,6 +1334,11 @@ SETS.hq_floors = (() => {
   function propsL30(g) {
     const P = (o) => (g.add(o), o);
     R.pa30 = P(paGrille('pa30', 37.0, 3.9, -18.4));
+    // ---- soft light on the mirror floor: the four lanes under the ceiling strips, the lift lobby in front of the doors
+    P(pools(({ fan, band }) => {
+      for (const x of [36.7, 44.15, 50.45, 57.15]) band(x - 1.5, -36.8, x + 1.5, -13.1, 0x0a1220, 3.0);
+      fan(60.4, -20.7, 3.4, 2.7, H, H + PI, 0x2a3c58);
+    })).name = 'pools30';
     // ---- the docked fleet: 768 pods (2 IM: shell + light), 12 awake ones that stir
     const slots = dockSlots(); R.slots = slots;
     R.docked = DRONE_INSTANCED.make(800, { state: 'patrol' });
@@ -1303,12 +1370,17 @@ SETS.hq_floors = (() => {
       bb(-1.3, 0.03, -0.45, 1.3, 0.16, 0.45, 0x3a4048);
       for (const sx of [-1, 1]) for (const z of [-0.25, 0.25]) cyl(0.07, 0.07, 0.06, 8, 0x1a1c20, sx * 1.05, 0.07, z, H, 0);
       for (const x of [-1.27, -0.62, 0, 0.62, 1.21]) for (const z of [-0.45, 0.39]) bb(x, 0.16, z, x + 0.06, 2.9, z + 0.06, RACK30);
-      bb(-1.3, 2.82, -0.45, 1.3, 2.9, 0.45, RACK30); bb(-1.3, 0.16, -0.03, 1.3, 2.82, 0.03, 0x1a1f26);
-      for (const y of TIERS) for (const sz of [-1, 1]) { bb(-1.3, y - 0.32, sz > 0 ? 0.39 : -0.45, 1.3, y - 0.27, sz > 0 ? 0.45 : -0.39, 0x2e353e); tquad(2.6, 0.12, M.cradle, 0, y - 0.24, sz * 0.455, sz > 0 ? 0 : PI, 0, [0.62, 0.12], 0xffffff, 0.5 - 2.1 / 0.62); }
+      bb(-1.3, 2.82, -0.45, 1.3, 2.9, 0.45, RACK30); bb(-1.3, 0.16, -0.03, 1.3, 2.82, 0.03, SPINE30);
+      for (const y of TIERS) for (const sz of [-1, 1]) { bb(-1.3, y - 0.32, sz > 0 ? 0.39 : -0.45, 1.3, y - 0.27, sz > 0 ? 0.45 : -0.39, TIER30); tquad(2.6, 0.12, M.cradle, 0, y - 0.24, sz * 0.455, sz > 0 ? 0 : PI, 0, [0.62, 0.12], 0xffffff, 0.5 - 2.1 / 0.62); }
       bb(-1.42, 0.95, -0.4, -1.36, 1.02, 0.4, STEEL); for (const z of [-0.36, 0.36]) bb(-1.36, 0.97, z - 0.02, -1.3, 1.0, z + 0.02, STEEL);
       bb(-0.3, 2.9, -0.06, 0.3, 2.98, 0.06, 0x2a3038); bb(-0.08, 2.98, -0.04, 0.08, 3.02, 0.04, 0xffb040, M.glow);
       for (let x = -0.93; x <= 0.94; x += 0.62) for (const sz of [-1, 1]) bb(x - 0.015, 2.78, sz * 0.46 - 0.006, x + 0.015, 2.81, sz * 0.46 + 0.006, 0x6fc8ff, M.glow);
+      // the cover reads at a glance among the static racks: an amber outline (corner posts, base bumper, top edges)
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) bb(sx * 1.27, 0.2, sz * 0.42, sx * 1.305, 2.8, sz * 0.465, M1AMB, M.glow);
+      for (const sz of [-1, 1]) { bb(-1.3, 0.07, sz * 0.45, 1.3, 0.12, sz * 0.465, M1AMB, M.glow); bb(-1.3, 2.84, sz * 0.45, 1.3, 2.88, sz * 0.465, M1AMB, M.glow); }
+      for (const sx of [-1, 1]) bb(sx * 1.3, 0.07, -0.45, sx * 1.315, 0.12, 0.45, M1AMB, M.glow);
     }, [46.2, 0, -34.6]));
+    const m1Pool = pools(({ fan }) => fan(0, 0, 2.3, 1.35, 0, TAU, 0x2e1e0c)); m1Pool.name = 'm1_pool'; R.m1.add(m1Pool);   // its charge glow on the floor (moves with it)
     const md = DRONE_INSTANCED.make(24, { state: 'patrol' }); md.body.name = 'm1_shells'; md.light.name = 'm1_lights';
     let n = 0;
     for (const sz of [-1, 1]) for (const y of TIERS) for (const x of [-0.93, -0.31, 0.31, 0.93]) { md.set(n, x, y, sz * 0.57, sz < 0 ? PI : 0, 1); tc.set(0x8fd8ff).multiplyScalar(0.75 + (n % 3) * 0.06); md.glow(n, tc.getHex()); n++; }
@@ -1350,8 +1422,8 @@ SETS.hq_floors = (() => {
     }
     // ---- the private lift: doors (two black leaves), reader (red / green), the SafeSense side panel, the car
     R.lift30 = P(new THREE.Group()); R.lift30.name = 'lift30';
-    R.liftN = part('lift30_door_n', () => { bb(60.43, 0, -21.5, 60.53, 2.45, -20.71, 0x2a2e36); bb(60.425, 0.1, -21.42, 60.43, 2.35, -21.4, 0x4a5260); bb(60.42, 0, -20.75, 60.43, 2.45, -20.71, 0xc8ccd2); }, null, 0);
-    R.liftS = part('lift30_door_s', () => { bb(60.43, 0, -20.69, 60.53, 2.45, -19.9, 0x2a2e36); bb(60.425, 0.1, -20.0, 60.43, 2.35, -19.98, 0x4a5260); bb(60.42, 0, -20.69, 60.43, 2.45, -20.65, 0xc8ccd2); }, null, 0);
+    R.liftN = part('lift30_door_n', () => { bb(60.43, 0, -21.5, 60.53, 2.45, -20.71, 0x343a46); bb(60.425, 0.1, -21.42, 60.43, 2.35, -21.4, 0x4a5260); bb(60.42, 0, -20.75, 60.43, 2.45, -20.71, 0xc8ccd2); }, null, 0);
+    R.liftS = part('lift30_door_s', () => { bb(60.43, 0, -20.69, 60.53, 2.45, -19.9, 0x343a46); bb(60.425, 0.1, -20.0, 60.43, 2.35, -19.98, 0x4a5260); bb(60.42, 0, -20.69, 60.43, 2.45, -20.65, 0xc8ccd2); }, null, 0);
     R.lift30.add(R.liftN, R.liftS);
     R.lift30.add(part('lift30_screens', () => {
       bb(60.33, 1.11, -19.42, 60.36, 1.29, -19.28, 0x2a2e34); quad(0.08, 0.12, M.reader, 60.325, 1.2, -19.35, -H);
@@ -1544,7 +1616,7 @@ SETS.hq_floors = (() => {
   const FLOOR_MIR = {   // per floor: mirror tint brightness by env, reflect amount
     l12: { reflect: 0.55, env: { l12: 0.95, lift: 0.55 }, def: 0.95 },
     l21: { reflect: 0.6, env: { l21: 1.25, l21_fog: 2.4 }, def: 1.25 },
-    l30: { reflect: 0.62, env: { l30: 1.35, car30: 0.8 }, def: 1.35 },
+    l30: { reflect: 0.62, env: { l30: 1.6, car30: 0.8 }, def: 1.6 },
   };
   function autoMode() {
     if (R.forced) return R.forced;
@@ -1731,6 +1803,9 @@ SETS.hq_floors = (() => {
     BEACM ||= mat(0x40281a, { emissive: 0xff8a20, emissiveIntensity: 0.4, key: 'hqf_beacon' });
     RINGM ||= mat(0x10202a, { emissive: 0x6fd0ff, emissiveIntensity: 0.15, key: 'hqf_pa_ring' });
     PHONEM ||= matTex(T.phone, { emissive: 0xffffff, key: 'hqf_phone' });
+    POOLM ||= new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+      polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });   // additive + fog = lit shapes in the distance
+    POOLM.name = 'hqf_pool';
     GLOWM.name = 'hqf_glow'; GLASSM.name = 'hqf_glass'; SKYM.name = 'hqf_sky'; FOGM.name = 'hqf_fog'; BEACM.name = 'hqf_beacon'; RINGM.name = 'hqf_ring'; PHONEM.name = 'hqf_phone';
     M = {
       vc: mat(0xffffff), glow: GLOWM, ring: RINGM,
@@ -1822,7 +1897,7 @@ SETS.hq_floors = (() => {
       lift:    { bg: 0x101214, fog: [0x202428, 0.020], hemi: [0xd8e2ea, 0x404448, 1.30], dir: [0xffffff, 0.35, [0, 10, 0]], rain: 0 },
       l21:     { bg: 0x0a1420, fog: [0x10223a, 0.035], hemi: [0x8fb8e8, 0x1a2430, 1.7], dir: [0x9cc4ff, 0.8, [-6, 10, 4]], rain: 0 },
       l21_fog: { bg: 0x40586e, fog: [0x6a8aa8, 0.075], hemi: [0xa8c8e8, 0x2a3440, 1.9], dir: [0x9cc4ff, 0.6, [-6, 10, 4]], rain: 0 },
-      l30:     { bg: 0x0b0f16, fog: [0x141c28, 0.030], hemi: [0x7f9cc8, 0x1a2028, 1.7], dir: [0xa8b8c8, 1.0, [0, 12, 20]], rain: 0 },
+      l30:     { bg: 0x0b0f16, fog: [0x141c28, 0.030], hemi: [0x7f9cc8, 0x1a2028, 2.2], dir: [0xa8b8c8, 1.25, [0, 12, 20]], rain: 0 },
       car30:   { bg: 0x08080a, fog: [0x101012, 0.030], hemi: [0x8a8070, 0x202020, 1.2], dir: [0xffe8c8, 0.45, [0, 10, 0]], rain: 0 },
     },
     build, dress, lamp, reflect, makeMirror: MIRROR,

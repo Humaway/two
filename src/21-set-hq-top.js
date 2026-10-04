@@ -66,7 +66,9 @@
 //   left shoulder (from straight behind, his head hides the screen); the ring leaves an open arc toward the glass so the
 //   pop-up and clock read through it; env intensities are scaled for r186 physical lights (hemi/dir ×≈2.5, lamp × 5).
 //   The 'boss' rail cam (spec §7.1) cannot frame anyone within ~1.5 m of the north wall (they are under the lens): the
-//   boss game's bossCam override must keep its target at lerp(console, chase, 0.5) as specified.
+//   boss game's bossCam override must keep its target at lerp(console, chase, 0.5) as specified. The console's east face
+//   carries an unlit gloss gradient with a cool streak under its top edge (the usb_port lens read black but for the
+//   ring; the face gets no light from the rig), and the port's slot is a flat pill.
 SETS.hq_top = (() => {
   const PI = Math.PI, H = PI / 2, TAU = PI * 2, DS = THREE.DoubleSide;
   // ---------------------------------------------------------- palette (spec §3.1)
@@ -1028,8 +1030,14 @@ SETS.hq_top = (() => {
       const sh = new THREE.Shape(); sh.moveTo(-0.304, 0.95); sh.lineTo(0.3, 0.95); sh.lineTo(0.3, 1.112); sh.closePath();   // the screen's wedge
       const wg = new THREE.ExtrudeGeometry(sh, { depth: 1.66, bevelEnabled: false }); wg.rotateY(-H); wg.translate(0.83, 0, 0); put(wg, 0x111317);
       quad(1.6, 0.6, M.con, 0, 1.0303, -0.02, PI, -1.309);                                               // tilted 15° toward Luka (north)
-      bb(1.2, 0.792, -0.008, 1.203, 0.808, 0.008, 0x020203, M.glow);                                     // the slot
+      bb(1.2, 0.7965, -0.0095, 1.203, 0.8035, 0.0095, 0x020203, M.glow);                                 // the slot (USB-C: a flat pill)
       labH(4, 0, 0.06, 0.015, 1.2035, 0.768, 0, H);
+      // the east face catches a faint rim of the storm light (the usb_port lens was black but for the ring): an unlit
+      // gloss gradient, near-black at the plinth, a soft cool streak under the top edge, so the face reads round the port
+      { const ROWS = [[0.946, 0x1e262f], [0.92, 0x2a3540], [0.88, 0x171d24], [0.8, 0x0f1418], [0.6, 0x0a0c0f], [0.13, 0x060708]];
+        const g = new THREE.PlaneGeometry(0.8, 1, 1, ROWS.length - 1), p = g.attributes.position, a = new Float32Array(p.count * 3);
+        for (let i = 0; i < p.count; i++) { const r = ROWS[i >> 1]; p.setY(i, r[0]); tc2.set(r[1]); a[i * 3] = tc2.r; a[i * 3 + 1] = tc2.g; a[i * 3 + 2] = tc2.b; }
+        g.setAttribute('color', new THREE.BufferAttribute(a, 3)); g.rotateY(H); g.translate(1.2008, 0, 0); put(g, null, M.glow); }
     }, [0, 0, -15.4]));
     R.portRing = new THREE.Mesh(new THREE.TorusGeometry(0.014, 0.0022, 4, 16).rotateY(H), PORTM); R.portRing.name = 'console_port'; R.portRing.position.set(1.2025, 0.8, 0); R.con.add(R.portRing);
     R.con.userData = {
