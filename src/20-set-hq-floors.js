@@ -49,7 +49,7 @@
 //   l12_hall_e · l21_landing l21_east_s l21_east_n l21_a0..a3 (chained, ease 0.25) l21_west_n l21_west_s · l30_a_s
 //   l30_a_n l30_l1_s l30_l1_n l30_l2_s l30_l2_n l30_c_n l30_c_s l30_lobby l30_car. ZONES tile every walkable floor.
 // PROPS (userData APIs; every call is instant while skipping, allocation-free, and its state survives a rebuild):
-//   l12_lift doors(u) light(on) panel(floor) · pa12 / pa21 / pa30 talk(on) level(k 0..1) · bank open(u) jiggle() isOpen k
+//   l12_lift doors(u) light(on) panel(floor) · pa12 / pa21 / pa30 talk(on) level(k 0..1) · bank open(u, { instant }) jiggle() isOpen k
 //   · ctrl_w / ctrl_e held(on) progress(k) · lane_bots · bins_l12 (guitars, skateboards, knives IMs) · chase_guitar ·
 //   headphones_wall take() put() taken · tramp_bin push(u) reset() done · stair_door12 open(u) · landing21 door(u)
 //   shutter.pulse() · tea_point steam() kettle_cord (child; .visible) · jack state('bare'|'adapter'|'phone')
@@ -58,6 +58,8 @@
 //   wake(i, on) tint(name, k) · m1 push(u) reset() done x · hatch30 open(u) · s1 / p1 / p2 play(on) · lift30 doors(u)
 //   reader('red'|'green') beep() panel('booking'|'recognised') car.light(on) car.button(on) · sky30 flash(k) · cleaners.
 // DATA: paths (clean_*, d21_*, d30*, old_trail, lane_bots), checkpoints, lures, ar { l12, l21, l30 }, drones { l21, l30 }.
+// EXTRAS: reset() (every eased prop finishes its move now: call after re-dressing on Continue), spawnDrones(floor)
+//   (DRONES.spawn for drones[floor], y -> hover, path names -> points).
 // Draw calls: one Builder per floor (vc + atlas + labels + glow + a few textured), the bank's 12 units (2 each), every
 // repeat instanced (docked 2, M1 2, cleaners 2, headphones 1, ...); the live mirror re-renders the visible floor once
 // (max 94 calls from any camera or anchor (l12_gap); L30 ≈ 530k tris live with the reflected fleet, ≈ 330k baked).
@@ -812,7 +814,7 @@ SETS.hq_floors = (() => {
     R.beacons = instanced(bg, BEACM, BANK.closed.map((x) => [x, 2.83, -30.5, 0, 1]));
     R.beacons.name = 'bank_beacons'; R.beacons.instanceMatrix.setUsage(THREE.DynamicDrawUsage); R.bank.add(R.beacons);
     R.bank.userData = {
-      open(u = 1) { R.bankTo = clamp01(+u); if (skipping()) { R.bankK = R.bankTo; placeBank(0); } else if (R.bankTo !== R.bankK) snd('door_slide', 0.45, 0.6, BANK_AT); },
+      open(u = 1, o) { R.bankTo = clamp01(+u); if (skipping() || (o && o.instant)) { R.bankK = R.bankTo; placeBank(0); } else if (R.bankTo !== R.bankK) snd('door_slide', 0.45, 0.6, BANK_AT); },
       jiggle() { R.jigT = 0; snd('clunk', 0.35, 1.4, BANK_AT); },
       get isOpen() { return R.bankK >= 0.999; },
       get k() { return R.bankK; },
@@ -1801,6 +1803,19 @@ SETS.hq_floors = (() => {
   }
 
   // ---------------------------------------------------------- data
+  const DRONE_DATA = {
+    l21: [
+      { id: 'd21_a0', path: 'd21_a0', y: 1.9, speed: 0.8, cone: { len: 4.6, half: 0.42 } },
+      { id: 'd21_a2', path: 'd21_a2', y: 1.9, speed: 0.7, cone: { len: 5.0, half: 0.42 } },
+    ],
+    l30: [
+      { id: 'd30a', path: 'd30a', y: 1.9, speed: 0.8, cone: { len: 4.5, half: 0.42 } },
+      { id: 'd30b', path: 'd30b', y: 1.9, speed: 1.0, cone: { len: 5.0, half: 0.42 } },
+      { id: 'd30c', at: [50.45, 1.8, -36.2], face: 0, y: 1.8, sweep: 10.3, sweepPeriod: 5, cone: { len: 11.0, half: 0.30 } },
+      { id: 'd30d', path: 'd30d', y: 1.9, speed: 0.9, cone: { len: 4.5, half: 0.42 } },
+      { id: 'd30e', at: [58.8, 1.9, -21.6], face: -H, y: 1.9, sweep: 51.6, sweepPeriod: 8.3, cone: { len: 4.2, half: 0.45 } },
+    ],
+  };
   return {
     env: {
       l12:     { bg: 0xdfe4ea, fog: [0xe8ecf0, 0.028], hemi: [0xf4f8ff, 0xc8ccd4, 2.0], dir: [0xe8f0ff, 1.1, [6, 14, 8]], rain: 0 },
@@ -1956,6 +1971,26 @@ SETS.hq_floors = (() => {
     ],
     get ambience() { return AMB[ambKey()]; },
     update,
+    // reset(): every eased prop finishes its move now (bank, lifts' doors, stair / landing doors, bin, fog, hatches,
+    // ladders, docked tint, m1): call it after re-dressing the props from the flags (Continue) so nothing slides on arrival
+    reset() {
+      if (!R.root) return;
+      R.liftU = R.liftTo; R.bankK = R.bankTo; R.binU = R.binTo; R.sdU = R.sdTo; R.ldU = R.ldTo; R.fogK = R.fogTo; R.h21U = R.h21To;
+      R.ldrU = R.ldrTo; R.dockK = R.dockTo; R.m1U = R.m1To; R.h30U = R.h30To; R.l30U = R.l30To;
+      placeBank(0);
+    },
+    // spawnDrones(floor): DRONES.spawn every drone of drones[floor] (y -> hover, path names -> points), as 3.2 does
+    spawnDrones(floor) {
+      if (typeof DRONES === 'undefined') return;
+      for (const d of DRONE_DATA[floor] || []) {
+        const o = { kind: 'courtesy', hover: d.y || 1.9, speed: d.speed || 1, cone: d.cone || { len: 4, half: 0.42 } };
+        if (d.path) o.path = typeof d.path === 'string' ? PATHS[d.path] : d.path;
+        if (d.at) o.at = d.at;
+        if (d.face != null) o.face = d.face;
+        if (d.sweep) { o.sweep = d.sweep; o.sweepPeriod = d.sweepPeriod || 5; }
+        DRONES.spawn(d.id, o);
+      }
+    },
     paths: PATHS,
     checkpoints: { l21: ['s32_cp_l21', 's32_cp_l21_w'], l30: ['s32_cp_a', 's32_cp_l1', 's32_cp_c'] },
     lures: { s1: [40.3, 1.5, -31.0], p1: [45.4, 0.01, -15.6], p2: [55.0, 0.01, -22.0] },
@@ -1980,19 +2015,7 @@ SETS.hq_floors = (() => {
         { id: 'ar_lift', at: [60.3, 2.9, -20.7], text: 'PRIVATE LIFT · MANAGER ONLY', kind: 'sign', w: 2.2 },
       ],
     },
-    // spec §7.3: the drones content spawns (DRONES.spawn) per floor
-    drones: {
-      l21: [
-        { id: 'd21_a0', path: 'd21_a0', y: 1.9, speed: 0.8, cone: { len: 4.6, half: 0.42 } },
-        { id: 'd21_a2', path: 'd21_a2', y: 1.9, speed: 0.7, cone: { len: 5.0, half: 0.42 } },
-      ],
-      l30: [
-        { id: 'd30a', path: 'd30a', y: 1.9, speed: 0.8, cone: { len: 4.5, half: 0.42 } },
-        { id: 'd30b', path: 'd30b', y: 1.9, speed: 1.0, cone: { len: 5.0, half: 0.42 } },
-        { id: 'd30c', at: [50.45, 1.8, -36.2], face: 0, y: 1.8, sweep: 10.3, sweepPeriod: 5, cone: { len: 11.0, half: 0.30 } },
-        { id: 'd30d', path: 'd30d', y: 1.9, speed: 0.9, cone: { len: 4.5, half: 0.42 } },
-        { id: 'd30e', at: [58.8, 1.9, -21.6], face: -H, y: 1.9, sweep: 51.6, sweepPeriod: 8.3, cone: { len: 4.2, half: 0.45 } },
-      ],
-    },
+    // spec §7.3: the drones content spawns (DRONES.spawn) per floor (spawnDrones(floor) maps and spawns them)
+    drones: DRONE_DATA,
   };
 })();

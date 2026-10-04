@@ -332,7 +332,7 @@ and the L30 glass is mostly blocked by R0 anyway.)
 | --- | --- | --- | --- |
 | `l12_lift` | 12 | car (quilts, rail, ceiling panel, speaker grille, panel) + the steel leaf | `doors(u)` 0…1 (leaf slides west 1.6 m, 1.2 s); `light(on)`; `panel(floor)` lights a button; collider follows |
 | `pa12`, `pa21`, `pa30` | all | ceiling speaker grilles | `talk(on)` a soft blue ring pulses with the Manager's PA blips |
-| `bank` | 12 | the 12 mobile units (12 small Groups: merged body + label quads) | `open(u)` 0…1 (units ease from closed to open centres over 3 s, beacons blink while moving, servo whine); `jiggle()` a 0.1 m twitch (when one control is held alone); dynamic colliders follow; `isOpen` |
+| `bank` | 12 | the 12 mobile units (12 small Groups: merged body + label quads) | `open(u, { instant })` 0…1 (units ease from closed to open centres over 3 s, or jump with `instant`; `SETS.hq_floors.reset()` finishes every eased prop's move at once, e.g. after re-dressing on Continue; beacons blink while moving, servo whine); `jiggle()` a 0.1 m twitch (when one control is held alone); dynamic colliders follow; `isOpen` |
 | `ctrl_w`, `ctrl_e` | 12 | the two control panels | `held(on)` (button lights, ring fills); `progress(k)` the shared "both held" ring 0…1 (1.5 s to open) |
 | `lane_bots` | 12 | IM 2 shelf robots behind the fence | ping-pong 0.6 m/s (ambient) |
 | `bins_l12` | 12 | the labelled bins (merged static) + guitars IM (9) + skateboards IM (12) + knives IM (40 thin blades in a rack) + ladders (merged) | static |
