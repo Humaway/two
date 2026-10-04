@@ -98,6 +98,8 @@ Source reports are in `docs/reports/`.
 - [ ] **systems** — a `y` hover option on `DRONES.goTo` (2.8 eases `d.hover` itself). (sent)
 - [ ] **valley** — anchors `s28_c40_close`, `s28_track_*`, `s29_luka_close` (door leaf blocks), `s29_reverse` (lens inside Luka at his turn mark), `s29_c40_dark` (back of head) frame badly with the scene's blocking (2.8–2.9 use computed lenses); no anchor for a face lying on its back.
 
+- [ ] **main** — `warmRig` bakes portraits by cropping the centre square of the screen canvas; on portrait screens that zooms to just the face (Polaroids, dialogue faces): render portraits from a fixed-aspect target.
+
 ## Visual QA (integration pass)
 
 - [ ] **B1** — real-time screenshot pass of the montage (2029 → match cut) and the post-screenshot framing fixes; **B2** entirely (fast autoplay passes; frames unviewed).
