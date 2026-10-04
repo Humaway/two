@@ -154,4 +154,5 @@ Sets (12 set commits):
 ## Final lead pass
 
 - [x] **art** — the 3.1 `desk` look was a man badged DEV; the script says "the woman at the desk". — done (lead): `fem: true`, long hair, badge PRIYA.
-- [ ] **hq_floors** — L30 too dark to read cover (M1 rack) and the private lift from the gameplay cams (Act 3 report). — in progress (set agent).
+- [x] **hq_floors** — L30 too dark to read cover (M1 rack) and the private lift from the gameplay cams (Act 3 report). — done (cf77f4c): lighter racks/walls/floor, additive floor light under the lane strips and before the lift, M1 outlined in amber, the lift framed in cool light; mean brightness ~+11 per gameplay cam; +2 draw calls (max 46). hq_top: rim gradient for `usb_port`.
+- [ ] **3.2 test hook** (68, autoplay only) — `&s32=l30` starts on L30 but places the actors at L21 positions (the full 3.2 run is fine; players never reach the hook). Low priority.
