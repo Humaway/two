@@ -108,3 +108,29 @@ Source reports are in `docs/reports/`.
 ## Visual QA (integration pass)
 
 - [ ] **B1** — real-time screenshot pass of the montage (2029 → match cut) and the post-screenshot framing fixes; **B2** entirely (fast autoplay passes; frames unviewed).
+
+## Content cleanups now possible (final polish pass; optional, each must keep the scene working)
+
+Engine (63c4619 etc.):
+- 63: drop `Object.assign(CHARACTERS, …)` for MAN/KID/WOMAN (now in 01-config).
+- 3.7: drop the one-tick wait before computed lenses; drop manual `rig.seated` resets; drop the bar slide during STORAGE FULL; `s37_*` anims → engine names (`kneel_work`, `lean_rail`, `wipe_face`, `hand_rest`, `peer`, `limp`, `lean_back`).
+- 3.5: drop `s3_still`/`s3_hurt` wrappers; `rig.ghost(['handR','foreR'], a)` instead of scaling the hand bone. 3.6: `phones_off`.
+- 2.4: `kettle: [steps]` instead of the hand-rolled kettle; `walk_rail` / `hand_rail` for Rue. 2.5: `laugh_cry` expression; drop autoplay follower walks. 2.7: `say('passenger', …, { actor })`.
+- 2.1: spawn `chase40` with `{ look: 'chase40_tee' }` (dawn T-shirt) instead of hiding coat/lanyard/headphones.
+- 1.5 / 2.6: `rig.attach.card` + `paint` + `hold_card` instead of content-built card meshes.
+- 1.6: `waitUntil(fn, { skip: false })` instead of its own `until()`; `hair_static` for the zap.
+- A1/B1: `rig.fade` instead of the `world.adopt` wrapper; `world.rigsOf`; `santa_hat` on luke; `lanyard_held`.
+- 2.8: `lure({ transfixed })`; `goTo({ y })`; keypad `title`/`prompt`/`okText` instead of the DOM relabel.
+- bridge set: `SETS.bridge.render` instead of wrapping `world.render`.
+
+Sets (12 set commits):
+- 1.7/1.8: drop `PATHS17`/`paths()` injection. 
+- 1.1: `smudge1At(x, z, 2.4)`; anchors `monitor2`, `pot_plant`; `backroom_door.userData.solid(true)`; P's glass lenses → `glass_popup` / `glass_popup_ecu`.
+- 1.2/1.3: `s12_heroic`, `s12_twoshot`; `blast({ tree: false })`; `store_phone.ring(true, { sfx: 'trill', every: 1.6, vol: 0.55, max: 4 })`.
+- 1.6: `A16` → `s16_addr_*`, `s16_jordan_close`.
+- 2.1–2.3: `s23_plaque`; `s22_drone_piano`, `s22_piano_cam`; 2.1 sleepers lie down via `SETS.flat.lie(true)` + `s21_couch_lie` / `s21_bed_lie`; `s21_dawn_wide`, `s21_box`; optional 2.3 save `{ at: 'urn_w', r: 1.2, kettle: true }`.
+- 2.6: sample spot `s26_sample_sizzle`.
+- 3.1/3.2: `invite` prop hold/home; `spawnDrones(floor)`; `SETS.hq_floors.reset()` after `dress32`.
+- 3.3: `lamp('mgr')` for the badge insert. 3.7: `ARC` → `s37_st_*`; crane start `s37_crane_a`.
+- A1: `ring(true, { sfx: 'phone_ring', every: 2.5, max: 2 })`; coda shot → `counter_phone`.
+- B1/B2: B2 cups → parade `coffees.show('both')`; B1 `HEROIC` → `s12_heroic`; 2037 frame `screens_all.caption('THE MANAGER')`.
