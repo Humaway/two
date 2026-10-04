@@ -369,9 +369,9 @@ Boss gameplay drones (Courtesy, Guardian, Pop-up, Cleaning) are **content-spawne
 
 | id | at | from | fov | for |
 | --- | --- | --- | --- | --- |
-| `glass_popup` | [−3.0, 2.15, −11.24] | [−3.0, 2.15, −13.85] | 40 | ECU · locked the pop-up (P step 2, 3.3 step 1 insert, 3.6 steps 17/19/22); the whole 3.2 × 1.8 panel fills 16:9 |
-| `glass_popup_ecu` | [−2.3, 1.75, −11.24] | [−2.3, 1.78, −12.5] | 34 | tighter on [YES] and the empty slot: the cursor stopping short (P), the one-frame [NO] (3.5 step 18) |
-| `glass_moon` | [−1.55, 2.9, −11.24] | [−1.6, 2.85, −12.0] | 26 | ECU the moon icon: Do Not Disturb (P step 13) |
+| `glass_popup` | [−3.0, 2.15, −11.24] | [−3.0, 2.15, −14.7] | 40 | ECU · locked the pop-up (P step 2, 3.3 step 1 insert, 3.6 steps 17/19/22); the whole 3.2 × 1.8 panel fills 16:9 |
+| `glass_popup_ecu` | [−3.04, 1.915, −11.24] | [−3.04, 1.935, −12.95] | 31 | tighter on [YES] and the empty slot: the cursor stopping short (P), the one-frame [NO] (3.5 step 18) |
+| `glass_moon` | [−3.8, 2.81, −11.24] | [−3.78, 2.78, −12.55] | 30 | ECU the moon icon: Do Not Disturb (P step 13) |
 | `glass_clock` | [−3.0, 3.55, −11.24] | [−3.0, 3.2, −12.7] | 30 | INSERT the countdown on the glass: 11:57 (3.5 step 22); 11:57:30 PAUSED (step 55); 11:57:30 … 11:58 (3.6 step 24) |
 | `p_desk_track_a` | [−9.55, 0.76, −15.0] | [−9.55, 0.86, −17.5] | 38 | INSERT slow track along the desk, start (low over the north end, the glass reflected in the gloss ahead) |
 | `p_desk_track_b` | [−9.55, 0.745, −15.0] | [−9.55, 0.84, −15.75] | 34 | track end: on the face-down frame; the gloved hand enters from screen-left (west) |
@@ -636,7 +636,7 @@ touch / low pixel ratio; no shadow maps; textures ≤ 256 px; no per-frame alloc
 SETS.hq_top = {
   env, build, marks, anchors, cams, zones, colliders, props, ambience, update,
   dress(state),          // 'p' | 's25' | 's33' | 's34' | 's35' | 's36'
-  lamp(name),            // 'desk' | 'console' | 'glass' | 'wall' | 'ring' | 'off'
+  lamp(name),            // 'desk' | 'console' | 'glass' | 'wall' | 'ring' | 'mgr' (the chest at mgr_turn) | 'off'
   flash(k),              // a visual-only lightning pulse (sky + glass); respects Reduce Flashing
   reflect(mode),         // 'live' | 'baked'
   spawns,                // §7.3

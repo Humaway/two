@@ -23,7 +23,8 @@
 //   storm_flash s34, strike s35 after the strike, yellow s36 ring, lit s36 at 11:58).
 // DRESS: dress('p' | 's25' | 's33' | 's34' | 's35' | 's36') — automatic on scene change (AUTO: P p, 2.5 s25, 3.3 s33,
 //   3.4 s34, 3.5 s35, 3.6 s36; the first API call or tick of a scene applies it first; Continue re-dresses).
-// LAMP: lamp('desk' | 'console' | 'glass' | 'wall' | 'ring' | 'off') parks the one spot (re-asserted every tick while lit).
+// LAMP: lamp('desk' | 'console' | 'glass' | 'wall' | 'ring' | 'mgr' | 'off') parks the one spot (re-asserted every tick while
+//   lit; 'mgr' = on the chest of whoever stands at mgr_turn: optional, no dress uses it).
 // FLASH: flash(k = 1) a visual-only lightning pulse (sky + glass; Reduce Flashing: a 1.5 s swell to 40%). Ambient lightning
 //   runs by itself in the storm states (12–25 s, thunder 1.2–3 s later); it never touches the env.
 // REFLECT: reflect('live' | 'baked' | null = auto: baked in s34, on touch, at pixel ratio < 0.75, or if the shader fails).
@@ -705,6 +706,7 @@ SETS.hq_top = (() => {
     glass:   { p: [-3.0, 4.9, -13.4], t: [-3.0, 1.8, -11.3], a: 0.5, pen: 0.7, d: 8, c: 0xcfe6ff, i: 1.0 },
     wall:    { p: [2.8, 4.9, -20.6], t: [2.8, 0.4, -22.6], a: 0.4, pen: 0.7, d: 8, c: 0xcfd8e8, i: 1.2 },
     ring:    { p: [-3.0, 4.9, -13.8], t: [-3.0, 0.8, -13.8], a: 0.55, pen: 0.8, d: 8, c: 0xffd21f, i: 1.2 },
+    mgr:     { p: [-8.0, 4.9, -12.0], t: [-9.45, 1.25, -12.0], a: 0.3, pen: 0.6, d: 7, c: 0xe8f0ff, i: 1.4 },   // on the chest at mgr_turn (3.3 badge insert)
   };
   const LAMP_GAIN = 5.0;   // the engine's spot (decay 1.5, physical units) needs ~5x the spec's nominal values at 4–5 m
   function lamp(name) { sync(); R.lampScene = sceneNow(); setLamp(name); }
@@ -1627,8 +1629,8 @@ SETS.hq_top = (() => {
     build, dress: (st) => { sync(); dress(st); }, lamp, flash: (k) => { sync(); flash(k); }, reflect, lightUp: (dur) => { sync(); lightUp(dur); },
     marks,
     anchors: {
-      glass_popup:        { at: [-3.0, 2.15, -11.24], from: [-3.0, 2.15, -13.85], fov: 40 },
-      glass_popup_ecu:    { at: [-3.0, 1.95, -11.24], from: [-3.0, 1.97, -12.95], fov: 34 },
+      glass_popup:        { at: [-3.0, 2.15, -11.24], from: [-3.0, 2.15, -14.7], fov: 40 },      // the whole panel inside the letterbox (P's lens)
+      glass_popup_ecu:    { at: [-3.04, 1.915, -11.24], from: [-3.04, 1.935, -12.95], fov: 31 },  // [YES] + the slot, no title sliver (P's lens)
       glass_moon:         { at: [-3.8, 2.81, -11.24], from: [-3.78, 2.78, -12.55], fov: 30 },
       glass_clock:        { at: [-3.0, 3.55, -11.24], from: [-3.0, 3.2, -12.7], fov: 30 },
       p_desk_track_a:     { at: [-9.55, 0.76, -15.0], from: [-9.55, 0.86, -17.5], fov: 38 },
