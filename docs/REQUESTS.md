@@ -37,6 +37,8 @@ Source reports are in `docs/reports/`.
 - [ ] **reddy40** — an optional caption mode for the address canvas ("THE MANAGER" for the B1 2037 frame).
 - [ ] **sets (optional)** — a funeral frame for B1's 2035 (B1 builds a small hall at load, parked in reddy26 at (40, −60, −40)).
 
+- [ ] **reddy26** — `store_phone.ring()` is visual only (A1 plays the ring sfx itself); the `counter_phone` angle shows the showcase rail (A coda uses its own lens).
+
 ## Engine
 
 - [ ] **systems** — a lured drone's collapsing cone sweeps a wide fan and can spot nearby actors: keep it narrow or skip detection until collapsed.
@@ -82,6 +84,14 @@ Source reports are in `docs/reports/`.
 
 - [ ] **keypad** — no keypad mini-game exists; `64-content-2-1-2-3.js` registers a port of Rue's alarm keypad as `MINIGAMES.keypad` if absent. Move it into a mini-game file (`54-mg-keypad.js`) and drop the content-side copy.
 - [ ] **world** — a per-set render hook (`def.render(alpha)`) called by `world.render` before drawing; `15-set-bridge.js` currently wraps `world.render` once to interpolate scooters/cars/pelicans between ticks.
+
+## Engine (second batch, from Ending A — for the next maintenance pass)
+
+- [ ] **art** — `rig.fade(k, wash)` with prebuilt transparent variants (A1 wraps `world.adopt` from its file for luka/chase/luka40/chase40 to build per-rig transparent copies at boot; then drop the wrapper).
+- [ ] **art** — a `santa_hat` attachment on `luke` (A1/B1 parent `PROPS.santa_hat()` clones to his head bone).
+- [ ] **art** — `glance` and upper anims on seated/lying rigs re-pose with `sit` (h 0.46 lifts a parapet sitter; a lying rig stands): respect the current seat height / lying state.
+- [ ] **world** — expose `world.pool` (or a rig lookup by look) so content needn't keep boot rig refs.
+- [ ] **art** — a hand-held lanyard prop (A1 uses Future Luka's lanyard attachment via `actor.hold`).
 
 ## Visual QA (integration pass)
 
