@@ -251,7 +251,7 @@ exactly in `wrecked`. With `instant` (skip / `fast=1`) jump to the end state.
 | `store_phone` | Rue's handset on the base at (7.55, 1.05, −9.2) | content lifts/sets it; `ring(on)` jiggles it 12 Hz ±2 mm; `ring(true, { sfx: 'phone_ring', every: 2.5, vol: 0.32, max })` also rings it (positional, first at once, never while skipping) |
 | `cash_tray` | Till drawer open with a cash tray at (7.05, 1.0, −9.25) | `home` |
 | `monitor_screen` | Both counter monitors (Rue) | `show('xmas'\|'app'\|'off')` |
-| `ladder` | Aluminium A-frame stepladder: h 1.8, treads y 0.42 / 0.84 / 1.26, top cap 1.68, footprint 0.55 × 0.9 open. Collider when standing [3.8,−12.2,4.3,−11.4] | `set('yes_wall'\|'folded'\|'carried'\|'hidden')`: `yes_wall` = open at (4.05, 0, −11.75), ry π (climber faces the wall); `folded` = leaning on the counter's right end at (8.05, 0, −8.7); `carried` = content parents it to an actor; `wobble()` ±0.04 rad roll for 0.6 s |
+| `ladder` | Aluminium A-frame stepladder: h 1.8, treads y 0.42 / 0.84 / 1.26, top cap 1.68, footprint 0.55 × 0.9 open. Collider when standing [3.8,−12.2,4.3,−11.4] | `set('yes_wall'\|'folded'\|'carried'\|'hidden')`: `yes_wall` = open at (4.05, 0, −11.75), ry π (climber faces the wall); `folded` = leaning on the counter's right end at (8.05, 0, −8.7); `carried` = folded along the holder's right side (call `set('carried')` after `actor.hold(ladder)`; PC); `wobble()` ±0.04 rad roll for 0.6 s |
 | `clock_floor_hands` | Hands for the new floor clock (8.4, 2.62, −12.455) | driven by the shared clock (below) |
 | `clock_hands` | Backroom clock hands (moved to (4.4, 2.35, −29.955)) | `set(h, m)` sets the **shared** time for both clocks; the time otherwise advances in real time from `SCENES[id].time` |
 | `calendar` | Rue's, on the right wall (10.965, 1.55, −10.35) | `set(day, month, weekday, year)` |
@@ -267,7 +267,7 @@ exactly in `wrecked`. With `instant` (skip / `fast=1`) jump to the end state.
 | `the_wall` | One group (wallAtlas quads + frames, merged): **Polaroid** frame 0.20 × 0.24 at (5.415, 1.62, −19.55); **PUDDING cassette** box frame 0.30 × 0.22 × 0.05 at (5.43, 1.58, −20.05) with the cassette inside; **"Sorry for the wait. — R." note** 0.15 × 0.10 pinned at (5.415, 1.70, −20.45); **MISSING poster** A4 portrait in a black frame 0.30 × 0.42 at (5.415, 1.55, −20.95); **hold-music flyer** A5 0.21 × 0.30 at (5.415, 1.62, −21.5) | static |
 | `print4` | Framed four-men print 0.30 × 0.22 above the Polaroid/cassette pair at (5.415, 2.02, −19.8) | visible in `wall_print` only |
 | `backroom_door` | Rue's hinged door with window + spinner panel on the corridor side (the JARVIS door) | `userData.open` (Rue); new `request()` spins the panel 9 s then opens ("the door takes nine seconds"); `solid(on)`: a doorway collider while shut (off by default and on every dress) |
-| `tube` | Rue's flickering tube | `userData.off`; new `flicker(n)` forces n bursts (A1/B1 "smoke curling up to the flickering tube") |
+| `tube` | Rue's flickering tube | `userData.off`; new `flicker(n)` forces n bursts (A1/B1 "smoke curling up to the flickering tube"); steady under Reduce Flashing |
 | `scorch` | Ceiling decals P1, P2, P3 (y 2.79, transparent `scorch` texture, random rotation) | `count(n)`: 2 (P1, P2) default; 3 (adds P3, "from Christmas") in `home`, `home_night`, `days_later`, `tinsel_down`, `wall_print`, `xmas27` |
 | `do_not_paint` | (static) laminated A4 taped to the ceiling, §2.1 | — |
 | `kettle` | Rue's kettle (save point) | Rue |
@@ -332,7 +332,7 @@ New marks:
 | `s13_luke_out` | [6.4, 0, −12.0, 0] | 1.3 end: Luke steps out of the corridor |
 | `s13_jordan_ladder` | [4.6, 0, −11.25, −2.8] | 1.3 end: Jordan holding the ladder |
 | `pc_jordan_mid` | [6.0, 0, −6.9, −2.6] | PC: Jordan alone in the middle of it all |
-| `pc_jordan_phone` | [7.5, 0, −8.05, π] | PC: answering the counter phone over the counter |
+| `pc_jordan_phone` | [7.15, 0, −8.05, π − 0.22] | PC: answering the counter phone over the counter |
 | `pc_luke_desk` | [9.25, 0, −16.35, 0] | PC: Luke shouting into the desk phone (= `office_desk`) |
 | `pc_ladder_pick` | [8.35, 0, −8.25, −2.2] | PC: picks up the folded ladder |
 | `pc_ladder_path` | [9.3, 0, −10.3, −1.9] | PC: carrying it round the counter end |
@@ -397,14 +397,14 @@ Rue anchors **kept**: `monitor`, `monitor2`, `monitor_screen`, `display_wall`, `
 | `wall_phone` | [4.3, 1.45, −24.0] | [4.5, 1.5, −24.75] | 36 | the wall phone / dialling |
 | `split_a` | [4.4, 1.55, −24.3] | [8.4, 1.65, −29.3] | 50 | 1.3 split half, toward the wall phone (top edge catches P1). **Identical in reddy40** (shows the machine) |
 | `split_b` | [6.4, 1.3, −27.5] | [4.0, 1.6, −24.4] | 52 | 1.3 split half, reverse: faces of the trio / the empty 2040 room. **Identical in reddy40** |
-| `floor_wreck_wide` | [6.6, 0.05, −8.2] | [1.6, 2.45, −1.4] | 52 | WIDE · locked: wreck, smoke, tinsel, counter, Yes wall, **office door (open in PC) right of frame** — 1.3 end and PC step 1/12 (deliberately the same frame) |
-| `counter_phone` | [7.55, 1.05, −9.3] | [7.5, 1.64, −8.5] | 34 | PC INSERT: he presses HOLD |
-| `a1_split_store` | [6.6, 1.15, −9.2] | [9.4, 1.9, −3.0] | 50 | A1/B1 split right half: wrapped table foreground-left, Luke at the till |
+| `floor_wreck_wide` | [6.4, 1.0, −10.0] | [10.4, 2.5, −1.7] | 52 | WIDE · locked: wreck, smoke, tinsel, counter, Yes wall, Luke at `pc_luke_desk` through the open office door — PC's two `[WIDE · locked]` shots (1.3 keeps its own `FLOOR_LOCK`) |
+| `counter_phone` | [7.55, 1.03, −9.24] | [7.52, 1.9, −8.72] | 34 | PC INSERT: he presses HOLD; A coda: both hands come in from the sides on the handset (no faces) |
+| `a1_split_store` | [5.86, 1.1, −8.45] | [8.2, 2.0, −0.8] | 50 | A1/B1 split right half: wrapped table foreground-left, Luke at the till |
 | `home_door` | [6.4, 1.35, −24.0] | [7.4, 1.25, −28.9] | 46 | "the corridor door bangs open" |
 | `b1_night_floor` | [6.0, 1.1, −8.0] | [2.0, 1.55, −2.4] | 46 | B1 step 43 WIDE: Luka at the table, Chase on the counter |
 | `table_downlight` | [5.6, 0.95, −5.3] | [5.6, 3.1, −5.0] | — | where content aims `world.torch` in `night` |
 | `a2_polish` | [5.7, 0.95, −5.6] | [3.4, 1.5, −3.3] | 40 | A2 frame 1 |
-| `a2_ladder` | [4.05, 1.9, −11.9] | [6.7, 1.6, −9.9] | 50 | A2 frame 2 **and** B1 2027 (same frame, roles reversed) |
+| `a2_ladder` | [4.1, 2.25, −11.9] | [6.7, 1.55, −9.9] | 54 | A2 frame 2 **and** B1 2027 (same frame, roles reversed) |
 | `a2_wall` | [5.42, 1.8, −19.8] | [6.7, 1.75, −19.75] | 40 | A2 frame 3: Polaroid, cassette, the new print above |
 
 ---
