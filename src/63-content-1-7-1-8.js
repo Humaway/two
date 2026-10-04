@@ -4,9 +4,9 @@
 // No mini-games. 1.7 is a roam (gentle Courtesy Drone patrols with stealth checkpoints, three samples, four human
 // moments, examines, the café urn as the kettle); 1.8 is a small roam that ends at the fridge, then the order of service:
 // played straight, no music, one stare, no release.
-// Extras who speak in 1.7 are pooled actors spawned by look id (the speaker ids below alias them, so the dialogue box
-// wears their baked bust): the man on the jetty (sizzle_c), the kid at the skate bowl (local40_d), the woman at the
-// chip-shop window (sizzle_e).
+// Extras who speak in 1.7 are pooled actors spawned by look id (01-config's speakers jettyman / skatekid / chipswoman
+// alias them, so the dialogue box wears their baked bust): the man on the jetty (sizzle_c), the kid at the skate bowl
+// (local40_d), the woman at the chip-shop window (sizzle_e).
 (() => {
   const PI = Math.PI, H = PI / 2;
   const say = (id, text, o) => Object.assign({ say: id, text }, o);
@@ -84,12 +84,6 @@
   const swapTo = (c, id) => { if (c.state.active !== id) c.flow.swapNext(); };
 
   // ---------------------------------------------------------- the people of the Parade (1.7's human moments)
-  // Speaker ids alias the pooled extras' actors (mouths, baked busts); minor voices (spec §4: generic blips).
-  Object.assign(CHARACTERS, {
-    jettyman: { name: 'MAN', actor: 'sizzle_c', voice: { wave: 'square', f: 132, len: 0.06, soft: true, filter: 1600 } },
-    skatekid: { name: 'KID', actor: 'local40_d', voice: { wave: 'triangle', f: 310, len: 0.032 } },
-    chipswoman: { name: 'WOMAN', actor: 'sizzle_e', voice: { wave: 'triangle', f: 236, len: 0.045, soft: true } },
-  });
   // the kid "practising standing on" a skateboard that isn't there: arms out, riding a board in a light wind
   if (!ANIMS.s17_balance) {
     ANIMS.s17_balance = (r, t, p) => {
@@ -259,13 +253,8 @@
   const AT_PLAQUE = { luka: [-2.75, 7.2], chase: [-1.75, 7.05], c40: [-0.75, 7.35] }, PLAQUE_PT = [-2.0, 0, 8.5];
   const C40_POV = [-0.75, 0, 7.35, PI];   // turned to the shops for the chip (clear of the lamp and the kerb bollards)
   const DUSK = { shot: 'CAM', pos: [27.2, 1.9, 4.8], look: [35.0, 2.7, -7.0], fov: 45, to: { pos: [28.4, 2.1, 3.7], look: [35.0, 2.8, -7.0], fov: 43 }, dur: 9, ease: 'linear' };
-  const PATHS17 = {   // the hero car's legs (added to SETS.parade.paths, which drive() reads by name)
-    s17_pass: [[-3, 3.0], [-44, 3.0], [-47, 6.5], [-47, 14]],
-    s17_turn: [[-39.5, 3.0], [-44, 3.0], [-47, 6.5], [-47, 16]],
-    s18_pass: [[17, -1.0], [52, -1.0]],
-  };
-  function paths() { const p = SETS.parade && SETS.parade.paths; if (p) for (const k in PATHS17) if (!p[k]) p[k] = PATHS17[k]; }
-  const drive = (name, speed) => ({ do: (c) => { paths(); const h = P(c, 'hovercar_hero'); if (h) h.userData.drive(name, speed); } });
+  // the hero car's legs are the set's paths s17_pass, s17_turn, s18_pass (drive() reads SETS.parade.paths by name)
+  const drive = (name, speed) => ({ do: (c) => { const h = P(c, 'hovercar_hero'); if (h) h.userData.drive(name, speed); } });
   const indicate = (on) => ({ do: (c) => { const h = P(c, 'hovercar_hero'); if (h) h.userData.indicate(on); } });
   // the Cloud+ billboard in Chase (2040)'s chip view (the plant: big and readable over the blank rooftop billboard)
   const CLOUD = { id: 's17_cloud', kind: 'ad', text: 'OPTUS CLOUD+ · NEVER FORGET ANYTHING AGAIN · $14.99/month', at: [-4, 8.5, -11.9], w: 4.3, size: 3.7, maxD: 80 };
@@ -289,7 +278,7 @@
 
   // dressing from flags (Continue restarts at step 0): the Parade at 13:40, the three locals in their places
   function dress17(c) {
-    paths(); listen();
+    listen();
     if (SETS.parade && SETS.parade.dress && c.world.setId === 'parade') SETS.parade.dress('day17');
     c.state.flags.chip_off = true;                 // 1.6: "Aeroplane mode. For the brain." (his light stays dark)
     const man = act(c, 'sizzle_c'), kid = act(c, 'local40_d'), wom = act(c, 'sizzle_e');
@@ -501,6 +490,7 @@
     { wait: 0.3 },
     say('chase40', 'Twenty to two.'),
     { wait: 0.3 },
+    { do: (c) => c.cam.release(0) },   // (control: a cut to the zone camera; a glide out of his close-up crosses the others)
   ];
 
   // Exit: the door beside the fish-and-chip shop. Dusk. Cut.
@@ -540,7 +530,9 @@
   const HANDS_CARD = { shot: 'CAM', pos: [3.08, 1.85, -3.3], look: [2.45, 1.1, -3.05], fov: 40, card: ['order_service', {}] };
   const ROOM_WIDE = { shot: 'CAM', pos: [-2.9, 1.72, 0.4], look: [-1.39, 1.1, -2.76], fov: 60, to: { pos: [-2.7, 1.7, 0.15], look: [-0.6, 1.1, -2.8], fov: 58 }, dur: 7, ease: 'linear' };
   const DOOR_WIDE = { shot: 'CAM', pos: [-1.0, 1.65, -0.6], look: [2.0, 1.2, -3.3], fov: 50 };
-  const KITCHEN_LOCKED = { shot: 'CAM', pos: [1.6, 2.0, -3.45], look: [2.6, 1.0, -1.2], fov: 58 };   // from the doorway: the three, the parcel, the window and its lights
+  // from the doorway: the three (Luka's back to us, the card in his hands), the parcel on the bench, the window and the
+  // light string along its eave (the look high enough to keep the lights under the top bar)
+  const KITCHEN_LOCKED = { shot: 'CAM', pos: [1.6, 2.0, -3.45], look: [2.6, 1.38, -1.2], fov: 58 };
   const FRIDGE_MM = { shot: 'CAM', pos: [2.92, 1.5, -2.9], look: [3.29, 1.43, -3.12], fov: 28, to: { pos: [2.95, 1.49, -2.92], look: [3.29, 1.43, -3.12], fov: 27 }, dur: 4, ease: 'linear' };
   const EXT = { shot: 'CAM', pos: [34.4, 1.6, 9.8], look: [34.4, 3.0, -7.0], fov: 42, to: { pos: [34.4, 1.7, 8.6], look: [34.4, 3.15, -7.0], fov: 40 }, dur: 9, ease: 'linear' };
 
@@ -694,6 +686,7 @@
     { shot: 'OTS', on: 'luka', over: 'chase', fov: 40, dist: 1.0 },
     glance('luka', 'chase', 0.9), { wait: 0.6 },
     say('luka', 'Obviously.'),
+    { do: (c) => c.cam.release(0) },   // (control: a cut to the room's camera; a glide out of the over-the-shoulder crosses Chase)
   ];
 
   // Cutscene — "1.8_order". No music. Played straight: no release.
@@ -837,7 +830,7 @@
     // [WIDE · exterior, from the Parade, looking up at the window] Three figures at a small table, eating in silence. A
     // hover-car glides past a foot off the road. Its indicator chirps: "Are you sure?"
     { set: 'parade', env: 'evening' },
-    { do: (c) => nextTick().then(() => { paths(); if (SETS.parade && SETS.parade.dress) SETS.parade.dress('evening18'); const w = P(c, 'flat_window'); if (w) w.userData.lit(true); }) },
+    { do: (c) => nextTick().then(() => { if (SETS.parade && SETS.parade.dress) SETS.parade.dress('evening18'); const w = P(c, 'flat_window'); if (w) w.userData.lit(true); }) },
     EXT,
     { wait: 1.0 },
     drive('s18_pass', 3.2), indicate(true),

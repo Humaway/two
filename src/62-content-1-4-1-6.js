@@ -29,8 +29,8 @@
   const dress = (st) => { const s = SET(); if (s && s.dress && world.setId === 'reddy40') s.dress(st); };
   // one tick later (even while skipping): the set re-dresses itself on its first tick in a new scene
   const nextTick = () => new Promise((res) => { const f = () => { removeUpdate(f); res(); }; addUpdate(f); });
-  // autoplay's waits: checked every tick, even while a cutscene is being skipped (waitUntil resolves at once then)
-  const until = (fn) => new Promise((res) => { const f = () => { if (fn()) { removeUpdate(f); res(); } }; addUpdate(f); });
+  // autoplay's waits: checked every tick, even while a cutscene is being skipped
+  const until = (fn) => waitUntil(fn, { skip: false });
   // a tween on the game clock, snapped at once while skipping or when the scene changes (no allocation per tick)
   function tween(c, dur, fn) {
     const sid = c.flow.sceneId;
@@ -579,10 +579,12 @@
     say('chase40', 'Dunno. ^ Felt right.'),
     // (No one reacts.)
     { do: (c) => { const d = P(c, 'des'); if (d) d.userData.glow(false); } },
-    { place: 'chase40', at: [5.85, 0, -25.3] },
+    // (Chase between and behind the two of them: from the machine, three faces in a row)
+    { place: 'chase40', at: [5.85, 0, -25.3] }, { place: 'chase', at: [5.35, 0, -26.05] },
     { face: 'chase40', to: [4.25, 0, -24.4], dur: 0 }, { face: 'luka', to: [4.25, 0, -24.4], dur: 0 }, { face: 'chase', to: [4.25, 0, -24.4], dur: 0 },
     ALL_FOUR,
     { wait: 1.6 },
+    { do: (c) => c.cam.release(0) },   // (control: a cut to the backroom's camera, not a glide past the machine)
   ];
 
   // Meeting Jordan (2040): Chase reaches the counter.
@@ -668,6 +670,8 @@
   const DOORS15 = cam([-4.0, 1.3, -3.2], [-2.0, 1.25, 0.0], 46, [[-3.9, 1.3, -3.3], [-0.9, 1.25, -2.3]], 4.2, { ease: 'in' });   // he stomps in through the doors
   const DAZZA = cam([5.15, 1.5, -8.75], [5.2, 1.52, -10.25], 44, [[5.15, 1.5, -8.95]], 6);            // Luka and Chase, leaning in
   const POV15 = cam([6.4, 1.66, -9.8], [6.4, 1.25, -8.4], 50, [[6.4, 1.64, -9.65], [6.4, 1.3, -8.2], 46], 6);   // his eyes: the terminal, Jayden beyond
+  // "Mate. Move.": across the counter from the customer side, both faces (Luka at the left edge)
+  const MOVE_TWO = cam([5.3, 1.66, -8.45], [6.05, 1.5, -10.1], 42, [[5.35, 1.65, -8.6]], 5);
   const SWAT = cam([6.95, 1.58, -6.9], [6.4, 1.55, -10.0], 40, [[6.92, 1.58, -7.15]], 5);               // Jayden's side of the counter
   const POPS15 = [
     ['Are you sure?', [0.36, 0.38]], ['Upgrade to Cloud+?', [0.64, 0.3]], ['Never forget anything again!', [0.42, 0.56]],
@@ -764,7 +768,7 @@
     { act: [['chase40', 'hands_head']] },
     AWAY('chase40', 'chase', { dist: 0.95, fov: 36, push: 0.08, dur: 6 }),
     say('chase40', 'It has to be— ^ the form has to be right first time, or—'),
-    { do: (c) => { if (!sk(c)) c.cam.shot({ shot: 'TWO', on: ['chase', 'chase40'], fov: 42 }); } },
+    MOVE_TWO,
     { expr: [['chase', 'determined']] },
     say('chase', 'Mate. Move.'),
     // Chase takes the terminal; Chase (2040) steps aside
@@ -776,26 +780,53 @@
     { face: 'chase', to: 'jayden', dur: 0 },
     { place: 'jordan40', at: 's15_jordan_watch' },   // he drifts back to his door to watch (out of the terminal shot)
   ];
+  // the little glowing card: in Jordan's hand a content mesh (jordan40's look has no card attachment); in Chase (2040)'s,
+  // his own hand-held card (rig.attach.card, painted the same, shown by hold_card)
   const BONUS = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.006, 0.058), new THREE.MeshBasicMaterial({ color: 0x8ee9ff }));
   BONUS.name = 's15_bonus_card';
   const BONUS_GLOW = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.12), new THREE.MeshBasicMaterial({ color: 0x5fd0ff, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending }));
   BONUS_GLOW.rotation.x = -H; BONUS_GLOW.position.y = 0.004; BONUS.add(BONUS_GLOW);
   function bonusTo(c, id) {
-    const a = act(c, id), g = a && (a.rig.attach.gripR || a.rig.parts.handR);
+    BONUS.removeFromParent(); BONUS.visible = false;
+    const a = act(c, id);
+    if (!a) return;
+    if (a.rig.attach.card && a.rig.attach.card.userData.paint) { a.rig.attach.card.userData.paint(paintBonus); return; }
+    const g = a.rig.attach.gripR || a.rig.parts.handR;
     if (!g) return;
     g.add(BONUS); BONUS.position.set(0, -0.01, 0.03); BONUS.rotation.set(0.25, 0, 0); BONUS.visible = true;
     if (!S15.card) S15.card = scope('1.5', () => {}, () => { BONUS.removeFromParent(); S15.card = null; });
   }
+  // the card's face: a pale chip-blue glow, a bright rim, a chip glyph and CRED (128 × 80)
+  function paintBonus(cx, w, h) {
+    const g = cx.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#d8fbff'); g.addColorStop(0.55, '#8ee9ff'); g.addColorStop(1, '#5fd0ff');
+    cx.fillStyle = g; cx.fillRect(0, 0, w, h);
+    cx.strokeStyle = '#ffffff'; cx.lineWidth = 4; cx.strokeRect(3, 3, w - 6, h - 6);
+    cx.fillStyle = '#ffffff'; cx.fillRect(14, 22, 22, 18); cx.fillStyle = '#5fd0ff'; cx.fillRect(18, 26, 14, 10);
+    cx.fillStyle = '#0d3550'; cx.font = 'bold 20px Arial, sans-serif'; cx.textAlign = 'right'; cx.textBaseline = 'middle'; cx.fillText('CRED', w - 12, 32);
+    cx.fillStyle = 'rgba(13,53,80,.55)'; cx.fillRect(14, 54, w - 28, 4); cx.fillRect(14, 62, (w - 28) * 0.6, 4);
+  }
   const S15 = { card: null };
   const JORDAN_DOOR = cam([8.0, 1.62, -9.85], [9.85, 1.55, -12.3], 36, [[8.1, 1.62, -10.0]], 6);
-  // the card in his hand: from in front of him, a little above it, his chest behind it
-  const CARD_HAND = { do: (c) => { if (sk(c)) return; const a = act(c, 'chase40'); if (!a) return; a.root.updateMatrixWorld(true); BONUS.getWorldPosition(V1); const fx = Math.sin(a.rotY), fz = Math.cos(a.rotY);
-    c.cam.shot({ shot: 'CAM', pos: [V1.x + fx * 0.62, V1.y + 0.2, V1.z + fz * 0.62], look: [V1.x, V1.y, V1.z], fov: 30, to: { pos: [V1.x + fx * 0.52, V1.y + 0.17, V1.z + fz * 0.52] }, dur: 4, ease: 'linear' }); } };
+  // across the counter from behind Chase's left shoulder: Jayden's face clear of his head (Luka and Chase (2040) out of
+  // frame either side)
+  const JAYDEN_DONE = cam([5.75, 1.72, -10.9], [6.4, 1.58, -7.85], 40, [[5.8, 1.71, -10.75]], 7);
+  // Jordan hands it over: both in profile, from past the counter's end
+  const BONUS_TWO = cam([8.85, 1.62, -9.0], [7.75, 1.5, -10.65], 42, [[8.75, 1.61, -9.15], null, 40], 6);
+  // the card in his hand, as he sees it: over his left shoulder, down onto the card (the face he's reading)
+  const V2 = new THREE.Vector3();
+  const CARD_HAND = { do: (c) => {
+    if (sk(c)) return;
+    const a = act(c, 'chase40'), k = a && a.rig.attach.card; if (!k) return;
+    a.root.updateMatrixWorld(true); k.getWorldPosition(V1); a.eyePos(V2);
+    const fx = Math.sin(a.rotY), fz = Math.cos(a.rotY), lx = Math.cos(a.rotY), lz = -Math.sin(a.rotY);   // (his left: +cos, −sin)
+    const px = V2.x + lx * 0.2 - fx * 0.1, py = V2.y + 0.06, pz = V2.z + lz * 0.2 - fz * 0.1;
+    c.cam.shot({ shot: 'CAM', pos: [px, py, pz], look: [V1.x, V1.y, V1.z], fov: 36, to: { pos: [px + (V1.x - px) * 0.15, py + (V1.y - py) * 0.15, pz + (V1.z - pz) * 0.15], look: [V1.x, V1.y, V1.z], fov: 34 }, dur: 4, ease: 'linear' });
+  } };
   CUTSCENES['1.5_after'] = [
     { place: 'chase', at: 's15_chase_terminal' }, { place: 'chase40', at: 's15_c40_aside' }, { place: 'jayden', at: 's15_jayden_counter' },
     { place: 'jordan40', at: 's15_jordan_watch' }, { place: 'luka', at: L15 },
     { act: [['jordan40', 'arms_crossed']] },
-    { do: (c) => { if (!sk(c)) c.cam.shot({ shot: 'OTS', on: 'jayden', over: 'chase', fov: 40, dist: 1.0 }); } },
+    JAYDEN_DONE,
     { expr: [['jayden', 'stunned']] },
     say('jayden', 'Done? ^ Already?'),
     { wait: 0.8 },
@@ -818,14 +849,14 @@
     { act: [['jordan40', 'idle']] },
     { do: (c) => bonusTo(c, 'jordan40') },
     { place: 'jordan40', at: [8.2, 0, -10.95, -0.9] }, { face: 'chase40', to: 'jordan40', dur: 0 },
-    { do: (c) => { if (!sk(c)) c.cam.shot({ shot: 'TWO', on: ['jordan40', 'chase40'], fov: 40 }); } },
+    BONUS_TWO,
     { act: [['jordan40', 'give', { dur: 1.4, loop: false }]] },
     { wait: 0.5 },
     say('jordan40', "Christmas bonus. Early. Don't spend it on cables."),
     { do: (c) => bonusTo(c, 'chase40') },
     { do: (c) => { stroll(c, 'jordan40', [[9.6, 0, -11.7], [9.9, 0, -13.4]]); } },
     // (Chase (2040) looks at the card, then at his younger self.)
-    { act: [['chase40', 'reading_bare']] },
+    { act: [['chase40', 'hold_card']] },
     { wait: 0.5 },
     CARD_HAND,
     { wait: 1.8 },
@@ -867,10 +898,22 @@
   // [PAN · across the store]: from the customer by the accessory wall, clapping, across the floor to Jordan and the
   // boys; then the old man by Margaret's chair (crying quietly, smiling); then Jordan, who doesn't clap
   const PAN16 = cam([-8.1, 1.5, -5.5], [-6.3, 1.4, -6.45], 46, [null, [1.8, 1.5, -6.8]], 4.2, { ease: 'in' });
-  const OLD_MAN = cam([2.6, 1.05, -2.15], [2.65, 1.2, -0.9], 38, [[2.61, 1.06, -2.05]], 4);
-  // where they stand for the address (in the open floor between the display tables and the counter's west end)
-  const A16 = { luka: [1.6, 0, -6.55, -2.65], chase: [2.25, 0, -6.2, -2.7], chase40: [2.85, 0, -6.95, -2.6], jordan40: [3.8, 0, -7.3, -2.6], close: [3.35, 0, -7.35, -0.64] };
+  // the old man in the chair by Margaret's (one of the set's locals, facing −Z): a low close read off his head at the cut
+  const OLD_MAN_CAM = cam([2.6, 1.15, -2.15], [2.65, 1.32, -0.9], 38, [[2.61, 1.16, -2.05]], 4);
+  const OLD_MAN = { do: (c) => {
+    if (sk(c)) return;
+    const loc = P(c, 'locals'), r = loc && loc.userData.rigs && loc.userData.rigs.local40_c, h = r && r.parts && r.parts.head;
+    if (!h) { c.cam.shot(OLD_MAN_CAM); return; }
+    h.updateWorldMatrix(true, false); h.getWorldPosition(V1); V1.y += 0.1;
+    c.cam.shot({ shot: 'CAM', pos: [V1.x - 0.06, V1.y - 0.1, V1.z - 1.2], look: [V1.x, V1.y - 0.02, V1.z], fov: 36, to: { pos: [V1.x - 0.06, V1.y - 0.09, V1.z - 1.08] }, dur: 4, ease: 'linear' });
+  } };
+  // where they stand for the address (in the open floor between the display tables and the counter's west end): the
+  // set's marks s16_addr_luka / _chase / _c40 / _jordan, and s16_jordan_close for "Back door."
+  const A16 = { luka: 's16_addr_luka', chase: 's16_addr_chase', chase40: 's16_addr_c40', jordan40: 's16_addr_jordan', close: 's16_jordan_close' };
   const DOORS16 = fromA('doors_lock', { push: 0.3, dur: 8 });
+  // [TWO-SHOT · Luka and Chase, the only faces without chip lights]: both in profile, from the display-table side
+  // (Chase (2040) beyond them, between)
+  const TWO16 = cam([1.2, 1.62, -4.9], [1.93, 1.5, -6.38], 44, [[1.26, 1.61, -5.02], null, 42], 12);
   const DRONES_IN = cam([2.9, 2.3, -8.4], [-2.0, 1.6, -2.6], 44, [[2.75, 2.28, -8.2]], 6);            // over their heads: the three drones hovering, scanning
   const SIDE_BY = cam([3.6, 1.6, -5.65], [3.1, 1.55, -7.15], 40, [[3.58, 1.6, -5.75]], 7);             // Jordan beside him, not looking at him: both three-quarter on
   const POSTS = { drone_a: [3.6, -10.45], drone_b: [10.2, -11.75], drone_c: [6.4, -15.2] };
@@ -1296,8 +1339,9 @@
     { hud: { noService: true, quiet: '46:58:00', samples: false, bars: null } },
     // [TWO-SHOT · Luka and Chase, the only faces without chip lights]
     { do: (c) => pulseChips(c, false) },
-    { face: 'chase', to: 'luka', dur: 0 }, { face: 'luka', to: 'chase', dur: 0 },
-    { do: (c) => { if (!sk(c)) c.cam.shot({ shot: 'TWO', on: ['luka', 'chase'], fov: 40 }); } },
+    // (facing each other, cheated open a little toward the lens so both faces read)
+    { face: 'chase', to: -1.45, dur: 0 }, { face: 'luka', to: 0.5, dur: 0 },
+    TWO16,
     { wait: 0.6 },
     say('chase', "That's Luke."),
     glance('luka', 'chase', 0.8),
@@ -1385,7 +1429,7 @@
     { do: (c) => { DRONES.goTo('drone_b', [3.85, 0, -11.75], { speed: 200 }); DRONES.face('drone_b', 'chase'); } },
     { do: (c) => DRONES.zap('drone_b', 'chase') },
     { expr: [['chase', 'stunned']] },
-    { do: (c) => { const a = act(c, 'chase'); if (a) a.rig.face.mark('soot', true); } },
+    { do: (c) => { const a = act(c, 'chase'); if (a) { a.rig.face.mark('soot', true); a.rig.show('hair_static', true); } } },
     ZAP_DRONE,
     say('drone', 'Static discharge! ^ For your safety!'),
     // Chase's hair stands on end and one fingertip smokes a little.
@@ -1412,7 +1456,7 @@
   async function afterZap(c) {
     DRONES.reset();
     holdAlcove(c);
-    const a = act(c, 'chase'); if (a) { a.place([1.45, 0, -12.5, H]); a.rig.face.mark('soot', true); }
+    const a = act(c, 'chase'); if (a) { a.place([1.45, 0, -12.5, H]); a.rig.face.mark('soot', true); a.rig.show('hair_static', true); }
     stealth.checkpoint();
     await c.playCutscene([
       { expr: [['luka', 'neutral'], ['chase', 'neutral']] },
