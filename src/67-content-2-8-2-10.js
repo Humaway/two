@@ -575,7 +575,12 @@
     if (!ch) return;
     const side = ch.pos.x > TABLE_C[0] ? 's28_pick' : 's28_drop';
     await c.runSteps([{ move: 'chase', to: side }, { face: 'chase', to: [TABLE_C[0], 0, TABLE_C[2]], dur: 0.2 }]);
-    if (!sk(c)) c.cam.shot(aShot('s28_cafe_table', 0.1, 6));
+    // across the table at him: his face, the phone over the table, Mia's bench behind (the set's s28_cafe_table anchor
+    // looks down at the bare table past his elbow)
+    if (!sk(c)) {
+      const w = side === 's28_drop' ? 1 : -1, x0 = TABLE_C[0];
+      c.cam.shot(glideCam([x0 + 1.3 * w, 1.55, 32.3], [x0 - 0.5 * w, 1.0, 31.3], 46, [[x0 + 1.18 * w, 1.52, 32.22], null, 45], 6));
+    }
     const list = c.state.samples.filter((k) => SAMPLES[k]);
     if (!list.length) list.push('radio');
     const labels = list.map((k) => SAMPLES[k].label).concat(['Cancel']);
@@ -1284,7 +1289,7 @@
   CUTSCENES['2.9_door'] = [
     { do: (c) => {
       c.state.flags.s29_door = true;
-      standA(act(c, 'luka'), [-28.4, 0, -11.15, 0]);
+      standA(act(c, 'luka'), [-28.4, 0, -11.5, 0]);   // inside, behind the shut door: it opens on him
       const ch = act(c, 'chase');
       if (ch) { standA(ch, C_WING); ch.rig.show('coaster', true); ch.setExpr('neutral'); }
       const k = UD(c, 'coaster'); if (k) k.place([-28.0, -3.0, -14.0]);
@@ -1297,12 +1302,17 @@
     { wait: 0.5 },
     { do: (c) => { const d = UD(c, 'stage_door'); if (d) d.open(1); } },
     { sfx: 'creak', vol: 0.4 },
-    { wait: 1.6 },
+    { wait: 0.9 },
+    // into the doorway, the rain in front of him
+    { move: 'luka', to: [-28.4, 0, -11.2], speed: 0.7 },
+    { wait: 0.5 },
     // CHASE (off, behind him)
     say('chase', 'Where are you going?', { tag: 'off' }),
-    { do: (c) => { const a = act(c, 'luka'); if (a) { a.place(L_TURN); a.play('idle'); } } },
     { expr: [['luka', 'stunned']] },
+    { face: 'luka', to: PI, dur: 0.6, wait: true },
     // [REVERSE · Chase in the dark of the venue, the coaster in his hand] He's been awake the whole time.
+    // (Luka to his turn mark under the cut: the anchors are set for it)
+    { do: (c) => { const a = act(c, 'luka'); if (a) { a.place(L_TURN); a.play('idle'); } } },
     aPush('s29_reverse', 0.15, 7, { fovTo: 33 }),
     { wait: 1.4 },
     aPush('s29_luka_close', 0.12, 8),
@@ -1353,7 +1363,8 @@
     TWO('chase', 'luka', { side: 1, dist: 1.5, fov: 40, dur: 8 }),
     slow('chase', 'Then don’t know how. ^ Just stay.', { expr: 'neutral' }),
     // [INSERT] Luka puts the brick phone in Chase's hand.
-    { do: (c) => { const a = act(c, 'luka'); if (a) a.rig.show('brick', true); const ch = act(c, 'chase'); if (ch) ch.rig.show('coaster', false); } },
+    // (Chase a step back under the cut: the two reaching hands meet over the brick instead of crossing)
+    { do: (c) => { const a = act(c, 'luka'); if (a) a.rig.show('brick', true); const ch = act(c, 'chase'); if (ch) { ch.rig.show('coaster', false); ch.place([C_CLOSE[0], 0, C_CLOSE[2] - 0.22, C_CLOSE[3]]); } } },
     aPush('s29_hands', 0.12, 5),
     { act: [['luka', 'give', { dur: 1.8, loop: false }]] },
     { wait: 0.5 },

@@ -1532,6 +1532,7 @@ SETS.valley = (() => {
       // Region S
       patch: basic('vl_patch', { map: T.patch, transparent: true, blending: ADD, depthWrite: false, color: 0xffffff }),
       patchDawn: basic('vl_patch_dawn', { map: T.patchDawn, transparent: true, blending: ADD, depthWrite: false, color: 0x000000 }),
+      dawnGlass: basic('vl_dawn_glass', { transparent: true, blending: ADD, depthWrite: false, color: 0x000000, fog: false }),
       rshadow: basic('vl_rshadow', { map: T.rshadow, transparent: true, opacity: 0.6, depthWrite: false }),
       streetGlow: basic('vl_street_glow', { map: T.atlasS, fog: false }),
       exit: basic('vl_exit', { map: T.atlasS }),
@@ -2004,6 +2005,7 @@ SETS.valley = (() => {
     R.winGlass = P(part('window_glass', () => {
       quad(7.0, 1.2, M.streak, -35.5, 4.6, -11.2, PI, 0, 0xa0b0c0, [0, 0, 3, 0.6]);
       quad(9.0, 3.0, M.streetGlow, -35.5, 4.8, -10.2, PI, 0, 0xffffff, SA.glow);
+      quad(9.0, 3.0, M.dawnGlass, -35.5, 4.8, -10.25, PI, 0);   // grey-blue daylight over the street glow (2.10's dawn; black otherwise)
     }, null, 0, { floor: false }), regS);
     // EXIT signs + emergency bulkheads (steady; the bulkheads dip now and then)
     R.exits = P(part('exit_signs', () => { quad(0.5, 0.25, M.exit, -28.4, 2.35, -11.43, PI, 0, 0xffffff, SA.exit); quad(0.5, 0.25, M.exit, -26.42, 2.35, -28.7, -H, 0, 0xffffff, SA.exit); }, null, 0, { floor: false }), regS);
@@ -2394,6 +2396,7 @@ SETS.valley = (() => {
       R.dawnK = (R.dawnK || 0) + ((R.env === 'dawn' ? 1 : 0) - (R.dawnK || 0)) * Math.min(1, dt * 0.8);   // the daylight eases in with the env
       M.patchDawn.color.setScalar(R.dawnK * 0.9);
       M.streetGlow.color.setRGB(1 + 0.5 * R.dawnK, 1 + 0.7 * R.dawnK, 1 + 1.0 * R.dawnK);   // the glass itself greys to day
+      M.dawnGlass.color.setRGB(0.30 * R.dawnK, 0.36 * R.dawnK, 0.48 * R.dawnK);
       const rainK = typeof world !== 'undefined' && world.set === SETS.valley && SETS.valley.env[R.env] ? SETS.valley.env[R.env].rain || 0 : 0;
       if (rainK > 0.05) { T.rshadow.offset.y = t * 0.06; T.streak.offset.y = (T.streak.offset.y + 0.12 * dt * rainK) % 1; }
       M.rshadow.opacity = 0.6 * Math.min(1, rainK * 1.4);

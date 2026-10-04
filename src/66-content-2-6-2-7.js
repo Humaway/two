@@ -461,8 +461,8 @@
     // they go; LUKE (to Chase (2040), as they go)
     { hold: 'chase', prop: null },
     { do: (c) => { route(c, 'chase', [[-2.4, 0, 1.1], [-1.5, 0, -0.5]], { face: PI * 0.8 }); route(c, 'luka', [[-0.9, 0, -0.9]], { face: PI * 0.8 }); route(c, 'chase40', [[-2.2, 0, 0.6]], { speed: 1.2 }); } },   // Chase round the north of the A-frame sign
-    // from the street side: Luke at the table (left), the sign, the three setting off (right)
-    { do: (c) => { if (!sk(c)) c.cam.shot(glideCam([-3.0, 1.8, 3.4], [-2.5, 1.3, -0.8], 48, [[-2.9, 1.78, 3.15], null, 47], 6)); } },
+    // from the street side, high: Luke at the table (left), the sign, the three setting off for the station (right)
+    { do: (c) => { if (!sk(c)) c.cam.shot(glideCam([-3.6, 2.7, 3.9], [-2.3, 1.0, -1.0], 50, [[-3.5, 2.62, 3.6], null, 49], 6)); } },
     { wait: 1.2 },
     { face: 'chase40', to: 'luke40', dur: 0.6 },
     { face: 'luke40', to: 'chase40', dur: 0 },
