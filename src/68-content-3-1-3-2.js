@@ -798,12 +798,13 @@
   // ---------------------------------------------------------- L12
   // On arrival at L12, as the lift doors open on a floor so clean it reflects them.
   CUTSCENES['3.2_l12'] = [
-    put('luka', 'l12_car_luka'), put('chase', 'l12_car_chase'), put('chase40', 'l12_car_c40'),
+    // (in the car Luka stands in its back east corner, out from under the lens: at l12_car_luka his hat filled a corner)
+    put('luka', [-52.45, 0, -42.35, 0]), put('chase', [-52.55, 0, -41.45, 0]), put('chase40', [-53.5, 0, -41.6, 0]),
     { face: 'luka', to: 0, dur: 0 }, { face: 'chase', to: 0, dur: 0 }, { face: 'chase40', to: 0, dur: 0 },
     flr((c, S) => { S.dress('l12'); S.lamp('lift12'); }),
     { prop: 'l12_lift', fn: (o) => { o.userData.doors(0); o.userData.light(true); o.userData.panel(12); } },
     // inside the car, the muzak still playing; the doors
-    cam([-53.75, 2.25, -42.85], [-52.9, 1.2, -40.0], 62, [[-53.65, 2.2, -42.75], [-52.85, 1.1, -39.6]], 6),
+    cam([-53.45, 2.3, -42.85], [-52.95, 1.15, -39.8], 62, [[-53.4, 2.26, -42.75], [-52.9, 1.08, -39.5]], 6),
     { wait: 1.4 },
     { sfx: 'lift_ding', vol: 0.5 },
     { wait: 0.5 },
@@ -881,7 +882,7 @@
     { do: (c) => closeOn(c, 'chase40', { yaw: 0.55, dist: 1.0, fov: 36, push: 0.05, dur: 5 }) },
     say('chase40', "That's mine."),
     { face: 'chase', to: 'chase40', dur: 0.3 },
-    cam([-55.4, 1.5, -20.5], [-55.6, 1.5, -23.1], 42, [[-55.4, 1.5, -20.8]], 9),
+    cam([-55.4, 1.74, -20.55], [-55.6, 1.42, -23.1], 42, [[-55.4, 1.72, -20.8]], 9),   // (over the cage: the guitars' tops below the frame)
     say('chase', 'They took your guitar?'),
     say('chase40', 'Noise complaint.'),
     say('chase', "You didn't fight it?"),
@@ -904,7 +905,7 @@
     { act: [['chase', 'hold_headphones_up']] },
     { face: 'chase', to: 'chase40', dur: 0.4 },
     { wait: 0.8 },
-    { do: (c) => closeOn(c, 'chase', { yaw: 0.4, dist: 1.05, fov: 38, push: 0.06, dur: 5 }) },
+    { do: (c) => closeOn(c, 'chase', { yaw: 0.85, dist: 1.0, fov: 38, push: 0.06, dur: 5 }) },   // (round the side of the headphones he holds up)
     say('chase', 'For later.'),
     { act: [['chase', 'idle']] },
     { flag: 'headphones' },
@@ -1237,6 +1238,11 @@
     // The Manager on the PA. L30:
     put('luka', 's32_l30_luka'), put('chase', 's32_l30_chase'), put('chase40', 's32_l30_c40'),
     { act: [['luka', 'look_up'], ['chase', 'look_up'], ['chase40', 'look_up']] },
+    flr((c, S) => {   // (the hangar is dark: the spot from up by the speaker onto the three faces turned up to it)
+      S.lamp('off');
+      const t = c.world.torch;
+      if (t) { c.world.torchAuto = false; t.position.set(36.6, 3.6, -19.9); t.target.position.set(36.3, 1.5, -18.3); t.target.updateMatrixWorld(); t.angle = 0.62; t.penumbra = 0.75; t.distance = 7; t.color.setHex(0xdfe8ff); t.intensity = 4.5; }
+    }),
     ...pa(30, 'Chase. ^ Go home. ^ Please.', cam([37.0, 0.75, -21.4], [36.7, 2.35, -18.0], 54, [[37.0, 0.78, -21.2]], 7)),
     { act: [['luka', 'idle'], ['chase', 'idle'], ['chase40', 'idle']] },
     { expr: [['chase40', 'still']] },
@@ -1246,6 +1252,7 @@
     { do: (c) => closeAway(c, 'chase', 'luka', { dist: 1.0, fov: 36, push: 0.06, dur: 4 }) },
     { wait: 1.4 },
     { expr: [['chase40', 'neutral']] },
+    flr((c, S) => S.lamp('lift30')),
     { flag: 's32_l30' },
   ];
   // out of the floor hatch: up the rungs (y -1.6 -> 0) and a step onto the floor
@@ -1370,7 +1377,8 @@
     glance('luka', 'chase', 0.8),
     { wait: 0.6 },
     say('luka', "Santa's got roof access."),
-    // Santa steps up to the panel; it knows him
+    // Santa steps up to the panel; it knows him (seen from the doors' lens: his close would be left empty)
+    A32('lift30_doors', { push: 0.2, dur: 4 }),
     { move: 'luka', to: [59.6, 0, -21.6] }, { face: 'luka', to: H, dur: 0.3 },
     A32('side_panel', { push: 0.03, dur: 3 }),
     { prop: 'lift30', fn: (o) => { o.userData.panel('recognised'); o.userData.reader('green'); o.userData.beep(); } },
@@ -1422,7 +1430,7 @@
     // the Story Bridge, the Valley's dimmed neon below. A Santa sleigh photo set: a cardboard sleigh, a ring light,
     // nobody there.
     put('luka', 's32r_out_luka'), put('chase', 's32r_out_chase'), put('chase40', 's32r_out_c40'),
-    cam([-5.0, 13.4, -37.6], [3.0, 0.0, -22.0], 50, [[-6.0, 9.5, -31.0], [6.0, -6.0, 6.0], 54], 6.0, { ease: undefined }),
+    cam([-5.4, 12.8, -34.6], [3.0, 0.0, -22.0], 50, [[-6.0, 9.5, -31.0], [6.0, -6.0, 6.0], 54], 6.0, { ease: undefined }),   // (south of the Yes letters)
     { do: (c) => { if (sk(c)) return; for (const [id, to] of [['luka', 's32r_hatch_luka'], ['chase', 's32r_chase'], ['chase40', 's32r_c40']]) { const a = act(c, id); if (a) a.moveTo(to); } } },
     { sfx: 'thunder', vol: 0.4 },
     { wait: 6.0 },
@@ -1433,7 +1441,7 @@
     { wait: 3.6 },
     // [CLOSE · the maintenance hatch] Luka hauls it open. Below: dark.
     put('luka', [7.25, 0, -13.75, 0.75]),
-    cam([10.0, 1.45, -13.1], [7.7, 0.6, -13.35], 50, [[9.9, 1.42, -13.12]], 5),
+    cam([10.0, 1.45, -13.1], [7.7, 0.6, -13.35], 50, [[10.25, 1.55, -13.05], [7.6, 0.95, -13.4], 52], 5),   // (easing up as he straightens: his head stays in)
     { act: [['luka', 'lift_strain']] },
     { wait: 0.9 },
     { prop: 'maint_hatch', fn: (o) => o.userData.open(1) },
