@@ -52,7 +52,8 @@
 //   tree_wrapped {star (the padded star; .turn rad/s)} · tree_bulbs · banner_fun · countdown_wall {set(h, m, s), run(rate),
 //   zero(dur), ctl} · yes_unsure {lit(b)} · choir_meter {level(db | null)} · choir {hush(b)} · crowd_staff {nod(i),
 //   look(i, where | null), pos(i, out)} · staff_shadows · cracker_table {pull(i), goggles(i, on), reset()} · santa_table
-//   {take(i), put(i), left(), slot(i, out), reset()} · gift_parcel (a hidden loose parcel for a hand) · tea_table {pie(i),
+//   {take(i), put(i), left(), slot(i, out), reset()} · gift_parcel (a hidden loose parcel for a hand) · invite (Luke's
+//   invitation card, hidden: {hold(who, on = true, hand = 'R'), home()}; home it before the set goes) · tea_table {pie(i),
 //   steam(), reset()} · tea_urn · lanyard_desk · staff_lifts · quiet_corner · entrance_doors {open(u)} · speed_gates ·
 //   svc_lift {open(u)} · svc_reader {set('red'|'green'), beep()} · lift_car {light(on), speaker(k), panel(floor)} ·
 //   columns · corner_foam · mezz · pendant_stars · canopy · ext_street · ext_bollards · ext_lamps · ext_traffic {stop(b)}
@@ -367,6 +368,13 @@ SETS.hq_atrium = (() => {
       c.fillStyle = '#fffdf4'; c.fillRect(84, 10, 30, 20); c.strokeStyle = '#b8b0a0'; c.lineWidth = 1; c.strokeRect(84.5, 10.5, 29, 19);
       c.beginPath(); c.moveTo(84, 20); c.lineTo(70, 30); c.stroke();
     }, K('gift'));
+    // Luke's invitation (the hand prop `invite`): card stock, a Yes-yellow border, MANDATORY FUN, LUKE + 2
+    T.invite = canvasTex(128, 96, (c) => {
+      c.fillStyle = '#f7f4ec'; c.fillRect(0, 0, 128, 96);
+      c.strokeStyle = '#ffd21f'; c.lineWidth = 4; c.strokeRect(5, 5, 118, 86);
+      text(c, 'MANDATORY', 64, 33, 15, '#c62828', 'center', 'bold'); text(c, 'FUN', 64, 51, 15, '#c62828', 'center', 'bold');
+      text(c, 'LUKE + 2', 64, 74, 10, '#141d3a', 'center', 'normal');
+    }, K('invite'));
     // a cracker (64 around × 32 along): silver frilled ends, red body, a gold band and white stars
     T.cracker = canvasTex(64, 32, (c) => {
       c.fillStyle = '#d8323a'; c.fillRect(0, 0, 64, 32);
@@ -452,7 +460,7 @@ SETS.hq_atrium = (() => {
       atlasLit: matTex(T.atlas, { emissive: 0xffffff, emissiveIntensity: 0.85 }),
       glow: basic('hqa_glow', { vertexColors: true }),
       glass: basic('hqa_glass', { color: 0xcfe0ea, transparent: true, opacity: 0.25, depthWrite: false, side: DS }),
-      quilt: matTex(T.quilt), steel: matTex(T.steel), podium: matTex(T.podium), road: matTex(T.road), pave: matTex(T.pave),
+      invite: matTex(T.invite), quilt: matTex(T.quilt), steel: matTex(T.steel), podium: matTex(T.podium), road: matTex(T.road), pave: matTex(T.pave),
       banner: matTex(T.banner, { emissive: 0xffffff, emissiveIntensity: 0.18 }),
       meter: matTex(T.meter, { emissive: 0xffffff, emissiveIntensity: 0.35 }),
       arc: basic('hqa_arc', { color: 0xff3a40, transparent: true, opacity: 0, blending: ADD, depthWrite: false }),
@@ -748,6 +756,19 @@ SETS.hq_atrium = (() => {
       R.gifts = instanced(gm, M.gift, GIFTS.map((G) => [G.at[0] - 3.5, G.at[1], G.at[2] + 33.6, 0, 1])); R.gifts.name = 'gifts'; R.santa.add(R.gifts);
       R.parcel = new THREE.Mesh(gm, M.gift); R.parcel.name = 'gift_parcel'; R.parcel.visible = false; root.add(R.parcel);
     }
+    // Luke's invitation: a hidden card (0.15 × 0.105) at home under the root, for a hand: hold(who, on = true, hand = 'R')
+    // puts it in that grip as 3.1 holds it (face out), home() / hold(who, false) back here hidden; actor.hold works too
+    R.invite = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.105, 0.004), M.invite); R.invite.name = 'invite'; R.invite.visible = false; root.add(R.invite);
+    R.invite.userData = {
+      hold(who, on = true, hand = 'R') {
+        const c = R.invite; if (!on) { R.invite.userData.home(); return; }
+        const a = typeof world !== 'undefined' && world.actor ? world.actor(who) : null;
+        const g = a && a.rig && ((a.rig.attach && a.rig.attach[hand === 'L' ? 'gripL' : 'gripR']) || (a.rig.parts && a.rig.parts[hand === 'L' ? 'handL' : 'handR']));
+        if (!g) return;
+        g.add(c); c.position.set(0, -0.07, 0.04); c.rotation.set(0, -H, 0); c.visible = true;
+      },
+      home() { const c = R.invite; if (c.parent !== R.root && R.root) R.root.add(c); c.position.set(0, -40, 0); c.rotation.set(0, 0, 0); c.visible = false; },
+    };
     R.santa.userData = {
       take(i) { if (i >= 0 && i < 20) { S.taken[i] = true; giftMx(i); } },
       put(i) { if (i >= 0 && i < 20) { S.taken[i] = false; giftMx(i); } },
@@ -1548,7 +1569,7 @@ SETS.hq_atrium = (() => {
     },
     gifts: GIFTS, ar: [...AR_SIGNS, ...AR_NAMES, ...AR_TAGS], ar_signs: AR_SIGNS, ar_names: AR_NAMES, ar_tags: AR_TAGS, hotspots: HOTSPOTS,
     props: ['tree_wrapped', 'tree_star', 'tree_bulbs', 'banner_fun', 'countdown_wall', 'yes_unsure', 'choir_meter', 'choir', 'crowd_staff', 'staff_shadows',
-      'cracker_table', 'santa_table', 'gift_parcel', 'tea_table', 'tea_urn', 'lanyard_desk', 'staff_lifts', 'quiet_corner', 'entrance_doors', 'speed_gates',
+      'cracker_table', 'santa_table', 'gift_parcel', 'invite', 'tea_table', 'tea_urn', 'lanyard_desk', 'staff_lifts', 'quiet_corner', 'entrance_doors', 'speed_gates',
       'svc_lift', 'svc_leaf', 'svc_reader', 'lift_car', 'columns', 'corner_foam', 'mezz', 'pendant_stars', 'canopy', 'ext_street', 'ext_bollards', 'ext_lamps',
       'ext_traffic', 'podium', 'tower', 'facade_countdown', 'yes_sign', 'tower_drones', 'skyline', 'floor_mirror'],
     ambience: AMBIENCE, update,
