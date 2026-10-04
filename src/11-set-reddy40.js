@@ -1415,7 +1415,7 @@ SETS.reddy40 = (() => {
       'led_string', 'front_doors', 'locals', 'local40_a', 'local40_b', 'local40_c', 'local40_d', 'counter_speaker', 'jordan_office_door', 'xmas_tree_floor',
       'machine', 'battery_leds', 'des', 'wall_phone40', 'door_wedge', 'drone_tower', 'skip_bin', 'hover_cars', 'hover_parked_yard', 'palm_lights', 'drone_ring',
       'pelican_glider', 'storm_clouds', 'sky_dome', 'bay_glints'],
-    ambience: { loops: ['aircon', 'fluoro'], room: 'room' },
+    ambience: { loops: ['aircon'], room: 'room' },   // (no fluoro tube buzz)
   };
   const def = SETS.reddy26.make('2040', EXT40);
   Object.assign(def, { ar: AR40, ar16: AR16, drones: DRONES40, paths: PATHS40, lure: LURE40, roam: ROAM, stealth: STEALTH });

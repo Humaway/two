@@ -2261,7 +2261,7 @@ SETS.reddy26 = (() => {
       zones,
       colliders: COL,
       props: E26 ? PROPLIST.slice() : PROPLIST.filter((n) => !/^(hero_|tinsel_|fairy|snow|aframe|tether_loose|alarm_beacon|glass_shards|blast_flash|plastic_heap|store_phone|cash_tray|monitor_screen|ladder|calendar|cust26|the_wall$|print4|kettle|rue_mug|laptop|remote_plugged|traffic|shimmer)/.test(n)).concat('the_wall40', ext.props || []),
-      ambience: ext.ambience || { loops: ['aircon', 'fluoro'], room: 'room' },
+      ambience: ext.ambience || { loops: ['aircon'], room: 'room' },   // (no fluoro tube buzz: it looped under every scene)
       update,
       dress: (s, o) => dress(s, o),
       get dressState() { return R.dressState; },

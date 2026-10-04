@@ -455,7 +455,7 @@ Zone triggers (not hotspots): `s14_meet` [3.2,−8.55,9.0,−6.6] (player Chase 
 
 ## 12. AMBIENCE and `update()` (allocation-free)
 
-`ambience: { loops: ['aircon', 'fluoro'], room: 'room' }` (the 2040 store hums the same). In the yard content switches
+`ambience: { loops: ['aircon'], room: 'room' }` (no fluoro tube buzz, as 2026). In the yard content switches
 `AUDIO.setRoom('none')` and adds `city` (the Parade, hover hum) at the roller door. Music is content's (`store40`,
 `stealth`, silence for the address, the Manager motif). Thunder for the title's lightning is the title code's.
 

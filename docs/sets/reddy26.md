@@ -539,7 +539,7 @@ cams). No drones/stealth in reddy26.
 
 ## 12. AMBIENCE and `update()` (allocation-free)
 
-`ambience: { loops: ['aircon', 'fluoro'], room: 'room' }`. Diegetic music is content's: `music('radio')` (1.1–1.2,
+`ambience: { loops: ['aircon'], room: 'room' }` (the fluoro tube buzz was dropped: it looped under every scene). Diegetic music is content's: `music('radio')` (1.1–1.2,
 the store radio; `store_radio.playing` follows it), alarms are content's loop `alarm` (1.2–1.3, muffled through the
 backroom door). The hold music from Chase's phone is `music('hold')` or a quiet SFX bed — content.
 
