@@ -357,6 +357,11 @@
   function dressTower(c) {
     const S = ATR();
     if (S && c.world.setId === 'hq_atrium') S.dress('crane31');
+    // both countdowns a few seconds ahead, so the facade's reads 01:58:00 as the push lands on it, and the wall's as the
+    // atrium opens
+    const t = P(c, 'tower'), fc = t && t.userData.countdown, cw = ud(c, 'countdown_wall');
+    if (fc) { fc.set(1, 58, 11); fc.run(1); }
+    if (cw) { cw.set(1, 58, 12); cw.run(1); }
     const F = c.state.flags;
     F.santa = true; F.chip_off = true;
     if (typeof chip !== 'undefined') chip.forceOff(true, 'Chip off.');
@@ -406,8 +411,9 @@
     atr((c, S) => S.dress('party31')),
     { env: 'atrium' },
     { music: 'choir', fade: 1.4 },
-    A31('s31_wide', { push: 2.2, dur: 6.5 }),
-    { wait: 4.0 },
+    // (down from the banner to the floor: MANDATORY FUN, then the tree, the choir, the countdown)
+    { shot: 'CAM', pos: [-2.6, 5.2, -12.2], look: [-0.6, 10.3, -22.5], fov: 56, to: { pos: [-2.54, 5.16, -14.4], look: [-2.0, 4.8, -34.0], fov: 60 }, dur: 4.6 },
+    { wait: 4.2 },
     A31('choir_meter', { push: 0.35, dur: 3.2 }),
     { wait: 2.4 },
     cam([-13.4, 1.55, -17.6], [-12.0, 0.9, -20.6], 40, [[-13.3, 1.5, -17.9]], 3),
@@ -415,10 +421,12 @@
     // [TRACK · the three of them at the entrance] Chase (2040) holds Luke's invitation.
     put('luka', [-1.0, 0, -5.4, PI]), put('chase', [1.0, 0, -5.1, PI]), put('chase40', [0.0, 0, -5.8, PI]),
     { do: (c) => invite(c, true) },
-    cam([4.4, 1.5, -6.6], [0.0, 1.3, -6.4], 46, [[4.0, 1.5, -8.4], [0.0, 1.3, -9.6]], 2.8),
+    // (low, just ahead of them and to the east, backing off as they come: three faces side by side, the card in his hand;
+    // side-on they hid each other; cut before the door so the drone's lens sees them arrive)
+    cam([1.4, 1.22, -10.0], [0.0, 1.35, -5.6], 36, [[1.7, 1.28, -10.7], [-0.1, 1.45, -8.4], 42], 2.6),
     { move: 'luka', to: 's31_door_luka', nowait: true }, { move: 'chase', to: 's31_door_chase', nowait: true },
-    { move: 'chase40', to: 's31_door_c40' },
-    { wait: 0.4 },
+    { move: 'chase40', to: 's31_door_c40', nowait: true },
+    { wait: 2.4 },
     // DOOR DRONE
     A31('door_drone', { push: 0.25, dur: 5 }),
     { sfx: 'drone_scan', vol: 0.5 },
@@ -433,12 +441,14 @@
     { sfx: 'drone_scan', vol: 0.45 },
     { wait: 2.2 },
     { do: (c) => doorScreen(c, 'LUKE +2') },
-    { do: (c) => { closeAway(c, 'chase40', 'luka', { dist: 1.15, fov: 40, push: 0.05, dur: 6, yaw: 0.5 }); } },
+    // the guest and the drone face to face, side on from the east (the drone's screen in the frame; a lens in front of
+    // him sat under its light)
+    cam([2.3, 1.72, -10.05], [-0.15, 1.72, -10.12], 38, [[2.05, 1.72, -10.06]], 6),
     say('door_drone', 'Guest: LUKE, plus two. ^ Welcome, Luke!'),
     { do: (c) => doorScreen(c, 'WELCOME, LUKE!') },
     { sfx: 'ss_chirp', vol: 0.4 },
     { expr: [['chase40', 'tired']] },
-    { do: (c) => closeOn(c, 'chase40', { yaw: 0.45, dist: 0.95, fov: 36, push: 0.06, dur: 5 }) },
+    { do: (c) => closeOn(c, 'chase40', { yaw: -1.0, dist: 0.95, fov: 36, push: 0.06, dur: 5 }) },
     say('chase40', '…Thanks.'),
     // the doors slide open; the Door Drone floats aside; they go in
     { do: (c) => { invite(c, false); const ed = ud(c, 'entrance_doors'); if (ed) ed.open(1); if (typeof DRONES !== 'undefined') DRONES.goTo('door_drone', [2.9, 0, -10.0], { speed: 1.2 }); } },
@@ -507,7 +517,7 @@
     { do: (c) => { const S = ATR(); if (S && S.lamp) S.lamp('tree'); } },
     // [MID] Luka hands a small parcel to NADIA (40s, antlers, tired eyes, Network Safety lanyard). She takes it. She
     // looks up at him over the beard.
-    { do: (c) => { ots(c, 'nadia', 'luka', { fov: 46, back: 1.15, off: 0.6, dy: -0.05, dur: 7, push: 0.15 }); } },
+    A31('s31_nadia_mid', { push: 0.45, dur: 7 }),   // (side-on: the parcel crosses between them; over his back it was hidden)
     { wait: 0.6 },
     { act: [['luka', 'give', { dur: 1.4, loop: false }]] },
     { wait: 0.7 },
@@ -561,7 +571,8 @@
     { do: (c) => { const l = act(c, 'luka'); if (l) l.rig.show('lanyard2', true); } },
     { wait: 0.9 },
     { act: [['nadia', 'idle']] }, { expr: [['nadia', 'fond']] },
-    { do: (c) => closeAway(c, 'nadia', 'chase40', { dist: 0.95, fov: 34, push: 0.06, dur: 6, mag: 0.55 }) },
+    // (she stands 0.7 m from him now: a closer lens, wider round her face, clear of his head)
+    AWAY('nadia', 'chase40', { dist: 0.8, fov: 36, push: 0.05, dur: 6, mag: 0.9 }),
     say('nadia', 'Merry Christmas, Santa.'),
     // Ticks: ☑ Get an HQ lanyard · ☑ Find the service lift.
     { objective: [{ text: 'Get an HQ lanyard', done: true }, { text: 'Find the service lift', done: true }] },
@@ -589,7 +600,8 @@
     { face: 'luka', to: [-3.55, 0, -40.55], dur: 0.3 },
     { act: [['luka', 'give', { dur: 1.4, loop: false }]] },
     { wait: 0.8 },
-    A31('lift_reader', { push: 0.04, dur: 3 }),
+    // the lanyard to the reader: his profile, the hand and the reader (the set's lens is all knuckle with his hand in it)
+    cam([-2.25, 1.55, -38.85], [-3.7, 1.3, -40.3], 42, [[-2.4, 1.53, -39.0]], 3),
     { wait: 0.5 },
     { prop: 'svc_reader', fn: (o) => { o.userData.set('green'); o.userData.beep(); } },
     { sfx: 'key_beep', vol: 0.5 },
@@ -617,7 +629,7 @@
     { wait: 2.6 },
     // Chase (2040) stares at the speaker in the ceiling.
     { act: [['chase40', 'look_up']] },
-    cam([-5.25, 1.2, -40.95], [-5.45, 2.05, -41.8], 56, [[-5.26, 1.22, -41.02]], 5),
+    cam([-5.1, 1.1, -40.86], [-5.42, 1.62, -41.75], 60, [[-5.12, 1.13, -40.95]], 5),   // (from under his chin: his face and the speaker over it)
     { wait: 3.4 },
     // Nobody says anything.
     cam([-5.0, 1.75, -40.9], [-5.0, 1.38, -42.5], 74, [[-5.0, 1.73, -40.98], null, 72], 5),
