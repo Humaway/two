@@ -145,8 +145,8 @@
   const yawTo = (from, to) => Math.atan2(to[0] - from[0], to[2] - from[2]);
 
   // ---------------------------------------------------------- hand props (built at load from art's cached materials)
-  // Luke's invitation and Jordan's Christmas bonus card: two thin cards that live in a detached group between uses
-  // (actor.hold puts a prop back where it came from)
+  // Luke's invitation: a thin card that lives in a detached group between uses (actor.hold puts a prop back where it came
+  // from). luke40's rig has no `card` attachment (art gives one to the heroes only); Jordan's bonus card is chase40's.
   const CARD_HOME = new THREE.Group();
   CARD_HOME.name = 'cards_2627';
   function handCard(name, hex, edge) {
@@ -158,8 +158,21 @@
     CARD_HOME.add(g);
     return g;
   }
-  const INVITE_CARD = handCard('s26_invite_card', 0xf7f4ec, 0x1f3d8a);
-  const BONUS_CARD = handCard('s27_bonus_card', 0x2a6fd8, 0xe8eef8);
+  const INVITE_CARD = handCard('s26_invite_card', 0xf7f4ec, 0x1f3d8a);   // luke40 has no rig card: his stays a content card
+  // Jordan's Christmas bonus card: Chase (2040)'s rig card (art's attach.card), painted at the gate
+  function paintBonus(cx, w, h) {
+    cx.fillStyle = '#2a6fd8'; cx.fillRect(0, 0, w, h);
+    cx.fillStyle = '#e8eef8'; cx.fillRect(0, h * 0.62, w, h * 0.16);
+    cx.fillStyle = '#ffd21f'; cx.fillRect(w * 0.1, h * 0.2, w * 0.18, h * 0.26);
+    cx.fillStyle = '#c8262e'; for (let i = 0; i < 5; i++) cx.fillRect(w * (0.42 + i * 0.1), h * 0.24, w * 0.05, h * 0.05);
+    cx.strokeStyle = '#163f8a'; cx.lineWidth = 3; cx.strokeRect(1.5, 1.5, w - 3, h - 3);
+  }
+  function bonusCard(c, on) {
+    const a = act(c, 'chase40'), k = a && a.rig.attach.card;
+    if (!k) return;
+    if (on) k.userData.paint(paintBonus);
+    a.rig.show('card', !!on);
+  }
 
   // ---------------------------------------------------------- CARDS (readable INSERTs this file owns)
   // 2.6: Luke's invitation. A glossy card: MANDATORY FUN · Christmas Eve Morning Tea · Optus Tower, Ann Street, Fortitude
@@ -244,7 +257,7 @@
     c.state.flags.santa = true; c.state.flags.chip_off = true;
     dress26('luke26');
     const S = SG(); if (S && S.storm && S.storm.build) S.storm.build(0.35, 0);
-    const lk = act(c, 'luke40'); if (lk) { lk.place(LUKE_HOT); lk.play('sizzle_flip'); lk.setExpr('happy'); lk.hold(null); }
+    const lk = act(c, 'luke40'); if (lk) { lk.place(LUKE_HOT); lk.play('sizzle_flip'); lk.setExpr('happy'); lk.hold(null); lk.rig.show('tongs', true); }
     const ch = act(c, 'chase'), l = act(c, 'luka'), c4 = act(c, 'chase40');
     if (ch) { ch.place(ST_CHASE); ch.play('idle'); ch.setExpr('determined'); ch.hold(null); ch.rig.show('phone', false); }
     if (l) { l.place(ST_LUKA); l.play('idle'); l.setExpr('neutral'); l.habit = null; l.rig.show('santa', true); beardSet(c, 'on'); }
@@ -291,11 +304,11 @@
     hotspots: [
       // the urn on the front table: the save point (spec 13.1), steam off its lid
       { id: 'h26_urn', at: [-7.30, 1.12, -0.80], r: 0.95, verb: 'Use', kettle: true },
-      // the Sizzle sample: the onions on the plate, across the table (Chase holds his phone out over it)
-      { id: 'h26_sizzle', at: [-6.4, 0, -0.05], r: 0.7, only: 'chase', sample: 'sizzle' },
+      // the Sizzle sample: the onions on the plate, across the table (Chase holds his phone out over it): the set's spot
+      { id: 'h26_sizzle', at: 's26_sample_sizzle', r: 0.7, only: 'chase', sample: 'sizzle' },
       // the hand-painted sign: the one sign anyone without a chip can read (a silent insert)
       { id: 'h26_sign', at: [-2.9, 0, 0.95], r: 0.95, verb: 'Examine', flag: 's26_sign',
-        steps: [aPush('sandgate', 's26_sign', 0.18, 4), { wait: 2.6 }] },
+        steps: [aPush('sandgate', 's26_sign', 0.12, 4, { fov: 40 }), { wait: 2.6 }] },
       // the tongs: round the end of the table, where the volunteers go in
       { id: 'h26_tongs', at: [-7.95, 0, -0.05], r: 0.95, verb: 'Grab some tongs', flag: 's26_tongs', do: () => {} },
     ],
@@ -346,9 +359,9 @@
     { act: [['luke40', 'idle']] },
     { do: (c) => { if (!sk(c)) c.cam.shot(glideCam([-7.55, 1.72, -4.05], [-6.7, 1.5, 0.05], 38, [[-7.5, 1.72, -3.85], null, 36], 7)); } },
     say('chase', 'We know it’s you.', { expr: 'determined' }),
-    CLOSE('luke40', { dist: 1.05, yaw: 0.1, fov: 34 }),
+    CLOSE('luke40', { dist: 1.3, yaw: 0.1, fov: 34 }),
     say('luke40', '…Know what’s me?', { expr: 'neutral' }),
-    CLOSE('chase', { dist: 1.0, yaw: -0.1, fov: 34, dy: -0.06 }),
+    CLOSE('chase', { dist: 1.2, yaw: -0.1, fov: 34, dy: -0.06 }),
     say('chase', 'The MANAGER.', { act: 'point' }),
     { act: [['chase', 'idle']] },
     // the side two-shot across the table, from its east end: Luke at the plate (right), Chase at the front (left)
@@ -356,25 +369,25 @@
     { act: [['luke40', 'gesture']] },
     say('luke40', 'I WAS a manager. I hated it. Retired in ’37. ^ I do sausages now. ^ Sausages don’t hang up on you.', { expr: 'fond' }),
     { act: [['luke40', 'sizzle_flip']] },
-    CLOSE('chase', { dist: 1.0, yaw: -0.12, fov: 34, dy: -0.06 }),
+    CLOSE('chase', { dist: 1.2, yaw: -0.12, fov: 34, dy: -0.06 }),
     say('chase', 'You hung up on US.', { expr: 'determined' }),
     { act: [['luke40', 'idle']] },
-    CLOSE('luke40', { dist: 1.05, yaw: 0.1, fov: 34 }),
+    CLOSE('luke40', { dist: 1.3, yaw: 0.1, fov: 34 }),
     say('luke40', 'When?', { expr: 'neutral' }),
-    CLOSE('chase', { dist: 1.0, yaw: -0.12, fov: 34, dy: -0.06 }),
+    CLOSE('chase', { dist: 1.2, yaw: -0.12, fov: 34, dy: -0.06 }),
     say('chase', '1987.'),
     { do: (c) => { if (!sk(c)) c.cam.shot(glideCam([-3.15, 1.73, -1.52], [-6.9, 1.38, -1.55], 35, [[-3.6, 1.72, -1.54], null, 34], 10)); } },
     say('luke40', '…I’ve never been to 1987.', { expr: 'suspicious' }),
     say('chase', 'We rang you FROM 1987.', { expr: 'determined' }),
     // (Luke looks past him at Chase (2040).)
-    CLOSE('luke40', { dist: 1.05, yaw: 0.1, fov: 34 }),
+    CLOSE('luke40', { dist: 1.3, yaw: 0.1, fov: 34 }),
     { do: (c) => glanceAt(c, 'luke40', 'chase40', 2.6) },
     { wait: 1.0 },
     say('luke40', 'Chase? ^ Is this your—', { expr: 'suspicious' }),
     { face: 'chase40', to: 'luke40', dur: 0.4 },
-    CLOSE('chase40', { dist: 1.05, yaw: 0.05, fov: 32 }),
+    CLOSE('chase40', { dist: 1.25, yaw: 0.05, fov: 32 }),
     slow('chase40', 'Don’t.', { expr: 'tired' }),
-    CLOSE('luke40', { dist: 1.05, yaw: 0.1, fov: 34 }),
+    CLOSE('luke40', { dist: 1.3, yaw: 0.1, fov: 34 }),
     say('luke40', '…Right.', { expr: 'neutral' }),
     // (Luke decides he doesn't want to know.)
     { face: 'luke40', to: 0, dur: 0.5 },
@@ -384,7 +397,7 @@
     { do: (c) => { glanceAt(c, 'luke40', 'luka', 3.4); if (!sk(c)) c.cam.shot(glideCam([-6.55, 1.62, -1.85], [-7.25, 1.55, -3.25], 36, [[-6.6, 1.62, -1.95], null, 35], 6)); } },
     say('luke40', 'And who’s Santa?', { expr: 'suspicious' }),
     { face: 'luka', to: 'luke40', dur: 0.3 },
-    CLOSE('luka', { dist: 1.0, yaw: -0.15, fov: 32 }),
+    CLOSE('luka', { dist: 1.0, yaw: -0.3, fov: 34, dy: 0.28, ly: -0.02 }),   // a touch above the queue's heads: Chase and the customers out of the frame
     glance('luka', 'chase', 0.9),
     { wait: 0.9 },
     say('luka', '…Ho ho.', { tag: 'gruff', expr: 'sheepish' }),
@@ -393,12 +406,12 @@
     { move: 'chase40', to: C4_ASIDE, speed: 1.3 },
     { face: 'chase40', to: 'chase', dur: 0.3 },
     { face: 'chase', to: 'chase40', dur: 0.4 },
-    // from behind them (north): the two Chases close together, Luke between them at the plate in the background
-    { do: (c) => { if (!sk(c)) c.cam.shot(glideCam([-7.2, 1.66, 2.05], [-7.12, 1.48, 0.1], 42, [[-7.2, 1.64, 1.75], null, 40], 9)); } },
+    // from the table side, turned toward his face: the two Chases close together, Luka behind them
+    TWO('chase40', 'chase', { side: -1, yaw: -0.55, dist: 2.2, fov: 42, dy: 0.12, dur: 9 }),
     say('chase40', 'He’s not even on the network. Hasn’t been since he retired. ^ The Manager IS the network. ^ It’s not Luke.', { tag: 'quietly', expr: 'tired' }),
     { expr: [['chase', 'sad']] },
     { face: 'chase', to: 'luke40', dur: 0.7 },
-    CLOSE('chase', { dist: 0.95, yaw: 0.35, fov: 32, push: 0.18 }),
+    CLOSE('chase', { dist: 1.15, yaw: -0.3, fov: 32, push: 0.18 }),   // from his right: Luka not standing in his shoulders
     { wait: 0.4 },
     say('chase', '…It’s not Luke.', { tag: 'deflating', expr: 'sad' }),
     // ▶ Luke's volunteer hasn't turned up and the queue's growing.
@@ -418,7 +431,7 @@
       dress26('invite26', true);
       const S = SG(); if (S && S.storm && S.storm.build) S.storm.build(0.5, sk(c) ? 0 : 6);
       const lk = act(c, 'luke40'), ch = act(c, 'chase'), l = act(c, 'luka'), c4 = act(c, 'chase40');
-      if (lk) { lk.hold(null); lk.place(INV.luke); lk.play('wipe'); lk.setExpr('fond'); }
+      if (lk) { lk.hold(null); lk.rig.show('tongs', false); lk.place(INV.luke); lk.play('wipe'); lk.setExpr('fond'); }   // the tongs down: the card goes in the hand that held them
       if (ch) { ch.hold(null); ch.place(INV.chase); ch.play('idle'); ch.setExpr('neutral'); }
       if (l) { l.hold(null); l.place(INV.luka); l.play('idle'); l.setExpr('tired'); }
       if (c4) { c4.place(INV.c40); c4.play('idle'); c4.setExpr('tired'); }
@@ -426,18 +439,20 @@
     // LUKE (wiping his hands, pulling a card from his apron pocket)
     aPush('sandgate', 's26_apron', 0.12, 6),
     { wait: 1.3 },
-    { act: [['luke40', 'idle']] },
-    { hold: 'luke40', prop: INVITE_CARD, hand: 'L' },
-    { do: (c) => closeOn(c, 'luke40', { dist: 1.15, yaw: -0.35, fov: 36, dur: 9 }) },
+    // (after the wipe has started: leaving sizzle_flip hands the tongs' visibility back to what it was before it)
+    { do: (c) => { const lk = act(c, 'luke40'); if (lk) lk.rig.show('tongs', false); } },
+    { hold: 'luke40', prop: INVITE_CARD },
+    { act: [['luke40', 'hold_card', { show: true }]] },
+    { do: (c) => closeOn(c, 'luke40', { dist: 1.5, yaw: -0.35, fov: 40, dur: 9, ly: -0.12, dy: -0.02 }) },
     say('luke40', 'Here. ^ Got one every year since I retired. Optus Christmas morning tea at HQ. Mandatory fun. I never go.', { expr: 'fond' }),
     // [INSERT] A glossy card
     { do: (c) => { if (!sk(c)) { c.cam.shot(glideCam([-3.25, 1.52, 0.65], [-4.05, 1.3, -0.1], 38, [[-3.33, 1.5, 0.57], null, 36], 6)); c.ui.card('s26_invite'); } } },
     { wait: 4.4 },
     { do: (c) => c.ui.card(null) },
-    TWO('luke40', 'chase', { side: -1, dist: 1.9, fov: 40 }),
+    TWO('luke40', 'chase', { side: 1, dist: 1.9, fov: 40 }),   // from the table's front: Luke's face as he holds it out
     { act: [['luke40', 'give', { dur: 1.4, loop: false }]] },
     say('luke40', 'Plus two. Take it. ^ Don’t tell anyone I helped. I’m retired.', { expr: 'happy' }),
-    { hold: 'luke40', prop: null, hand: 'L' },
+    { hold: 'luke40', prop: null },
     { hold: 'chase', prop: INVITE_CARD },
     { item: 'invite' },
     { flag: 's26_invite' },
@@ -445,14 +460,15 @@
     { wait: 0.6 },
     // they go; LUKE (to Chase (2040), as they go)
     { hold: 'chase', prop: null },
-    { do: (c) => { route(c, 'chase', [[-1.6, 0, -0.6]], { face: PI * 0.8 }); route(c, 'luka', [[-0.9, 0, -0.9]], { face: PI * 0.8 }); route(c, 'chase40', [[-2.2, 0, 0.6]], { speed: 1.2 }); } },
-    { do: (c) => { if (!sk(c)) c.cam.shot(glideCam([-5.2, 1.7, 1.2], [-2.2, 1.35, -0.1], 44, [[-5.05, 1.68, 1.05], null, 43], 6)); } },
+    { do: (c) => { route(c, 'chase', [[-2.4, 0, 1.1], [-1.5, 0, -0.5]], { face: PI * 0.8 }); route(c, 'luka', [[-0.9, 0, -0.9]], { face: PI * 0.8 }); route(c, 'chase40', [[-2.2, 0, 0.6]], { speed: 1.2 }); } },   // Chase round the north of the A-frame sign
+    // from the street side: Luke at the table (left), the sign, the three setting off (right)
+    { do: (c) => { if (!sk(c)) c.cam.shot(glideCam([-3.0, 1.8, 3.4], [-2.5, 1.3, -0.8], 48, [[-2.9, 1.78, 3.15], null, 47], 6)); } },
     { wait: 1.2 },
     { face: 'chase40', to: 'luke40', dur: 0.6 },
     { face: 'luke40', to: 'chase40', dur: 0 },
     CLOSE('luke40', { dist: 1.2, yaw: 0.3, fov: 34, push: 0.12, dur: 8 }),
     say('luke40', 'You look after yourself, Chase. ^ You never did, after Luka.', { expr: 'neutral' }),
-    CLOSE('chase40', { dist: 1.05, yaw: 0.2, fov: 32, push: 0.1 }),
+    CLOSE('chase40', { dist: 1.25, yaw: 0.2, fov: 32, push: 0.1 }),
     { wait: 1.2 },
     { act: [['chase40', 'nod']] },
     { wait: 0.9 },
@@ -462,11 +478,11 @@
     { env: 'gust26', dur: 8 },
     { do: (c) => {
       const S = SG(); if (S && S.storm && S.storm.build) S.storm.build(0.65, sk(c) ? 0 : 8);
-      const lk = act(c, 'luke40'); if (lk) { lk.place([-7.1, 0, -3.25, 0.25]); lk.play('sizzle_flip'); lk.setExpr('neutral'); }
+      const lk = act(c, 'luke40'); if (lk) { lk.place([-7.1, 0, -3.25, 0.25]); lk.rig.show('tongs', true); lk.play('sizzle_flip'); lk.setExpr('neutral'); }
       const pts = [[-0.6, 0, -4.0], [0.0, 0, -9.6], [0.4, 0, -11.6]];
       route(c, 'luka', [[-1.4, 0, -1.2]].concat(pts));
       route(c, 'chase', [[-2.0, 0, -0.9], [-0.9, 0, -4.4], [-0.3, 0, -9.8], [0.0, 0, -11.9]]);
-      route(c, 'chase40', [[-2.7, 0, -0.5], [-1.4, 0, -4.2], [-0.6, 0, -9.7], [-0.4, 0, -12.0]], { speed: 1.5 });
+      route(c, 'chase40', [[-2.3, 0, -1.4], [-1.4, 0, -4.2], [-0.6, 0, -9.7], [-0.4, 0, -12.0]], { speed: 1.5 });   // east of the A-frame sign: in the clear in the exit WIDE
     } },
     aPush('sandgate', 's26_exit_wide', 0.4, 9),
     { wait: 2.6 },
@@ -474,11 +490,14 @@
     { do: (c) => { if (!sk(c)) c.cam.shot(glideCam([-8.45, 1.92, -1.95], [-1.4, 1.25, -7.0], 42, [[-8.35, 1.9, -2.05], null, 40], 9)); } },
     { act: [['luke40', 'sizzle_flip']] },
     { wait: 2.0 },
-    { do: (c) => { const l = act(c, 'luka'), lk = act(c, 'luke40'); if (lk) { lk.play('idle'); if (l) lk.face([l.pos.x, 0, l.pos.z], sk(c) ? 0 : 0.7); } } },
-    { do: (c) => glanceAt(c, 'luke40', 'luka', 2.4) },
-    { wait: 2.6 },
+    { act: [['luke40', 'idle']] },
+    { face: 'luke40', to: 'luka', dur: 0.7, wait: true },
+    { wait: 1.2 },
+    // a second too long: his face, then the head shake
+    CLOSE('luke40', { dist: 1.4, yaw: -0.4, fov: 34, push: 0.08, dur: 6 }),
+    { wait: 1.2 },
     { act: [['luke40', 'shake']] },
-    { wait: 1.0 },
+    { wait: 1.2 },
     { face: 'luke40', to: 0.25, dur: 0.6 },
     { act: [['luke40', 'sizzle_flip']] },
     { wait: 1.8 },
@@ -689,7 +708,7 @@
   async function wakeLuka(c) {
     await c.runSteps([
       { move: 'chase', to: [0.12, 0, 4.0] }, { face: 'chase', to: 'luka', dur: 0.25 },
-      { do: (cc) => { if (!sk(cc)) cc.cam.shot(glideCam([0.25, 1.5, 2.6], [-0.7, 1.1, 4.3], 46, [[0.22, 1.48, 2.8], null, 44], 4)); } },
+      { do: (cc) => { if (!sk(cc)) cc.cam.shot(glideCam([0.45, 1.78, 2.2], [-0.55, 1.15, 4.3], 50, [[0.42, 1.76, 2.4], null, 48], 4)); } },
       { act: [['chase', 'tap', { dur: 1.0, loop: false }]] },
       { wait: 0.8 },
       { do: (cc) => { beardSet(cc, 'chin'); const l = act(cc, 'luka'); if (l) { l.play('sit', { h: 0.45 }); l.setExpr('stunned'); } } },
@@ -713,7 +732,7 @@
   async function borrowReindeer(c) {
     await c.runSteps([
       { move: 'chase', to: [0.1, 0, 5.15] }, { face: 'chase', to: 'reindeer_man', dur: 0.25 },
-      { do: (cc) => { if (!sk(cc)) cc.cam.shot(glideCam([0.3, 1.52, 6.65], [-0.65, 1.15, 5.15], 50, [[0.28, 1.5, 6.5], null, 48], 4)); } },
+      { do: (cc) => { if (!sk(cc)) cc.cam.shot(glideCam([0.45, 1.85, 6.9], [-0.55, 1.2, 5.15], 52, [[0.43, 1.83, 6.75], null, 50], 4)); } },
       { act: [['chase', 'gesture']] },
       { wait: 1.0 },
       { act: [['reindeer_man', 'nod', { dur: 1.0, loop: false }]] },
@@ -747,7 +766,7 @@
       { act: [['chase', 'gesture']] },
       { wait: 0.9 },
       { do: (cc) => glanceAt(cc, pax, 'chase', 2.2) },
-      say(pax, 'Only if you’re sure.', { name: 'PASSENGER' }),
+      say('passenger', 'Only if you’re sure.', { actor: pax }),
       { act: [['chase', 'nod', { dur: 0.8, loop: false }]] },
       { move: 'chase', to: [0.0, 0, 9.3] }, { face: 'chase', to: PI, dur: 0.25 },
     ]);
@@ -869,6 +888,7 @@
       const g = P(c, 'fare_gates'); if (g) { g.userData.reader(2, 'idle'); g.userData.open(2, false); }
       const c4 = act(c, 'chase40'), ch = act(c, 'chase'), l = act(c, 'luka');
       if (c4) { c4.place('s27_gate_c40'); c4.play('idle'); c4.setExpr('tired'); c4.hold(null); }
+      bonusCard(c, false);
       if (ch) { ch.place('s27_gate_chase'); ch.play('idle'); ch.setExpr('neutral'); ch.hold(null); }
       if (l) { l.place('s27_gate_luka'); l.play('idle'); l.setExpr('tired'); l.rig.show('santa', true); }
       beardSet(c, 'on');
@@ -877,17 +897,19 @@
     // [INSERT · the station gate] Chase (2040) taps Jordan's Christmas bonus card. Three fares. Balance: $4.
     { do: (c) => { if (!sk(c)) c.cam.shot(glideCam([2.45, 1.62, -15.1], [0.8, 1.38, -11.9], 44, [[2.25, 1.6, -14.75], null, 42], 7)); } },
     { fade: 'in', dur: 0.8 },
-    { wait: 1.2 },
-    { hold: 'chase40', prop: BONUS_CARD },
+    { wait: 1.0 },
+    // the card out of his coat and onto the reader (in the wide), then the reader close: three fares, $4 left
+    { do: (c) => bonusCard(c, true) },
     { act: [['chase40', 'give', { dur: 1.6, loop: false }]] },
-    { do: (c) => { if (!sk(c)) c.cam.shot(glideCam([0.55, 1.42, -12.45], [0.9, 1.05, -13.0], 30, [[0.58, 1.4, -12.52], null, 26], 4.5)); } },
-    { wait: 0.7 },
+    { wait: 0.75 },
     { sfx: 'tap_pay', vol: 0.7 },
     { do: (c) => { const g = P(c, 'fare_gates'); if (g) g.userData.reader(2, 'tap3'); } },
-    { wait: 3.0 },
+    { do: (c) => { if (!sk(c)) c.cam.shot(glideCam([0.55, 1.42, -12.45], [0.9, 1.05, -13.0], 30, [[0.58, 1.4, -12.52], null, 26], 4.5)); } },
+    { wait: 0.5 },
+    { do: (c) => bonusCard(c, false) },
+    { wait: 2.5 },
     { do: (c) => { const g = P(c, 'fare_gates'); if (g) { g.userData.reader(2, 'ok'); g.userData.open(2, true); } } },
     { sfx: 'accepted', vol: 0.5 },
-    { hold: 'chase40', prop: null },
     { do: (c) => {
       route(c, 'chase40', [[1.8, 0, -12.6], [1.8, 0, -14.6], [1.6, 0, -15.6]]);
       later(c, 0.6, () => route(c, 'chase', [[1.8, 0, -12.4], [1.8, 0, -14.6], [1.2, 0, -15.5]]));
@@ -906,8 +928,11 @@
     say('train', 'This train is running three minutes late, for your safety.', { tag: 'on the PA' }),
     // the Chases side by side, the passenger opposite
     aPush('train', 's27_board_three', 0.15, 9),
+    { wait: 1.0 },
+    // Chase turns to him (from in front: his face, not the back of his head)
+    CLOSE('chase', { dist: 0.85, yaw: -0.3, fov: 36, dy: -0.02 }),
     { do: (c) => glanceAt(c, 'chase', 'chase40', 2.0) },
-    { wait: 0.6 },
+    { wait: 0.4 },
     say('chase', 'Is Cross River Rail finished?', { expr: 'talk' }),
     CLOSE('chase40', { dist: 0.85, yaw: 0.4, fov: 34, dy: -0.04 }),
     slow('chase40', 'Don’t.', { expr: 'tired' }),
@@ -944,7 +969,8 @@
     { do: (c) => closeOn(c, 'chase', { dist: 1.0, yaw: 0.3, fov: 34, dur: 4 }) },
     { expr: [['chase', 'worried']] },
     { wait: 1.6 },
-    aPush('train', 's27_luka_doze', 0.08, 4),
+    // Luka dozing in B2 with the beard over his eyes: from the aisle in front of him, a little above his slumped head
+    { do: (c) => { if (!sk(c)) c.cam.shot(glideCam([-0.3, 1.42, 3.4], [-1.08, 1.05, 4.45], 42, [[-0.34, 1.41, 3.47], null, 40], 4)); } },
     { wait: 1.7 },
     { do: (c) => { if (!sk(c)) c.cam.shot(glideCam([0.3, 1.9, 1.4], [-0.3, 1.4, -8.0], 44, [[0.3, 1.85, 0.6], null, 42], 4)); } },
     { do: (c) => DRONES.face(DID, [-1.12, 0, -7.65]) },
@@ -986,7 +1012,8 @@
       const r = c.world.prop('reindeer'); if (r && r.userData.state) r.userData.state('flop');
       c.state.flags.s27_talk = true;
     } },
-    aPush('train', 's27_chase_asleep', 0.12, 6),
+    // Chase asleep against the window, his earbud in: from in front, on the aisle side (his face, not the top of his head)
+    CLOSE('chase', { dist: 0.9, yaw: 0.45, fov: 40, dy: -0.32, ly: -0.04, push: 0.1, dur: 6 }),   // from under his lolled head: the face
     { fade: 'in', dur: 1.2 },
     { wait: 2.8 },
     // [the locked two-shot]

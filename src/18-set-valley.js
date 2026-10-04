@@ -39,7 +39,8 @@
 // THE SET (SETS.valley): { env, build, marks, anchors, cams, zones, colliders, floor, props, ambience, update, dress(state),
 // lamp(name), neon(k, dur = 2), VG, tower, skyline, countdown, creaks, paths, ar, state (getter) }.
 // ENV presets: quiet (default; 2.8 street) · starlight (2.8 inside, dusty) · lights_out (2.9 inside) · annst (2.9 door,
-//   outside) · three_am · dawn (2.10) · lit (3.6, rain) · lit_dry (credits) · gig (credits). Spot intensities are scaled
+//   outside) · three_am · dawn (2.10; the high window's neon patches ease over to a grey-blue daylight layer and the
+//   glass greys to day) · lit (3.6, rain) · lit_dry (credits) · gig (credits). Spot intensities are scaled
 //   for physical falloff (6–30, Rue's range); the env sets the spot's colour/intensity, lamp() its geometry.
 // DRESS states (auto on scene change: 2.8 quiet28, 2.9 night29, 2.10 three210; with no scene, as in ?setview, the env
 //   picks one): quiet28 · transit28 · dusty28 · night29 · three210 · lit36 · credits_neon · gig.
@@ -1345,6 +1346,15 @@ SETS.valley = (() => {
       c.fillStyle = 'rgba(255,90,48,0.5)'; for (const [x, y] of [[20, 20], [60, 40], [90, 16], [110, 46]]) c.fillRect(x, y, 4, 3);
       c.filter = 'none';
     }, { key: 'vl_patch' });
+    // the same window, at dawn: grey-blue daylight instead of the neon (2.10's last WIDE; faded in by the 'dawn' env)
+    T.patchDawn = canvasTex(128, 64, (c) => {
+      c.clearRect(0, 0, 128, 64);
+      c.filter = 'blur(3px)';
+      const g = c.createLinearGradient(0, 0, 128, 0); g.addColorStop(0, 'rgba(150,176,220,0.7)'); g.addColorStop(0.5, 'rgba(196,212,236,0.85)'); g.addColorStop(1, 'rgba(150,170,214,0.7)');
+      c.fillStyle = g;
+      for (const [x, w] of [[6, 30], [40, 26], [70, 26], [100, 22]]) c.fillRect(x, 8, w, 48);
+      c.filter = 'none';
+    }, { key: 'vl_patch_dawn' });
     T.rshadow = canvasTex(64, 128, (c) => {
       const r = rng(3);
       c.clearRect(0, 0, 64, 128);
@@ -1521,6 +1531,7 @@ SETS.valley = (() => {
       streak: matTex(T.streak, { transparent: true, side: THREE.DoubleSide, key: 'vl_streak' }),
       // Region S
       patch: basic('vl_patch', { map: T.patch, transparent: true, blending: ADD, depthWrite: false, color: 0xffffff }),
+      patchDawn: basic('vl_patch_dawn', { map: T.patchDawn, transparent: true, blending: ADD, depthWrite: false, color: 0x000000 }),
       rshadow: basic('vl_rshadow', { map: T.rshadow, transparent: true, opacity: 0.6, depthWrite: false }),
       streetGlow: basic('vl_street_glow', { map: T.atlasS, fog: false }),
       exit: basic('vl_exit', { map: T.atlasS }),
@@ -1988,6 +1999,7 @@ SETS.valley = (() => {
     R.winLight = P(part('window_light', () => {
       quad(9.0, 7.5, M.patch, -36.0, 0.012, -23.25, 0, -H); quad(9.0, 7.5, M.rshadow, -36.0, 0.016, -23.25, 0, -H, 0xffffff, [0, 0, 3, 2.5]);
       quad(7.0, 3.0, M.patch, -35.5, 0.912, -14.5, 0, -H); quad(7.0, 3.0, M.rshadow, -35.5, 0.916, -14.5, 0, -H, 0xffffff, [0, 0, 2.3, 1]);
+      quad(9.0, 7.5, M.patchDawn, -36.0, 0.013, -23.25, 0, -H); quad(7.0, 3.0, M.patchDawn, -35.5, 0.913, -14.5, 0, -H);
     }, null, 0, { floor: false }), regS);
     R.winGlass = P(part('window_glass', () => {
       quad(7.0, 1.2, M.streak, -35.5, 4.6, -11.2, PI, 0, 0xa0b0c0, [0, 0, 3, 0.6]);
@@ -2111,7 +2123,7 @@ SETS.valley = (() => {
   const AUTO = { '2.8': 'quiet28', '2.9': 'night29', '2.10': 'three210' };
   const ENV_DRESS = { quiet: 'quiet28', starlight: 'dusty28', lights_out: 'night29', annst: 'night29', three_am: 'three210', dawn: 'three210', lit: 'lit36', lit_dry: 'credits_neon', gig: 'gig' };
   const ENV_LAMP = { quiet: 'bench', starlight: 'torch', lights_out: 'neon', annst: 'door', three_am: 'slate', dawn: 'slate', lit: 'off', lit_dry: 'off', gig: 'gig' };
-  const ENV_WIN = { quiet: [0xffffff, 0.6], starlight: [0xffffff, 0.55], lights_out: [0xffffff, 1.0], annst: [0xffffff, 1.0], three_am: [0x9ff0e8, 0.5], dawn: [0x8aa0c8, 0.8], lit: [0xffffff, 1.0], lit_dry: [0xffffff, 1.0], gig: [0xffd8f0, 0.6] };
+  const ENV_WIN = { quiet: [0xffffff, 0.6], starlight: [0xffffff, 0.55], lights_out: [0xffffff, 1.0], annst: [0xffffff, 1.0], three_am: [0x9ff0e8, 0.5], dawn: [0x6a7898, 0.25], lit: [0xffffff, 1.0], lit_dry: [0xffffff, 1.0], gig: [0xffd8f0, 0.6] };
   const LAMPS = {   // pos, target, angle, penumbra, distance, colour, intensity
     bench: [[-3.0, 5.4, 29.2], [-5.2, 0.4, 30.4], 0.75, 0.7, 12, 0xffb6d0, 14],
     torch: [null, null, 0.5, 0.5, 14, 0xe8f0ff, 6],
@@ -2379,6 +2391,9 @@ SETS.valley = (() => {
         if (R.winFlare > (rf ? 1.5 : 0.12)) R.winFlare = null;
       }
       M.patch.color.copy(winC).lerp(whiteC, fl).multiplyScalar(0.5 + fl * 1.3);
+      R.dawnK = (R.dawnK || 0) + ((R.env === 'dawn' ? 1 : 0) - (R.dawnK || 0)) * Math.min(1, dt * 0.8);   // the daylight eases in with the env
+      M.patchDawn.color.setScalar(R.dawnK * 0.9);
+      M.streetGlow.color.setRGB(1 + 0.5 * R.dawnK, 1 + 0.7 * R.dawnK, 1 + 1.0 * R.dawnK);   // the glass itself greys to day
       const rainK = typeof world !== 'undefined' && world.set === SETS.valley && SETS.valley.env[R.env] ? SETS.valley.env[R.env].rain || 0 : 0;
       if (rainK > 0.05) { T.rshadow.offset.y = t * 0.06; T.streak.offset.y = (T.streak.offset.y + 0.12 * dt * rainK) % 1; }
       M.rshadow.opacity = 0.6 * Math.min(1, rainK * 1.4);
@@ -2540,11 +2555,11 @@ SETS.valley = (() => {
   ];
   const ENV = {
     quiet:      { bg: 0x0c0e1c, fog: [0x1b1830, 0.016], hemi: [0x6a6aa0, 0x2a2026, 1.0], dir: [0x9aa2d8, 0.5, [-20, 30, 10]], spot: [0xffb6d0, 14], rain: 0 },
-    starlight:  { bg: 0x07060c, fog: [0x15111c, 0.040], hemi: [0x6a6084, 0x241c22, 1.05], dir: [0x8a7ab0, 0.3, [-6, 12, 10]], spot: [0xe8f0ff, 6], rain: 0 },
+    starlight:  { bg: 0x07060c, fog: [0x15111c, 0.034], hemi: [0x6a6084, 0x241c22, 1.25], dir: [0x8a7ab0, 0.3, [-6, 12, 10]], spot: [0xe8f0ff, 6], rain: 0 },
     lights_out: { bg: 0x05060c, fog: [0x140f1e, 0.045], hemi: [0x4e4c7a, 0x18121a, 0.8], dir: [0x5ad8d0, 0.35, [-4, 10, 12]], spot: [0xff5fa8, 30], rain: 1 },
     annst:      { bg: 0x0a0b16, fog: [0x221c30, 0.030], hemi: [0x6a6a96, 0x1a1420, 0.9], dir: [0x7ae0d8, 0.45, [-6, 14, 16]], spot: [0xfff0e0, 8], rain: 1 },
-    three_am:   { bg: 0x05060a, fog: [0x0f0e18, 0.040], hemi: [0x464c74, 0x141418, 0.75], dir: [0x6a7ab0, 0.22, [-4, 10, 12]], spot: [0xbfe6ff, 3.5], rain: 0.6 },
-    dawn:       { bg: 0x2a3448, fog: [0x3a4458, 0.030], hemi: [0x8a9ac0, 0x1a1a22, 0.75], dir: [0xa8b8d8, 0.5, [-4, 10, 14]], spot: [0xbfe6ff, 2.0], rain: 0.15 },
+    three_am:   { bg: 0x05060a, fog: [0x0f0e18, 0.032], hemi: [0x464c74, 0x141418, 0.95], dir: [0x6a7ab0, 0.22, [-4, 10, 12]], spot: [0xbfe6ff, 3.5], rain: 0.6 },
+    dawn:       { bg: 0x2a3448, fog: [0x3a4458, 0.022], hemi: [0x8a9ac0, 0x1a1a22, 1.05], dir: [0xa8b8d8, 0.75, [-4, 10, 14]], spot: [0xbfe6ff, 2.0], rain: 0.15 },
     lit:        { bg: 0x14102a, fog: [0x2a1c3e, 0.012], hemi: [0x8a7ac0, 0x24141e, 1.05], dir: [0xd0a0ff, 0.6, [-10, 20, 10]], spot: [0xff6fb0, 0], rain: 1 },
     lit_dry:    { bg: 0x120e26, fog: [0x241a38, 0.012], hemi: [0x8a7ac0, 0x24141e, 1.05], dir: [0xd0a0ff, 0.6, [-10, 20, 10]], spot: [0xff6fb0, 0], rain: 0 },
     gig:        { bg: 0x0a0610, fog: [0x1a0f22, 0.030], hemi: [0x7a5a9a, 0x1a0e1a, 0.85], dir: [0xff9ad0, 0.4, [-4, 10, 12]], spot: [0xffd8f0, 30], rain: 0 },
@@ -2581,10 +2596,12 @@ SETS.valley = (() => {
     s28_crane_a: { at: [0.0, 112.0, -10.7], from: [10.0, 118.0, 26.0], fov: 46 },
     s28_crane_b: { at: [-15.0, 0.0, 22.0], from: [-15.0, 27.0, -3.0], fov: 54 },
     s28_crane_c: { at: [0.0, 1.4, 20.0], from: [-1.5, 3.2, 8.5], fov: 48 },
-    s28_track_a: { at: [-0.4, 1.3, 15.0], from: [4.2, 1.5, 13.0], fov: 44 },
-    s28_track_b: { at: [-0.4, 1.3, 24.0], from: [4.2, 1.5, 22.0], fov: 44 },
+    // TRACK a -> b (2.8_crane, ~10.5 s): ahead of the three on the café side, looking back at them, clear of table A's
+    // umbrella (3.4, 27.0); b ends with them at their s28_hear_* / s28_c40_stop marks, 3/4 from the front
+    s28_track_a: { at: [-0.5, 1.45, 13.9], from: [2.5, 1.62, 17.4], fov: 46 },
+    s28_track_b: { at: [-0.8, 1.45, 25.0], from: [2.5, 1.62, 29.0], fov: 46 },
     s28_mia_mid: { at: [-5.5, 0.95, 30.4], from: [-2.6, 1.3, 31.6], fov: 40 },
-    s28_c40_close: { at: [-1.4, 1.62, 26.9], from: [0.2, 1.62, 28.0], fov: 34 },
+    s28_c40_close: { at: [-1.50, 1.62, 26.98], from: [-2.21, 1.65, 27.97], fov: 34 },   // his face as he turns to Mia (at s28_c40_stop)
     s28_confiscate: { at: [-4.0, 2.0, 29.2], from: [3.8, 2.2, 22.5], fov: 50 },
     s28_safebox: { at: [-3.6, 3.3, 28.2], from: [-1.6, 2.6, 27.0], fov: 30 },
     s28_db_meter: { at: [-3.5, 2.2, 28.2], from: [-2.4, 2.0, 28.4], fov: 30 },
@@ -2605,7 +2622,7 @@ SETS.valley = (() => {
     s28_stage_door_ext: { at: [-28.4, 1.3, -11.0], from: [-27.0, 1.6, -5.5], fov: 42 },
     urn: { at: [7.75, 1.1, 30.0], from: [6.6, 1.45, 30.0], fov: 34 },
     // 2.8 the Starlight
-    sl_wide_dusty: { at: [-37.0, 1.0, -17.0], from: [-27.0, 4.6, -32.0], fov: 58 },
+    sl_wide_dusty: { at: [-31.0, 1.0, -18.5], from: [-38.5, 3.0, -29.5], fov: 50 },   // from the bar end: the stage door, the floor, the stage
     sl_posters: { at: [-43.65, 1.9, -23.5], from: [-41.2, 1.7, -23.5], fov: 46 },
     sl_poster_hero: { at: [-43.65, 1.8, -22.6], from: [-42.6, 1.75, -22.6], fov: 30 },
     sl_desk: { at: [-34.7, 1.05, -26.5], from: [-34.2, 1.75, -28.2], fov: 40 },
@@ -2614,21 +2631,23 @@ SETS.valley = (() => {
     // 2.9
     s29_floor: { at: [-36.6, 0.42, -18.5], from: [-36.9, 0.62, -25.4], fov: 50 },
     s29_floor_end: { at: [-36.6, 0.40, -18.5], from: [-36.8, 0.60, -24.4], fov: 46 },
-    s29_c40_dark: { at: [-38.3, 0.2, -23.1], from: [-39.2, 0.55, -23.7], fov: 36 },
+    // a face lying on its back (s29_c40, head toward -Z): from above the face, nudged toward his feet so it reads upright
+    s29_c40_dark: { at: [-38.24, 0.24, -23.03], from: [-37.99, 0.73, -22.72], fov: 40 },
     s29_coaster: { at: [-37.0, 1.11, -30.95], from: [-37.0, 1.45, -30.5], fov: 28 },
     s29_window: { at: [-35.5, 4.6, -11.35], from: [-35.5, 1.2, -20.0], fov: 40 },
     s29_door_out: { at: [-28.4, 1.4, -11.0], from: [-28.0, 1.55, -6.8], fov: 38 },
-    s29_reverse: { at: [-29.0, 1.4, -14.9], from: [-28.3, 1.6, -11.5], fov: 40 },
-    s29_luka_close: { at: [-28.4, 1.6, -11.4], from: [-27.4, 1.6, -9.7], fov: 34 },
-    s29_hands: { at: [-28.5, 1.1, -12.2], from: [-27.6, 1.3, -11.6], fov: 30 },
+    // (2.9_door blocking: Luka at s29_luka_turn in the doorway facing in, Chase at s29_chase_wing -> _close)
+    s29_reverse: { at: [-28.95, 1.42, -14.9], from: [-27.7, 1.6, -11.8], fov: 34 },        // past Luka's shoulder to Chase in the wing
+    s29_luka_close: { at: [-28.40, 1.60, -11.73], from: [-28.74, 1.63, -13.09], fov: 34 },  // from inside: his face, the wet street behind
+    s29_hands: { at: [-28.5, 1.15, -12.1], from: [-30.5, 1.4, -12.2], fov: 38 },             // side-on from the wing: hand to hand against the doorway
     s29_door_wide: { at: [-28.4, 2.0, -11.0], from: [-21.0, 1.4, 6.0], fov: 44 },
     // 2.10
-    s210_wide_stage: { at: [-33.8, 1.0, -24.5], from: [-39.5, 1.7, -29.5], fov: 50 },
+    s210_wide_stage: { at: [-34.6, 0.7, -26.0], from: [-30.4, 2.9, -20.2], fov: 54 },   // from the stage lip: Luka asleep, the desk and both faces, the bar
     s210_desk_two: { at: [-34.0, 1.2, -26.8], from: [-33.2, 1.5, -24.2], fov: 42 },
     s210_slate: { at: [-34.4, 1.08, -26.6], from: [-34.4, 1.55, -27.1], fov: 28 },
     s210_chase_close: { at: [-32.7, 1.25, -26.4], from: [-33.6, 1.35, -25.4], fov: 34 },
     s210_c40_close: { at: [-34.7, 1.75, -27.1], from: [-34.2, 1.75, -25.9], fov: 34 },
-    s210_locked: { at: [-33.0, 0.8, -17.5], from: [-42.6, 4.6, -31.6], fov: 58 },
+    s210_locked: { at: [-36.0, 1.5, -17.5], from: [-28.2, 3.4, -31.0], fov: 58 },   // the whole venue: the desk and the amp, Luka on the floor, the high window
     sl_clock: { at: [-38.0, 3.4, -32.65], from: [-38.0, 2.6, -30.0], fov: 26 },
     // 3.6 / credits
     s36_passerby_pov: { at: [0.0, 112.0, -10.7], from: [1.6, 1.62, 33.0], fov: 30 },

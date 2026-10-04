@@ -105,18 +105,6 @@
     a.play('glance', { yaw: Math.max(-1.3, Math.min(1.3, d)), dur });
   }
   const glance = (from, to, dur) => ({ do: (c) => glanceAt(c, from, to, dur) });
-  // a face lying on its back: the lens over the face (along its normal), nudged toward the feet so the face reads upright
-  function faceCam(c, id, o = {}) {
-    if (sk(c)) return;
-    const a = act(c, id);
-    if (!a) return;
-    a.eyePos(V1);
-    a.rig.parts.head.localToWorld(V2.set(0, 0.13, o.d || 0.55));
-    V2.x += o.fx || 0; V2.y += o.up ?? 0.08; V2.z += o.fz ?? 0.3;
-    const k = o.push ?? 0.12;
-    c.cam.shot({ shot: 'CAM', pos: [V2.x, V2.y, V2.z], look: [V1.x, V1.y, V1.z], fov: o.fov || 40,
-      to: { pos: [V2.x + (V1.x - V2.x) * k, V2.y + (V1.y - V2.y) * k, V2.z + (V1.z - V2.z) * k], look: [V1.x, V1.y, V1.z], fov: o.fov || 40 }, dur: o.dur || 8, ease: 'linear' });
-  }
   // seat / lie / stand at once (state: kept under skips)
   function seatA(a, at, h = 0.45, anim = 'sit') { if (!a) return; if (at) a.place(at); a.rig.seated = true; a.play(anim, { h }); }
   function standA(a, at) { if (!a) return; a.rig.seated = false; a.rig.floorSit = false; a.rig.lying = false; if (at) a.place(at); a.play('idle'); }
@@ -267,35 +255,6 @@
     };
   }
 
-  // ============================================================ the Safe Box keypad (the 2.2 keypad, relabelled)
-  // ['minigame' / flow.minigame('safebox_keypad', { digits, code, shot, onKey, test })] -> { ok, code } | { cancel }.
-  // It runs MINIGAMES.keypad (64-content: Rue's Alarm keypad, SafeSense glass) and only renames its labels for the box.
-  if (!MINIGAMES.safebox_keypad) MINIGAMES.safebox_keypad = (() => {
-    const K = () => MINIGAMES.keypad;
-    const SWAP = { 'ENTER SERVICE CODE': 'ENTER RELEASE CODE', 'LIMITER OFF': 'RELEASED' };
-    let mo = null;
-    function relabel(root) {
-      const t = root.querySelector('.k22t span'); if (t) t.textContent = 'SAFE BOX';
-      const lt = root.querySelector('.k22lt');
-      if (!lt) return;
-      const fix = () => { const v = SWAP[lt.textContent]; if (v) lt.textContent = v; };
-      fix();
-      if (typeof MutationObserver !== 'undefined') { mo = new MutationObserver(fix); mo.observe(lt, { childList: true, characterData: true, subtree: true }); }
-    }
-    return {
-      start(p, api) {
-        const k = K();
-        if (!k) { api.finish({ ok: true, code: String(p && p.code) }); return; }
-        k.start(p, api); relabel(api.ui);
-      },
-      update(dt) { const k = K(); if (k) k.update(dt); },
-      draw() {},
-      end(r) { if (mo) { mo.disconnect(); mo = null; } const k = K(); if (k) k.end(r); },
-      skipResult: (a) => ({ ok: true, code: String((a && a.params && a.params.code) || '') }),
-      autoplay(api) { const k = K(); return k ? k.autoplay(api) : null; },
-    };
-  })();
-
   // ============================================================ 2.8 — "Quiet Hours"
   const DN = 'd28_noise', DH = ['d28_high_a', 'd28_high_b'], DH_Y = [7.5, 8.0];
   const POST = [-2.5, 0, 26.4], POST_Y = 2.6, POST_FACE = -0.9;
@@ -303,9 +262,11 @@
   const BOX = new THREE.Vector3(-3.6, 3.31, 28.2);
   const CLIMB = [[-3.6, 0, 26.95], [-3.7, 0.9, 27.55], [-3.75, 1.55, 27.85]];
   const MIA_SEAT = [-5.55, 0, 30.4, H];
+  // the three inside the Starlight, where they stop after coming in (sl_wide_dusty frames them)
+  const IN_END = { luka: [-30.2, 0, -19.6, -2.4], chase: [-31.4, 0, -20.6, -2.2], chase40: [-29.6, 0, -21.2, -2.6] };
   const S28_PUZ = ['s28_code', 's28_lured', 's28_pole', 's28_top', 's28_uke', 's28_uke_down', 's28_phone_back', 's28_got'];
   const S28_ALL = S28_PUZ.concat(['s28_given', 's28_leave', 's28_left', 's28_posters', 's28_desk', 's28_stage', 's28_2ic']);
-  const S28 = { phase: 'street', code: '0000', phoneOn: false, lureLive: false, reAi: false, readT: 0, upd: null, desc: false, listening: false, c: null };
+  const S28 = { phase: 'street', code: '0000', phoneOn: false, lureLive: false, reAi: false, readT: 0, upd: null, listening: false, c: null };
   const CL = { on: false, stage: 0, k: 0, t: 0, wob: false, top: false, down: false, dk: 0, frz: false, held: null };
   const CLIMB_P = { speed: 1 }, HANG_P = { speed: 0.04 };
   const fresh28 = (s) => !s.flags.s28_given && !s.flags.s28_left;
@@ -343,7 +304,7 @@
     S28.phase = F.s28_left ? 'in' : F.s28_given ? 'post' : 'street';
     if (S28.phase === 'street') for (const f of S28_ALL) delete F[f];
     GEN++;
-    S28.c = c; S28.phoneOn = false; S28.lureLive = false; S28.desc = false; S28.readT = 0;
+    S28.c = c; S28.phoneOn = false; S28.lureLive = false; S28.readT = 0;
     Object.assign(CL, { on: false, top: false, down: false, frz: false, held: null });
     F.santa = true;
     delete F.chip_off;   // in the Valley he switches his chip back on (2.8's code)
@@ -368,7 +329,7 @@
       c.world.env('starlight');
       dressV('dusty28');
       c.world.despawn('mia');
-      standA(l, [-30.2, 0, -19.6, -2.4]); standA(ch, [-31.4, 0, -20.6, -2.2]); standA(c4, [-29.6, 0, -21.2, -2.6]);
+      standA(l, IN_END.luka); standA(ch, IN_END.chase); standA(c4, IN_END.chase40);
     }
   }
   // the noise drone, docked at its post over the bollard (ai: the puzzle's eyes)
@@ -376,12 +337,12 @@
     DRONES.spawn(DN, { kind: 'noise', at: POST, face: POST_FACE, hover: POST_Y, cone: { len: 3.4, half: 0.6 }, showPath: false, ai: !!ai });
   }
   // 2.8_mia step 14: the swoop (paths.d28_swoop): down onto Mia, the claw takes the ukulele, up to the Safe Box on the pole
-  // (it docks the ukulele in it), then the post. The flight is goTo legs; the height eases along each leg.
+  // (it docks the ukulele in it), then the post. The flight is goTo legs; goTo's y eases the height along each leg.
   async function swoop(c) {
     const m = act(c, 'mia');
     const end = () => {
       const d = DRONES.get(DN); if (d) { d.hover = POST_Y; }
-      DRONES.goTo(DN, POST, { speed: 9 }); DRONES.face(DN, POST_FACE); DRONES.claw(DN, 0.3, 0);
+      DRONES.goTo(DN, POST, { speed: 9, y: POST_Y }); DRONES.face(DN, POST_FACE); DRONES.claw(DN, 0.3, 0);
       const b = UD(c, 'safebox_mia'); if (b) { b.content('uke'); b.door(0); }
       const u = UD(c, 'uke_prop'); if (u) u.place('safebox');
       if (m) { m.rig.show('ukulele', false); seatA(m, MIA_SEAT, 0.45, 'sit'); m.setExpr('tired'); }
@@ -389,18 +350,9 @@
     DRONES.spawn(DN, { kind: 'noise', at: [-1.0, 0, 22.0], face: [-4.9, 0, 30.2], hover: 7.0, cone: { len: 3.4, half: 0.6 }, showPath: false, ai: false });
     if (sk(c)) { end(); return; }
     const sid = c.flow.sceneId, alive = () => c.flow.sceneId === sid && !sk(c);
-    const leg = async (to, h0, h1, speed) => {
-      const d = DRONES.get(DN);
-      if (!d) return;
-      const x0 = d.x, z0 = d.z, L = Math.hypot(to[0] - x0, to[2] - z0) || 1;
-      const f = () => { const e = DRONES.get(DN); if (!e) { removeUpdate(f); return; } const k = Math.min(1, 1 - Math.hypot(to[0] - e.x, to[2] - e.z) / L); const u = k * k * (3 - 2 * k); e.hover = h0 + (h1 - h0) * u; };
-      addUpdate(f);
-      await DRONES.goTo(DN, to, { speed });
-      removeUpdate(f);
-      const e = DRONES.get(DN); if (e) e.hover = h1;
-    };
+    const leg = (to, h1, speed) => DRONES.goTo(DN, to, { speed, y: h1 });   // the height eases with the flight
     sfx('drone_q', { vol: 0.5 });
-    await leg([-4.75, 0, 30.25], 7.0, 1.55, 4.2);
+    await leg([-4.75, 0, 30.25], 1.55, 4.2);
     if (!alive()) { end(); return; }
     // the claw takes the ukulele
     DRONES.claw(DN, 1, 0.2); await c.wait(0.25);
@@ -411,7 +363,7 @@
     DRONES.claw(DN, 0.15, 0.25);
     await c.wait(0.35);
     if (!alive()) { end(); return; }
-    await leg([-3.6, 0, 28.2], 1.55, 4.15, 2.6);
+    await leg([-3.6, 0, 28.2], 4.15, 2.6);
     if (!alive()) { end(); return; }
     // the box opens, the ukulele goes in, the box shuts
     const b = UD(c, 'safebox_mia');
@@ -424,7 +376,7 @@
     await c.wait(0.35);
     if (b) b.door(0);
     DRONES.claw(DN, 0.3, 0.3);
-    await leg(POST, 4.15, POST_Y, 1.6);
+    await leg(POST, POST_Y, 1.6);
     DRONES.face(DN, POST_FACE);
     if (m) m.setExpr('tired');
   }
@@ -446,7 +398,7 @@
     const u = UD(c, 'uke_prop'); if (u) u.place('safebox');
     const ph = UD(c, 'phone_drop'); if (ph) ph.show(false);
     const p = UD(c, 'pole_mia'); if (p) p.meter(null);
-    S28.phoneOn = false; S28.lureLive = false; S28.reAi = false; S28.readT = 0; S28.desc = false;
+    S28.phoneOn = false; S28.lureLive = false; S28.reAi = false; S28.readT = 0;
     if (CL.frz) player.frozenT = 0;
     Object.assign(CL, { on: false, stage: 0, k: 0, t: 0, wob: false, top: false, down: false, dk: 0, frz: false, held: null });
     for (let i = 0; i < 2; i++) { const d = DRONES.get(DH[i]); if (d) d.hover = DH_Y[i]; }
@@ -491,8 +443,7 @@
       if (flow.sceneId !== '2.8' || S28.phase !== 'street' || !stealth.active) return;
       const a = world.actor('chase40');
       if (!a) return;
-      S28.desc = true;
-      for (let i = 0; i < 2; i++) DRONES.goTo(DH[i], [a.pos.x + (i ? 1.2 : -1.2), 0, a.pos.z + 0.8], { speed: 3.2 });
+      for (let i = 0; i < 2; i++) DRONES.goTo(DH[i], [a.pos.x + (i ? 1.2 : -1.2), 0, a.pos.z + 0.8], { speed: 3.2, y: 1.8 });
     });
   }
   // the scene's watcher: the code in Chip View, the climb, the lure running out with the phone still on the table, the
@@ -504,7 +455,6 @@
   function tick28(dt) {
     if (world.setId !== 'valley') return;
     const F = state.flags;
-    if (S28.desc) for (let i = 0; i < 2; i++) { const d = DRONES.get(DH[i]); if (d && d.hover > 1.8) d.hover = Math.max(1.8, d.hover - dt * 4); }
     if (flow.skipping || flow.cutscene || stealth.busy || !(flow.roaming || TEST.auto)) return;
     if (S28.reAi && S28.phase === 'street' && !F.s28_got && DRONES.state(DN) !== 'return') { S28.reAi = false; const d = DRONES.get(DN); if (d) d.ai = true; }
     if (S28.phase === 'street' && !F.s28_got) {
@@ -600,7 +550,9 @@
     if (!F.s28_code) { toast(c, 'The code is AR. Chase (2040) can read it in Chip View.'); return; }
     const b = UD(c, 'safebox_mia');
     const shot = glideCam([-2.72, 3.85, 27.3], [-3.42, 3.22, 27.9], 36, [[-2.76, 3.82, 27.34], null, 35], 6);
-    const r = await c.flow.minigame('safebox_keypad', { digits: 4, code: S28.code, test: S28.code, shot, onKey: (k) => { if (b) b.press(k); } });
+    // the 2.2 keypad (54-mg-keypad), labelled for the box
+    const r = await c.flow.minigame('keypad', { digits: 4, code: S28.code, test: S28.code, shot, onKey: (k) => { if (b) b.press(k); },
+      title: 'SAFE BOX', prompt: 'ENTER RELEASE CODE', okText: 'RELEASED', badText: 'INCORRECT CODE' });
     if (c.flow.sceneId !== '2.8') return;
     if (r && r.ok) {
       if (b) { b.led('green'); b.door(1); }
@@ -638,15 +590,14 @@
     ch.rig.show('phone', false);
     const ph = UD(c, 'phone_drop'); if (ph) { ph.show(true); ph.pulse(true, Math.min(1, L.dur / 10)); }
     S28.phoneOn = true;
-    DRONES.lure(TABLE_C, k, { r: 9.5, dur, over: true, y: 2.1, disc: 0.6 });
-    const nd = DRONES.get(DN); if (nd && nd.st === 'lured') nd.ai = false;   // transfixed by the noise: it sees nothing else until it's done
+    DRONES.lure(TABLE_C, k, { r: 9.5, dur, over: true, y: 2.1, disc: 0.6, transfixed: true });   // transfixed by the noise: it sees nothing else until it's done
     S28.lureLive = true;
     c.state.flags.s28_lured = true;
     delete c.state.flags.s28_phone_back;
     duties28();
     testLog('2.8 lure ' + k + ' for ' + dur.toFixed(1) + ' s');
     // the drone turns to the sound and floats over to it
-    if (!sk(c)) c.cam.shot(glideCam([5.9, 1.75, 34.2], [-0.6, 2.0, 27.6], 48, [[5.7, 1.8, 33.8], [0.6, 2.1, 28.6], 46], 2.4));
+    if (!sk(c)) c.cam.shot(glideCam([4.4, 2.0, 35.8], [-0.6, 2.0, 27.6], 50, [[4.2, 2.05, 35.4], [0.8, 1.9, 29.2], 48], 2.4));   // clear of table D's umbrella
     await c.wait(1.6);
     await c.cam.release(0.4);
   }
@@ -659,7 +610,7 @@
     await c.wait(0.35);
     const ph = UD(c, 'phone_drop'); if (ph) ph.show(false);
     S28.phoneOn = false; S28.lureLive = false;
-    if (DRONES.state(DN) === 'lured') { DRONES.release(DN); S28.reAi = true; }   // the sound stops: back to its post (on watch again there)
+    if (DRONES.state(DN) === 'lured') { DRONES.release(DN); const d = DRONES.get(DN); if (d) d.ai = false; S28.reAi = true; }   // the sound stops: back to its post (on watch again there)
     else { const d = DRONES.get(DN); if (d) d.ai = true; }
     c.state.flags.s28_phone_back = true;
     if (c.state.flags.s28_uke_down) c.state.flags.s28_got = true;
@@ -896,12 +847,17 @@
         route(c, 'chase40', [ENTER_TO.chase40], { speed: 1.25, face: -1.05 });
       } },
       { wait: 1.6 },
-      // [TRACK · the three of them walking the mall]
-      GLIDE([3.3, 1.6, 17.4], [-0.3, 1.45, 13.9], 44, [[3.3, 1.6, 26.6], [-0.3, 1.45, 23.1], 44], 7.4),
-      { wait: 1.3 },
+      // [TRACK · the three of them walking the mall] (set anchors s28_track_a -> _b: the lens keeps ahead of them all the
+      // way to their marks)
+      { do: (c) => {
+        if (sk(c)) return;
+        const a = AN('s28_track_a'), b = AN('s28_track_b');
+        if (a && b) c.cam.shot({ shot: 'CAM', pos: a.from.slice(), look: a.at.slice(), fov: a.fov, to: { pos: b.from.slice(), look: b.at.slice(), fov: b.fov }, dur: 10.5, ease: 'linear' });
+      } },
+      { wait: 3.0 },
       say('chase', 'This used to be the loudest place in Brisbane.', { tag: 'whisper', expr: 'worried' }),
       say('chase40', 'That’s why it went first.', { tag: 'whisper', expr: 'tired' }),
-      { do: (c) => until(() => { const a = act(c, 'chase40'); return !a || sk(c) || Math.hypot(a.pos.x - ENTER_TO.chase40[0], a.pos.z - ENTER_TO.chase40[2]) < 0.2; }, 8) },
+      { do: (c) => until(() => { const a = act(c, 'chase40'); return !a || sk(c) || Math.hypot(a.pos.x - ENTER_TO.chase40[0], a.pos.z - ENTER_TO.chase40[2]) < 0.2; }, 3) },
     ] },
   ];
 
@@ -915,7 +871,7 @@
       { wait: 3.0 },
       // [CLOSE · Chase (2040)] He stops dead.
       { face: 'chase40', to: 'mia', dur: 0.5 },
-      CLOSE('chase40', { dist: 1.0, yaw: 0.25, fov: 34, push: 0.1, dur: 6 }),
+      aPush('s28_c40_close', 0.1, 6),
       { expr: [['chase40', 'stunned']] },
       { wait: 1.3 },
       say('chase40', '…What’s that?', { expr: 'stunned' }),
@@ -962,7 +918,7 @@
       { do: (c) => { const p = UD(c, 'pole_mia'); if (p) p.meter(null); } },
       { wait: 0.4 },
       // MIA: the third one this month (the trumpet and the tambourine in the other poles' boxes)
-      GLIDE([-3.2, 1.25, 32.3], [-4.8, 1.6, 29.9], 48, [[-3.3, 1.25, 32.2], null, 46], 6),
+      GLIDE([-3.4, 0.9, 32.4], [-5.0, 1.3, 30.0], 50, [[-3.5, 0.92, 32.25], null, 48], 6),   // low: Mia, the bench, the pole going up
       say('mia', 'That’s the third one this month.', { expr: 'tired' }),
     ] },
   ];
@@ -1051,7 +1007,7 @@
       // MIA (at whisper volume)
       say('mia', 'Hey. Grandpa. ^ Finish it, yeah?', { tag: 'whisper' }),
       { do: (c) => { GEN++; const a = act(c, 'chase40'); if (a) a.place([a.pos.x, 0, a.pos.z]); } },
-      { face: 'chase40', to: 'mia', dur: 0.6 },
+      { face: 'chase40', to: 'mia', dur: 0.6, wait: true },
       CLOSE('chase40', { dist: 1.05, yaw: 0.15, fov: 32, push: 0.08, dur: 6 }),
       { wait: 1.1 },
       slow('chase40', '…Yeah.', { expr: 'still' }),
@@ -1094,9 +1050,9 @@
         c.world.despawn('mia');
         c.state.flags.s28_left = true;
         standA(act(c, 'luka'), [-28.5, 0, -15.0, PI]); standA(act(c, 'chase'), [-28.0, 0, -13.8, PI]); standA(act(c, 'chase40'), [-28.8, 0, -12.6, PI]);
-        route(c, 'luka', [[-28.6, 0, -17.2], [-30.2, 0, -19.6]], { speed: 1.1, face: -2.4 });
-        route(c, 'chase', [[-28.4, 0, -16.6], [-29.4, 0, -18.4], [-31.4, 0, -20.6]], { speed: 1.1, face: -2.2 });
-        route(c, 'chase40', [[-28.5, 0, -16.2], [-29.0, 0, -19.4], [-29.6, 0, -21.2]], { speed: 0.95, face: -2.6 });
+        route(c, 'luka', [[-28.6, 0, -17.2], IN_END.luka], { speed: 1.1, face: IN_END.luka[3] });
+        route(c, 'chase', [[-28.4, 0, -16.6], [-29.4, 0, -18.4], IN_END.chase], { speed: 1.1, face: IN_END.chase[3] });
+        route(c, 'chase40', [[-28.5, 0, -16.2], [-29.0, 0, -19.4], IN_END.chase40], { speed: 0.95, face: IN_END.chase40[3] });
       } },
       aPush('sl_wide_dusty', 0.8, 9),
       { fade: 'in', dur: 0.9 },
@@ -1105,8 +1061,9 @@
     { do: (c) => { c.state.flags.s28_left = true; S28.phase = 'in'; } },
   ];
 
-  // the end of 2.8: the three of them in the dead venue; the torch clicks off
+  // the end of 2.8: the three of them in the dead venue (back where they came in: the wide frames them); the torch clicks off
   CUTSCENES['2.8_end'] = [
+    { do: (c) => { GEN++; for (const id in IN_END) standA(act(c, id), IN_END[id]); } },
     aPush('sl_wide_dusty', 0.6, 6),
     { wait: 2.2 },
     { sfx: 'tick', vol: 0.4 },
@@ -1235,7 +1192,7 @@
           { move: 'luka', to: [-34.85, 0, -22.45] }, { face: 'luka', to: [-35.6, 0, -22.35], dur: 0.25 },
           { wait: 0.3 },
           { do: (c) => { const a = act(c, 'luka'); if (a) a.play('kneel'); } },
-          GLIDE([-36.0, 1.1, -21.7], [-35.45, 0.25, -22.4], 38, [[-35.96, 1.05, -21.75], null, 36], 4),
+          GLIDE([-35.9, 1.25, -20.9], [-35.4, 0.25, -22.35], 40, [[-35.86, 1.2, -21.0], null, 38], 4),
           { wait: 0.8 },
           { do: (c) => { const k = UD(c, 'coaster'); if (k) k.place('chest_chase'); const a = act(c, 'luka'); if (a) a.rig.show('coaster', false); } },
           { sfx: 'cloth_swish', vol: 0.2 },
@@ -1309,7 +1266,8 @@
     { expr: [['luka', 'sad']] },
     { wait: 2.4 },
     // He reaches over and takes the brick phone out of Chase (2040)'s coat pocket.
-    { do: (c) => { const co = UD(c, 'coats_sleep'); if (co) co.lift(1, 1); const a = act(c, 'luka'); if (a) { a.rig.seated = false; a.rig.floorSit = false; a.place('s29_luka_reach'); a.play('kneel'); } } },
+    // (from sitting, shuffled over: a kneel would put his head out of the low locked frame)
+    { do: (c) => { const co = UD(c, 'coats_sleep'); if (co) co.lift(1, 1); const a = act(c, 'luka'); if (a) { a.place([-37.45, 0, -22.75, -H]); a.play('sit_floor_wall'); a.play('give', { dur: 2.4, loop: false }); } } },
     { wait: 1.4 },
     { do: (c) => { const a = act(c, 'luka'); if (a) a.rig.show('brick', true); } },
     { sfx: 'cloth_swish', vol: 0.3 },
@@ -1345,19 +1303,19 @@
     { do: (c) => { const a = act(c, 'luka'); if (a) { a.place(L_TURN); a.play('idle'); } } },
     { expr: [['luka', 'stunned']] },
     // [REVERSE · Chase in the dark of the venue, the coaster in his hand] He's been awake the whole time.
-    GLIDE([-27.7, 1.6, -11.8], [-28.95, 1.42, -14.9], 34, [[-27.74, 1.6, -11.95], null, 33], 7),
+    aPush('s29_reverse', 0.15, 7, { fovTo: 33 }),
     { wait: 1.4 },
-    { do: (c) => closeOn(c, 'luka', { dist: 1.2, yaw: 0.25, fov: 34, dur: 8 }) },
+    aPush('s29_luka_close', 0.12, 8),
     say('luka', 'HQ.', { expr: 'determined' }),
-    GLIDE([-27.7, 1.6, -11.8], [-28.95, 1.42, -14.9], 32, [[-27.74, 1.6, -11.92], null, 31], 6),
+    aPush('s29_reverse', 0.12, 6, { fov: 32, fovTo: 31 }),
     say('chase', 'On your own.', { expr: 'neutral' }),
-    { do: (c) => closeOn(c, 'luka', { dist: 1.15, yaw: 0.25, fov: 34, dur: 8 }) },
+    aPush('s29_luka_close', 0.18, 8),
     say('luka', 'If it’s just me, it’s just me that gets hurt.', { expr: 'sad' }),
     { move: 'chase', to: C_NEAR, speed: 0.9 },
     GLIDE([-27.62, 1.6, -11.7], [-28.85, 1.42, -13.6], 36, [[-27.66, 1.6, -11.82], null, 35], 6),
     say('chase', 'That’s not how it works.', { expr: 'determined' }),
-    // side-on in the wing: both of them, the doorway's light, the rain beyond
-    GLIDE([-26.75, 1.5, -12.55], [-28.75, 1.38, -12.6], 52, [[-26.8, 1.5, -12.6], null, 50], 10),
+    // side-on from the wing: both of them in profile, the doorway's light and the rain behind Luka
+    GLIDE([-30.9, 1.6, -12.5], [-28.6, 1.35, -12.55], 46, [[-30.75, 1.59, -12.5], null, 45], 10),
     say('luka', 'Every version where I’m near you, something happens to you. ^ I said ‘go left’, and you got zapped. I ring you on a Sunday, and—', { expr: 'sad' }),
     // (he points back into the dark, where Chase (2040) is asleep)
     { face: 'luka', to: [-37.5, 0, -22.0], dur: 0.3 },
@@ -1367,17 +1325,17 @@
     { face: 'luka', to: 'chase', dur: 0.3 },
     GLIDE([-27.62, 1.6, -11.7], [-28.85, 1.42, -13.6], 35, [[-27.66, 1.6, -11.84], null, 34], 7),
     say('chase', 'So you’re going to go and do it on your own and not tell anyone.', { expr: 'determined' }),
-    { do: (c) => closeOn(c, 'luka', { dist: 1.1, yaw: 0.3, fov: 34, dur: 8 }) },
+    aPush('s29_luka_close', 0.24, 8),
     say('luka', 'I’m going to keep you safe.', { expr: 'determined' }),
     GLIDE([-27.62, 1.6, -11.7], [-28.85, 1.42, -13.6], 34, [[-27.66, 1.6, -11.86], null, 33], 8),
     say('chase', 'That’s what you DID.', { expr: 'determined' }),
     say('chase', 'You went back in on your own, and he got fourteen years of not finishing anything.', { expr: 'sad' }),
-    { do: (c) => closeOn(c, 'luka', { dist: 1.05, yaw: 0.3, fov: 33, dur: 8 }) },
+    aPush('s29_luka_close', 0.3, 8, { fovTo: 33 }),
     say('luka', 'That’s not fair.', { expr: 'tearful' }),
-    GLIDE([-26.75, 1.5, -12.55], [-28.7, 1.38, -12.6], 52, [[-26.8, 1.5, -12.6], null, 51], 9),
+    GLIDE([-30.9, 1.6, -12.5], [-28.6, 1.35, -12.55], 45, [[-30.78, 1.59, -12.5], null, 44], 9),
     slow('chase', 'No. ^ It’s not.', { expr: 'sad' }),
     // (Rain. A long beat, 3 s.)
-    aPush('s29_door_wide', 0.5, 5),
+    aPush('s29_door_wide', 0.5, 5, { fov: 24 }),
     { wait: 3 },
     { move: 'chase', to: C_CLOSE, speed: 0.8 },
     { face: 'chase', to: 'luka', dur: 0.3 },
@@ -1396,9 +1354,11 @@
     slow('chase', 'Then don’t know how. ^ Just stay.', { expr: 'neutral' }),
     // [INSERT] Luka puts the brick phone in Chase's hand.
     { do: (c) => { const a = act(c, 'luka'); if (a) a.rig.show('brick', true); const ch = act(c, 'chase'); if (ch) ch.rig.show('coaster', false); } },
-    aPush('s29_hands', 0.08, 5),
-    { act: [['luka', 'give', { dur: 1.6, loop: false }]] },
-    { wait: 0.9 },
+    aPush('s29_hands', 0.12, 5),
+    { act: [['luka', 'give', { dur: 1.8, loop: false }]] },
+    { wait: 0.5 },
+    { act: [['chase', 'give', { dur: 1.6, loop: false }]] },
+    { wait: 0.5 },
     { do: (c) => { const a = act(c, 'luka'); if (a) a.rig.show('brick', false); const ch = act(c, 'chase'); if (ch) ch.rig.show('brick', true); } },
     { flag: 's29_stay' },
     { wait: 1.6 },
@@ -1436,7 +1396,7 @@
     { wait: 2 },
     // [CLOSE · Chase (2040), in the dark] The only cut. His eyes are open. They have been the whole time.
     { expr: [['chase40', 'neutral']] },
-    { do: (c) => faceCam(c, 'chase40', { d: 0.6, fov: 40, dur: 9 }) },
+    aPush('s29_c40_dark', 0.07, 9),
     { fade: 'in', dur: 0.6 },
     { wait: 1.4 },
     slow('chase40', 'Would yous two shut up. Some of us have a—', { expr: 'still' }),
@@ -1446,6 +1406,7 @@
     { wait: 0.6 },
     // (He gets up.)
     { do: (c) => { const co = UD(c, 'coats_sleep'); if (co) co.lift(2, 1); const a = act(c, 'chase40'); if (a) { a.place([-38.3, 0, -22.6, 0]); a.play('sit_floor_wall'); } } },
+    GLIDE([-37.2, 1.0, -21.0], [-38.3, 0.75, -22.6], 44, [[-37.25, 1.05, -21.1], null, 43], 3),
     { sfx: 'cloth_swish', vol: 0.3 },
     { wait: 1.2 },
     { fade: 'out', dur: 0.9 },
@@ -1524,7 +1485,8 @@
     { sfx: 'card_slide', vol: 0.35 },
     { wait: 0.6 },
     say('chase40', 'Then finish it.', { expr: 'still' }),
-    { do: (c) => { if (!sk(c)) { const s = aShot('s210_desk_two', 0, 1); if (s) c.cam.shot(s); } } },
+    // held into the sequencer (its own lens is INSERT s210_desk_two): no ease back to the room camera in between
+    { do: (c) => { const s = aShot('s210_desk_two', 0, 1); if (s) c.cam.shot(s); c.cam.cutscene = false; } },
   ];
 
   // Cutscene — "2.10_bounce."
@@ -1535,6 +1497,8 @@
       if (!c.state.pattern && MINIGAMES.sequencer && MINIGAMES.sequencer.pattern) c.state.pattern = MINIGAMES.sequencer.pattern(c.state.samples);
       const ds = UD(c, 'foh_desk'); if (ds) ds.state('half');
       const sl = UD(c, 'slate_desk'); if (sl) sl.screen('export');
+      const ch = act(c, 'chase'); if (ch) { ch.rig.show('headphones_head', false); ch.rig.show('headphones_held', false); ch.rig.show('phone', false); }
+      const hp = UD(c, 'headphones_desk'); if (hp) hp.show(true);
       if (ck && r && r.time) { const m = /(\d+):(\d+)/.exec(r.time); if (m) ck.set(+m[1], +m[2]); }
     } },
     // [INSERT · the slate] EXPORT. A file name field. Chase types: two. A progress bar fills, and it doesn't go backwards.
