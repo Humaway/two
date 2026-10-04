@@ -31,6 +31,8 @@ Source reports are in `docs/reports/`.
 - [ ] **hq_roof** — `roof_hatch` anchor sits south of the hatch so the lid fills the frame (3.2 uses a lens from the east).
 - [ ] **hq_atrium** — a hand prop for Luke's invitation (3.1 builds a card mesh at load).
 
+- [ ] **hq_top** — optional lamp preset near `mgr_turn` (the 3.3 badge insert is dark).
+
 ## Engine
 
 - [ ] **systems** — a lured drone's collapsing cone sweeps a wide fan and can spot nearby actors: keep it narrow or skip detection until collapsed.
@@ -56,6 +58,12 @@ Source reports are in `docs/reports/`.
 - [ ] **art** — a hand-held card prop (1.5 bonus card and 2.6 invitation are built content-side from `mat()`).
 - [ ] **BUG world** — `a.hold`: dropping/despawning an object that had no parent when picked up crashes (`h.parent.add` on null): guard `if (h.parent)`.
 - [ ] **BUG flow/ui** — the `{quiet}` step sets `state.quiet` before `hud.quiet()`, which then sees no change and never repaints: let `hud.quiet` assign it.
+- [ ] **art** — anims' `.expr` (e.g. `still`, `hurt_stand`) overwrite an explicit expression set in the same tick: let an explicit `expr` step win (3.5 uses wrappers `s3_still`, `s3_hurt`).
+- [ ] **art** — per-part opacity, e.g. `rig.ghost(part, alpha)` (3.5 fakes the erased hand by scaling the `handR` bone).
+- [ ] **art** — `luka40` needs `headphones_held` + a `phones_off` anim (3.6 hides `headphones_head`).
+- [ ] **art** — `lanyard_snapped` dressing must also hide `lanyard2` (Nadia's) when the inventory holds `nadia_lanyard`.
+- [ ] **ui** — the HACK bar sits over the top letterbox in 3.4–3.5 cutscenes: move it below the letterbox while a cutscene runs.
+- [ ] **audio** — `AUDIO.seq` (and song handles) don't pause with the pause menu: pause/resume them from the flow's pause (3.6's song + conductor keep running while paused).
 - [ ] **world** — `{shot:'TWO'}` in a split's left half frames the whole room instead of the two subjects (1.3 uses explicit lenses).
 - [ ] **world** — orbits in tight rooms shrink to 20% radius → cramped, head-cropped frames (engine C note).
 - [ ] **systems** — drone floor cones are low-contrast on the bright 2026 store floor (engine C note).
