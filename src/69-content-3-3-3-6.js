@@ -624,7 +624,7 @@
   // at the glass, facing the city: his face from between him and the glass (the room, the drones, his past self's side
   // behind him): from his left, low / from his right / from his left, high
   // (head and shoulders: the lens slides along the glass to his side rather than into his face)
-  // (L: from outside, through the rained-on glass, onto the face he turns to the city)
+  // (L: from outside, through the glass, onto the face he turns to the city)
   const GLASS_FACE_L = (dur) => glide([-5.62, 1.62, -10.9], [-5.3, 1.62, -11.98], 40, { pos: [-5.6, 1.62, -10.96], look: [-5.3, 1.62, -11.98], fov: 38 }, dur);
   const GLASS_FACE_R = (dur, push = 0.1) => glide([-6.6, 1.62, -11.45], [-5.3, 1.6, -11.98], 38, { pos: [-6.6 + 0.9 * push, 1.62, -11.45 - 0.2 * push], look: [-5.3, 1.6, -11.98], fov: 38 }, dur);
   const GLASS_FACE_H = (dur) => glide([-4.3, 1.98, -11.42], [-5.35, 1.55, -12.0], 44, { pos: [-4.36, 1.96, -11.44], look: [-5.35, 1.55, -12.0], fov: 43 }, dur);

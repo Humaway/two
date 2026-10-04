@@ -1441,7 +1441,7 @@
     { wait: 3.6 },
     // [CLOSE · the maintenance hatch] Luka hauls it open. Below: dark.
     put('luka', [7.25, 0, -13.75, 0.75]),
-    cam([10.0, 1.45, -13.1], [7.7, 0.6, -13.35], 50, [[10.25, 1.55, -13.05], [7.6, 0.95, -13.4], 52], 5),   // (easing up as he straightens: his head stays in)
+    cam([10.0, 1.45, -13.1], [7.7, 0.6, -13.35], 50, [[10.35, 1.72, -13.0], [7.6, 1.22, -13.4], 56], 5),   // (easing up as he straightens: his head stays in)
     { act: [['luka', 'lift_strain']] },
     { wait: 0.9 },
     { prop: 'maint_hatch', fn: (o) => o.userData.open(1) },
