@@ -15,6 +15,8 @@ Source reports are in `docs/reports/`.
 - [ ] **reddy26** — anchor `s12_heroic` (y 0.85) sits under the Hero Table glass (0.93–0.95): raise to ≈ y 1.02; from `s12_twoshot` the JARVIS monitor hides Chase at `s11_chase_phone` (content uses pos [6.95,1.45,−5.3] → [6.1,1.4,−8.4]); `floor_wreck_wide` puts the wreck under the dialogue box.
 - [ ] **reddy26** — `blast()` fells the tree at 0.25 s (inside the slow-motion close): add `blast({ tree: false })` or a delayed fall (1.2 calls `xmas_tree.userData.fall()` again at the real-time wide).
 
+- [ ] **reddy40** — 1.6 address marks: `s16_addr_luka [0.9,-6.4]` is inside display table 2 → luka `[1.6,-6.55]`, chase `[2.25,-6.2]`, c40 `[2.85,-6.95]`; `s16_addr_jordan [3.6,-7.6]` overlaps a stool → `[3.8,-7.3]`; `s16_jordan_close` → `[3.35,-7.35]`; `s16_speaker [7.55,-8.0]` is 0.1 m from a stool (content uses its own coordinates).
+
 ## Engine
 
 - [ ] **systems** — a lured drone's collapsing cone sweeps a wide fan and can spot nearby actors: keep it narrow or skip detection until collapsed.
@@ -24,6 +26,8 @@ Source reports are in `docs/reports/`.
 - [ ] **config** — confirm speaker ids MAN, KID, WOMAN (1.7 human moments; currently defined in `63-content-1-7-1-8.js`) or move them to `01-config.js`.
 - [ ] **art** — Chase (2040) T-shirt outfit for 2.1 dawn (currently: coat, lanyard and headphones hidden).
 - [ ] **art** — chip light renders as a fairly large bright square (engine C note).
+- [ ] **core** — `wait`/`waitUntil` resolve immediately while skipping, which traps autoplay code: document it and add a variant that keeps checking (1.6 uses its own per-tick `until()`).
+- [ ] **art** — hair-on-end for the 1.6 zap (uses soot mark + fingertip smoke); a card attachment (1.5's bonus card mesh lives in the content file).
 - [ ] **world** — `{shot:'TWO'}` in a split's left half frames the whole room instead of the two subjects (1.3 uses explicit lenses).
 - [ ] **world** — orbits in tight rooms shrink to 20% radius → cramped, head-cropped frames (engine C note).
 - [ ] **systems** — drone floor cones are low-contrast on the bright 2026 store floor (engine C note).
