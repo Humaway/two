@@ -156,7 +156,8 @@ const { chip, AR, DRONES, stealth, safeRoom, strengthHold, pairSwitch } = (() =>
 #ar .popup { color: #22466e; text-shadow: none; background: rgba(250,252,255,.88); border: 1px solid #fff; border-radius: 14px; white-space: pre-wrap;
   box-shadow: 0 0 16px var(--ssglow, rgba(120,190,255,.55)), 0 4px 14px rgba(0,30,80,.25); font-weight: 600; letter-spacing: .02em; padding: 8px 14px; }
 #ar .popup b { color: var(--ss, #2f86e0); font-size: 10px; letter-spacing: .16em; margin-bottom: 2px; }
-body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack, body.saferoom #signal { visibility: hidden; }
+body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack, body.saferoom #signal, body.saferoom #prompt { visibility: hidden; }
+body.saferoom #pops > :not(.sr-keep) { visibility: hidden !important; }   /* the scene's own pop-ups (1.6's rules) wait outside the room */
 @keyframes arflick { 0%, 46%, 49%, 81%, 84%, 100% { opacity: .96; } 47% { opacity: .5; } 82% { opacity: .78; } }
 `;
   const arEl = document.createElement('div'); arEl.id = 'ar';
@@ -1166,6 +1167,11 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     if (SR.hidden) SR.hidden.visible = true;
     SR.hidden = null; SR.home = null;
   }
+  async function askRetry() { // "Would you like to try again? [YES]": the one pop-up left visible in the room
+    const p = popup({ style: 'safesense', msg: SR_ASK, buttons: ['YES'], at: 'center', w: 380 });
+    p.el.classList.add('sr-keep');
+    try { await p.done; } finally { p.el.classList.remove('sr-keep'); }
+  }
   async function safeRoom(o = {}) {
     const g = gen, variant = o.variant === 'quiet' ? 'quiet' : 'room', who = o.who === undefined ? state.active : o.who;
     if (skipping() || SR.on) { if (o.onRetry) o.onRetry(); return; }
@@ -1183,7 +1189,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     await say('drone', SR_LINE, { auto: 0.6 });
     if (g !== gen) return;
     SR.dimTo = 1;
-    await popup({ style: 'safesense', msg: SR_ASK, buttons: ['YES'], at: 'center', w: 380 }).done;   // the only button
+    await askRetry();   // the only button
     if (g !== gen) return;
     await ui.fade(1, 0.3, tint);
     srOff();
@@ -1209,7 +1215,7 @@ body.saferoom #hud, body.saferoom #swap, body.saferoom #obj, body.saferoom #hack
     ui.fade(0, 0.35);
     await say('drone', SR_LINE, { auto: 0.6 });
     if (g !== gen) return;
-    await popup({ style: 'safesense', msg: SR_ASK, buttons: ['YES'], at: 'center', w: 380 }).done;
+    await askRetry();
     if (g !== gen) return;
     await ui.fade(1, 0.3, '#1e2733');
     document.body.classList.remove('saferoom');
