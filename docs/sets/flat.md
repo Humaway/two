@@ -238,6 +238,7 @@ inside furniture colliders by design: content `place`s actors there (no pathing)
 | `s21_couch_chase` | [−1.9, 0, −2.55, −H] | asleep, lying along the couch, head at the east end (x ≈ −1.1) |
 | `s21_bal_polish` | [−2.7, 0, 1.15, 0] | Luka at the railing polishing with the tea towel (dawn WIDE) |
 | `s21_bed_c40` | [−2.95, 0, −5.4, PI] | C40 asleep on the bed (door ajar) |
+| `s21_couch_lie`, `s21_bed_lie` | [−1.9, 0.42, −2.47, −H], [−2.95, 0.56, −5.3, 0] | lying on the couch (head on the east arm) / on the bed (head on the pillows): call `SETS.flat.lie(true)` first (the seat and the mattress become `floor(x, z)`; every `dress()` turns it off), then play `lie` / `sleep_back` (not seated) |
 | `s21_slate_chase` | [−3.05, 0, −0.95, −H] | Chase standing at the desk / slate |
 | `s21_photo_chase` | [0.25, 0, −2.75, PI] | at the shelf photo |
 | `s21_kettle` | [3.05, 0, −2.1, H] | at the kettle |
@@ -269,7 +270,7 @@ inside furniture colliders by design: content `place`s actors there (no pathing)
 | `s18_room_wide` | [0.6, 1.1, −2.7] | [−1.7, 1.75, 0.9] | 56 | step 3 WIDE from the balcony threshold: Chase at the sticky wall (left), Luka at the fridge (right) |
 | `s18_doorway_wide` | [2.0, 1.2, −3.3] | [−1.0, 1.65, −0.6] | 50 | step 7 WIDE · the doorway (entry door open, landing behind C40) |
 | `s18_kitchen_locked` | [2.6, 1.1, −1.8] | [−1.6, 1.8, −1.2] | 56 | step 20 WIDE · locked: the three in the kitchen, the parcel on the bench, the lights blinking through the window |
-| `s21_dawn_wide` | [−2.6, 1.1, 1.3] | [−1.9, 1.5, −3.3] | 50 | 2.1 step 1: from behind the couch (Chase asleep in the foreground), through the glass, Luka polishing, the pink-grey bay, storm bank far out |
+| `s21_dawn_wide` | [−2.65, 0.95, 1.4] | [−0.55, 1.95, −3.3] | 54 | 2.1 step 1: from behind the couch (Chase asleep in the foreground), through the glass, Luka polishing, the pink-grey bay, storm bank far out |
 | `s21_couch_close` | [−1.4, 0.65, −2.55] | [−0.6, 1.0, −1.5] | 38 | step 2 CLOSE · Chase on the couch |
 | `s21_slate` | [−3.72, 0.78, −0.95] | [−3.3, 1.35, −0.95] | 34 | slate INSERT (CARD `slate_list` scrolls) |
 | `s21_photo` | [0.0, 1.65, −3.32] | [0.0, 1.62, −2.75] | 30 | photo INSERT (CARD `photo_2031`) |
@@ -279,7 +280,7 @@ inside furniture colliders by design: content `place`s actors there (no pathing)
 | `s21_balcony_two` | [−2.3, 1.45, 1.05] | [−2.3, 1.5, −1.9] | 46 | 2.1_balcony: the locked two-shot through the fully open door (the door frame frames them; bay behind, rail between them and the drop) |
 | `s21_plan_wide` | [2.3, 1.0, −1.1] | [0.0, 1.75, −3.0] | 48 | 2.1_plan WIDE |
 | `s21_plan_notes` | [2.3, 0.76, −0.95] | [2.3, 1.85, −0.75] | 40 | top-down on the three notes |
-| `s21_box` | [−1.7, 0.25, −5.4] | [−0.8, 1.25, −4.6] | 40 | the box opened |
+| `s21_box` | [−1.45, 0.72, −5.35] | [−2.15, 1.45, −4.05] | 46 | the box opened (from the bed's foot: Luka kneeling at his mark doesn't block it) |
 | `s21_santa_mid` | [−1.05, 1.5, −5.4] | [0.35, 1.6, −4.3] | 40 | MID · Luka turns round (beard over his beard) |
 
 ---

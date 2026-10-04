@@ -38,6 +38,7 @@
 //   s18_sticky_chase s18_keys s18_shelf s18_balcony s18_fridge_luka s18_read_chase s18_door_c40 s18_in_c40 s18_bench_c40
 //   s21_couch_chase s21_bal_polish s21_bed_c40 s21_slate_chase s21_photo_chase s21_kettle s21_door_c40 s21_bal_luka
 //   s21_bal_chase s21_plan_luka s21_plan_c40 s21_plan_chase s21_box_luka s21_turn_luka s21_watch_chase s21_watch_c40
+//   s21_couch_lie s21_bed_lie (lying on the couch / bed: needs lie(true))
 //   kettle centre
 // ANCHORS: s18_pan_a s18_pan_b s18_sticky s18_keys s18_notebooks s18_balcony_view fridge_card s18_luka_close
 //   s18_room_wide s18_doorway_wide s18_kitchen_locked s21_dawn_wide s21_couch_close s21_slate s21_photo s21_kettle
@@ -63,7 +64,8 @@
 //   birds_dawn + bay_far + fridge; room 'room'.
 // THE SPOT: evening = the pendant over the table (dark while pendant.on(false)); dawn = a pink shaft through the balcony
 //   door; morning = off (torchAuto restored).
-// EXTRAS on the entry: dress(state), snore(on), floor(x, z), lightsLevel().
+// EXTRAS on the entry: dress(state), snore(on), floor(x, z), lightsLevel(), lie(on = true) (the couch seat and the mattress
+//   become floor(x, z) so a lying anim rests on them; reset by every dress(): call it after dressing).
 // Static geometry is vertex-coloured and merged per material; painted 64-256 px textures (nearest) only where something
 // must read; repeats are InstancedMeshes; nothing is created after build(). <= ~80 draw calls from any view (setshots).
 SETS.flat = (() => {
@@ -1292,7 +1294,7 @@ SETS.flat = (() => {
   function dress(st) {
     if (!AMB[st] || st === 'dawn21q') st = 'evening18';
     if (!R.root) return;
-    R.dressed = st;
+    R.dressed = st; LIE.on = false;
     const E = st === 'evening18', D = st === 'dawn21', Mo = st === 'morning21';
     twSnap(tw.door, E ? 0.5 : D ? 0 : 1); twSnap(tw.bed, E ? 0 : D ? 0.45 : 1.4); twSnap(tw.entry, 0);
     twSnap(tw.sheet, 0); R.sheetUp = false;
@@ -1451,7 +1453,17 @@ SETS.flat = (() => {
       if (W_ && W_.camera) R.zz.quaternion.copy(W_.camera.quaternion);
     }
   }
-  function floor(x, z) { return x > 0.9 && x < 2.4 && z < -4.8 ? Math.max(-1.6, (z + 4.8) * 0.72) : 0; }
+  // lie(true): the couch seat (y 0.42, between the arms) and the mattress (y 0.56) count as floor, so an actor placed on
+  // them (s21_couch_lie, s21_bed_lie) and played an unseated lying anim ('lie', 'sleep_back', 'sleep') lies ON them.
+  // Off by default and on every dress() (seated sleepers on the couch/bed use sit h 0.42/0.55 from floor level 0).
+  const LIE = { on: false };
+  function floor(x, z) {
+    if (LIE.on) {
+      if (x > -2.64 && x < -1.11 && z > -2.75 && z < -2.2) return 0.42;
+      if (x > -3.68 && x < -2.22 && z > -6.3 && z < -4.45) return 0.56;
+    }
+    return x > 0.9 && x < 2.4 && z < -4.8 ? Math.max(-1.6, (z + 4.8) * 0.72) : 0;
+  }
 
   // ---------------------------------------------------------- data
   const ENV = {
@@ -1471,6 +1483,9 @@ SETS.flat = (() => {
     s21_photo_chase: [0.25, 0, -2.75, PI], s21_kettle: [3.05, 0, -2.1, H], s21_door_c40: [-0.95, 0, -3.75, -0.65], s21_bal_luka: [-3.0, 0, 1.1, 0.7],
     s21_bal_chase: [-1.55, 0, 1.0, -1.25], s21_plan_luka: [1.65, 0, -0.95, H], s21_plan_c40: [2.95, 0, -0.95, -H], s21_plan_chase: [2.3, 0, -1.6, 0],
     s21_box_luka: [-1.05, 0, -5.4, -H], s21_turn_luka: [-1.05, 0, -5.4, 0.34], s21_watch_chase: [-0.6, 0, -3.95, -2.80], s21_watch_c40: [-0.95, 0, -3.3, -3.10],
+    // lying down (after SETS.flat.lie(true); play 'lie' / 'sleep_back'): head toward the mark's back, i.e. the couch's east
+    // arm (x ~ -1.15) and the bed's pillows (z ~ -6.1)
+    s21_couch_lie: [-1.9, 0.42, -2.47, -H], s21_bed_lie: [-2.95, 0.56, -5.3, 0],
     // general
     kettle: [3.05, 0, -2.1, H], centre: [0.0, 0, -1.8, 0],
   };
@@ -1486,7 +1501,7 @@ SETS.flat = (() => {
     s18_room_wide:      { at: [-1.39, 1.1, -2.76], from: [-2.9, 1.72, 0.4], fov: 60 },
     s18_doorway_wide:   { at: [2.0, 1.2, -3.3], from: [-1.0, 1.65, -0.6], fov: 50 },
     s18_kitchen_locked: { at: [2.6, 1.1, -1.8], from: [-1.6, 1.8, -1.2], fov: 56 },
-    s21_dawn_wide:      { at: [-2.4, 0.55, 0.9], from: [-0.6, 2.0, -3.38], fov: 56 },
+    s21_dawn_wide:      { at: [-2.65, 0.95, 1.4], from: [-0.55, 1.95, -3.3], fov: 54 },
     s21_couch_close:    { at: [-1.4, 0.65, -2.55], from: [-0.6, 1.0, -1.5], fov: 38 },
     s21_slate:          { at: [-3.72, 0.78, -0.95], from: [-3.3, 1.35, -0.95], fov: 34 },
     s21_photo:          { at: [0.0, 1.65, -3.32], from: [0.0, 1.62, -2.75], fov: 30 },
@@ -1496,7 +1511,7 @@ SETS.flat = (() => {
     s21_balcony_two:    { at: [-2.3, 1.45, 1.05], from: [-2.3, 1.5, -1.9], fov: 46 },
     s21_plan_wide:      { at: [2.3, 1.0, -1.1], from: [0.0, 1.75, -3.0], fov: 48 },
     s21_plan_notes:     { at: [2.3, 0.76, -0.95], from: [2.3, 1.85, -0.75], fov: 40 },
-    s21_box:            { at: [-1.65, 0.2, -5.4], from: [-1.95, 1.4, -4.5], fov: 44 },
+    s21_box:            { at: [-1.45, 0.72, -5.35], from: [-2.15, 1.45, -4.05], fov: 46 },
     s21_santa_mid:      { at: [-1.05, 1.5, -5.4], from: [0.35, 1.6, -4.3], fov: 40 },
   };
   return {
@@ -1531,6 +1546,7 @@ SETS.flat = (() => {
     // extras
     dress,
     snore: (on) => { if (R.zz) R.zz.userData.on(on); },
+    lie: (on = true) => { LIE.on = !!on; },
     lightsLevel: () => R.level || 0,
   };
 })();
