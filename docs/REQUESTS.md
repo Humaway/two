@@ -103,31 +103,36 @@ Source reports are in `docs/reports/`.
 ## From C/PC (third batch)
 
 - [x] **reddy26** — `floor_wreck_wide` doesn't show Luke at `pc_luke_desk` through the office door (PC uses pos [10.4,2.5,-1.7] → [6.4,1.0,-10.0], fov 52); `ladder` 'carried' has no side-carry offset (PC reorients it + `pc_ladder` anim); `pc_jordan_phone` (7.5,−8.05) sits beside the folded ladder (PC uses (7.15,−8.05)). — done (polish): `floor_wreck_wide` = PC's lens (from `[10.4, 2.5, -1.7]` → `[6.4, 1.0, -10.0]`, fov 52: the wreck, the counter, the Yes wall and Luke at his desk through the open door; nothing else used the anchor); `ladder.set('carried')` after `actor.hold(ladder)` lays it folded along the holder's right side (top rail at the right hand, 0.86 m; one-time maths per call); `pc_jordan_phone` → `[7.15, 0, -8.05, π − 0.22]`. PC drops its lens, its carry maths and its J_PHONE (keeps its `pc_ladder` arm pose). 1.1 / 1.2 re-run clean (1.1 never carries the ladder: it only uses `yes_wall`).
-- [ ] **art/world** — `climb` isn't an upper-body anim, so a `{move}` while climbing switches to walk (1.1's ladder; PC raises Jordan with a timed position change).
+- [ ] **art/world** — `climb` isn't an upper-body anim, so a `{move}` while climbing switches to walk (1.1's ladder; PC raises Jordan with a timed position change). (1.1 now sets `walkAnim = 'climb'` for its ladder moves.)
 
 ## Visual QA (integration pass)
 
 - [x] **B1** — real-time screenshot pass of the montage (2029 → match cut) and the post-screenshot framing fixes; **B2** entirely (fast autoplay passes; frames unviewed). — done (polish): B1 and B2 shot in real time end to end and fixed (see `docs/reports/16-polish-endings.md`); the match cut checked against `scene=1.2` step 1 (same lens via `s12_heroic`, same blocking).
 
+## From the Act One polish (docs/reports/15-polish-act1.md)
+
+- [ ] **reddy26** — the ceiling dome camera (`cyl(0.12, …, 9.8, 3.12, -1.2)`, the static build) sits 0.85 m from the `counter` zone camera's lens (`[10.5, 2.7, -0.8]`): on portrait phones (`fitNarrow` widens the vertical FOV toward 100°) it is a big black blob in the top-left of every counter-zone frame (release QA: the 1.1 roam's first frame at 390×844). Move the dome clear of the lens (e.g. to (8.6, 3.12, −2.6)) or drop the lens a little (e.g. `[10.5, 2.45, -0.6]`); content can't compose around a zone camera.
+- [ ] **art** — `jordan40` has no `card` attachment (his look's `attach` is `['phone']`): add `'card'` so 1.5's bonus hand-over can use `rig.attach.card` + `hold_card` on both sides (62 still parents a small content card to Jordan's grip for the hand-over).
+
 ## Content cleanups now possible (final polish pass; optional, each must keep the scene working)
 
 Engine (63c4619 etc.):
-- 63: drop `Object.assign(CHARACTERS, …)` for MAN/KID/WOMAN (now in 01-config).
+- 63: drop `Object.assign(CHARACTERS, …)` for MAN/KID/WOMAN (now in 01-config). — done (polish).
 - 3.7: drop the one-tick wait before computed lenses; drop manual `rig.seated` resets; drop the bar slide during STORAGE FULL; `s37_*` anims → engine names (`kneel_work`, `lean_rail`, `wipe_face`, `hand_rest`, `peer`, `limp`, `lean_back`).
 - 3.5: drop `s3_still`/`s3_hurt` wrappers; `rig.ghost(['handR','foreR'], a)` instead of scaling the hand bone. 3.6: `phones_off`.
 - 2.4: `kettle: [steps]` instead of the hand-rolled kettle; `walk_rail` / `hand_rail` for Rue. 2.5: `laugh_cry` expression; drop autoplay follower walks. 2.7: `say('passenger', …, { actor })`.
 - 2.1: spawn `chase40` with `{ look: 'chase40_tee' }` (dawn T-shirt) instead of hiding coat/lanyard/headphones.
-- 1.5 / 2.6: `rig.attach.card` + `paint` + `hold_card` instead of content-built card meshes.
-- 1.6: `waitUntil(fn, { skip: false })` instead of its own `until()`; `hair_static` for the zap.
+- 1.5 / 2.6: `rig.attach.card` + `paint` + `hold_card` instead of content-built card meshes. — 1.5 done (polish) for Chase (2040): his own `attach.card`, painted (a CRED face), `hold_card`; Jordan's hand-over keeps the small content card (`jordan40`'s look has no `card` attachment: see Act One polish below).
+- 1.6: `waitUntil(fn, { skip: false })` instead of its own `until()`; `hair_static` for the zap. — done (polish).
 - A1/B1: `rig.fade` instead of the `world.adopt` wrapper; `world.rigsOf`; `santa_hat` on luke; `lanyard_held`. — done (polish): `rig.fade` (A1's wrapper, boot warm-up and per-rig copies are gone; B1's homecoming fades them in out of the smoke with it too), `world.rigsOf('luka40')`, `rig.show('santa_hat')` (A1 and B1). `lanyard_held` kept as is: A1 hands over Future Luka's worn lanyard itself (it leaves his chest in the same move) and lays it with its own placements (badge up in Luka's palm, on his chest on the floor, turning over in A2, looped round the coda's wrist); B1's is a *snapped* strap in Luka's left fist (his right hand is on his ribs) — `lanyard_held` is a whole loop on the right grip, so neither gains.
 - 2.8: `lure({ transfixed })`; `goTo({ y })`; keypad `title`/`prompt`/`okText` instead of the DOM relabel.
 - bridge set: `SETS.bridge.render` instead of wrapping `world.render`.
 
 Sets (12 set commits):
-- 1.7/1.8: drop `PATHS17`/`paths()` injection. 
-- 1.1: `smudge1At(x, z, 2.4)`; anchors `monitor2`, `pot_plant`; `backroom_door.userData.solid(true)`; P's glass lenses → `glass_popup` / `glass_popup_ecu`.
-- 1.2/1.3: `s12_heroic`, `s12_twoshot`; `blast({ tree: false })`; `store_phone.ring(true, { sfx: 'trill', every: 1.6, vol: 0.55, max: 4 })`.
-- 1.6: `A16` → `s16_addr_*`, `s16_jordan_close`.
+- 1.7/1.8: drop `PATHS17`/`paths()` injection. — done (polish).
+- 1.1: `smudge1At(x, z, 2.4)`; anchors `monitor2`, `pot_plant`; `backroom_door.userData.solid(true)`; P's glass lenses → `glass_popup` / `glass_popup_ecu`. — done (polish): all of them (the print at ×3 now: the glass insert became a steep top-down between the phones), plus `glass_moon` for P's DND close.
+- 1.2/1.3: `s12_heroic`, `s12_twoshot`; `blast({ tree: false })`; `store_phone.ring(true, { sfx: 'trill', every: 1.6, vol: 0.55, max: 4 })`. — done (polish): all four (1.2's first frame unchanged: same lens and push from the anchor).
+- 1.6: `A16` → `s16_addr_*`, `s16_jordan_close`. — done (polish).
 - 2.1–2.3: `s23_plaque`; `s22_drone_piano`, `s22_piano_cam`; 2.1 sleepers lie down via `SETS.flat.lie(true)` + `s21_couch_lie` / `s21_bed_lie`; `s21_dawn_wide`, `s21_box`; optional 2.3 save `{ at: 'urn_w', r: 1.2, kettle: true }`.
 - 2.6: sample spot `s26_sample_sizzle`.
 - 3.1/3.2: `invite` prop hold/home; `spawnDrones(floor)`; `SETS.hq_floors.reset()` after `dress32`.
