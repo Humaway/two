@@ -11,7 +11,7 @@ const md = fs.readFileSync(path.join(root, 'docs/BUILD_PROMPT.md'), 'utf8').spli
 const norm = (s) => s.replace(/\\([_\[\]*])/g, '$1').replace(/[’‘]/g, "'").replace(/[“”]/g, '"').replace(/\s*\^\s*/g, ' ^ ')
   .replace(/\s+/g, ' ').trim();
 // prose quotes in the spec that are not lines
-const IGNORE = new Set(['best', 'two (2026)', 'two (2026–2040)', 'Hold this', 'modern', 'Quiet', 'Keep.', 'Again.']);
+const IGNORE = new Set(['best', 'two (2026)', 'two (2026–2040)', 'Hold this', 'modern', 'Quiet', 'Keep.', 'Again.', 'Role Play']);
 // ---- 1. collect segments from the spec
 const want = [];
 let sec = 0, scene = '?';
