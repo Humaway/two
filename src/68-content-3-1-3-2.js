@@ -235,22 +235,10 @@
   };
   CARDS.s32_panel.size = [1000, 560];
 
-  // ---------------------------------------------------------- the invitation in Chase (2040)'s hand (built at load, warm material)
-  const INVITE = (() => {
-    try {
-      const t = canvasTex(128, 96, (cx, w, h) => {
-        cx.fillStyle = '#f7f4ec'; cx.fillRect(0, 0, w, h);
-        cx.strokeStyle = '#ffd21f'; cx.lineWidth = 4; cx.strokeRect(5, 5, w - 10, h - 10);
-        cx.fillStyle = '#c62828'; cx.font = 'bold 15px Arial, sans-serif'; cx.textAlign = 'center'; cx.fillText('MANDATORY', w / 2, 38); cx.fillText('FUN', w / 2, 56);
-        cx.fillStyle = '#141d3a'; cx.font = '10px Arial, sans-serif'; cx.fillText('LUKE + 2', w / 2, 78);
-      }, { key: 's31_invite_prop' });
-      const g = new THREE.BoxGeometry(0.15, 0.105, 0.004);
-      const m = new THREE.Mesh(g, matTex(t));
-      m.name = 's31_invite_prop';
-      return m;
-    } catch (e) { return null; }
-  })();
-  if (typeof on === 'function') on('flow:stop', () => { if (INVITE && INVITE.parent) INVITE.parent.remove(INVITE); });
+  // ---------------------------------------------------------- the invitation in Chase (2040)'s hand: hq_atrium's `invite` prop
+  // (hold() parents it to his grip; it must go home before the set does, so a quit mid-scene sends it back too)
+  let inviteOut = null;
+  if (typeof on === 'function') on('flow:stop', () => { if (inviteOut) { inviteOut.home(); inviteOut = null; } });
 
   // ---------------------------------------------------------- custom poses (registered once; no allocation per tick)
   // pulling the Santa beard and hat off over his head, then holding them out in front (one-shot, ~1.6 s)
@@ -383,15 +371,10 @@
   }
   function doorScreen(c, t) { if (typeof DRONES === 'undefined') return; const d = DRONES.get('door_drone'); if (d && d.obj.userData.show) d.obj.userData.show(t); }
   // the invitation in his right hand (and back in the pocket)
-  // (straight onto the hand bone: the card has no home in the set for actor.hold to put it back to)
   function invite(c, on) {
-    if (!INVITE) return;
-    if (INVITE.parent) INVITE.parent.remove(INVITE);
-    INVITE.visible = false;
-    const a = act(c, 'chase40');
-    if (!on || !a) return;
-    const h = a.rig.attach.gripR || a.rig.parts.handR;
-    h.add(INVITE); INVITE.position.set(0, -0.07, 0.04); INVITE.rotation.set(0, -H, 0); INVITE.visible = true;
+    const u = ud(c, 'invite');
+    if (!u) return;
+    if (on && act(c, 'chase40')) { u.hold('chase40', true); inviteOut = u; } else { u.home(); inviteOut = null; }
   }
   // Secret Santa: Chase (2040) turns his chip on (the game switches Chip View back on; the light comes on)
   function chipBack(c) {
@@ -702,6 +685,7 @@
       for (const id of ['luka', 'chase', 'chase40']) { const a = act(c, id); if (a) a.place(L21_CP[id]); }
     } else { S32.floor = 'l12'; S.dress('l12', { keepLamp: false }); S.lamp('lift12'); }
     dress32(c);
+    if (S.reset) S.reset();   // (every eased prop at its end now: on Continue nothing slides on arrival)
     if (!S32.upd) S32.upd = scope('3.2', tick32, () => { S32.upd = null; });
   }
   // the scene's watcher (no allocation): the shelf / valve panels follow who's holding them, the L21 chip line
@@ -1016,10 +1000,7 @@
     swapTo(c, 'chase40');
     c.flow.swap = true; c.flow.setFollow(true);
     if (typeof AR !== 'undefined') { AR.clear(); for (const a of (S && S.ar && S.ar.l21) || []) AR.add(a); }
-    if (typeof DRONES !== 'undefined') {
-      DRONES.clear();
-      for (const d of (S && S.drones && S.drones.l21) || []) spawnDrone(d);
-    }
+    if (typeof DRONES !== 'undefined') { DRONES.clear(); if (S && S.spawnDrones) S.spawnDrones('l21'); }
     if (typeof stealth !== 'undefined') stealth.begin({
       escortAfter: 1.6, forgetAfter: 2,
       checkpoints: [
@@ -1041,15 +1022,6 @@
     else if (!f.s32_wired) toast(c, 'Chase, at the jack.');
     else if (!f.s32_hacked) toast(c, 'Luka, at the jack: plug in the brick phone.');
     else if (!f.s32_valves) toast(c, 'Two valves, one at each end of the floor. "Hold this" — and SWAP.');
-  }
-  function spawnDrone(d) {
-    const S = FLR(), paths = (S && S.paths) || {};
-    const o = { kind: 'courtesy', hover: d.y || 1.9, speed: d.speed || 1, cone: d.cone || { len: 4, half: 0.42 } };
-    if (d.path) o.path = typeof d.path === 'string' ? paths[d.path] : d.path;
-    if (d.at) o.at = d.at;
-    if (d.face != null) o.face = d.face;
-    if (d.sweep) { o.sweep = d.sweep; o.sweepPeriod = d.sweepPeriod || 5; }
-    DRONES.spawn(d.id, o);
   }
   // [the jack] a beige 1987 wall jack on an old copper line, hand-written label: JARVIS — 1987 — DO NOT UNPLUG.
   // The brick phone's 1987 plug doesn't fit the port's adapter.
@@ -1290,7 +1262,7 @@
       // the area signs, the sentinel's line and the doorman's arc (the patrolling drones draw their own routes)
       for (const a of (S && S.ar && S.ar.l30) || []) if (!/^ar_p_d30[abd]$/.test(a.id)) AR.add(a);
     }
-    if (typeof DRONES !== 'undefined') { DRONES.clear(); for (const d of (S && S.drones && S.drones.l30) || []) spawnDrone(d); }
+    if (typeof DRONES !== 'undefined') { DRONES.clear(); if (S && S.spawnDrones) S.spawnDrones('l30'); }
     if (typeof stealth !== 'undefined') stealth.begin({
       escortAfter: 1.4, forgetAfter: 1.8, checkpoints: L30.cps,
       onRetry: () => { for (const n of ['s1', 'p1', 'p2']) { const u = ud(c, n); if (u) u.play(false); } S32.lure = null; },

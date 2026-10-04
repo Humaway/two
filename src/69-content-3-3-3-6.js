@@ -621,9 +621,11 @@
   const C_GROUP = [5.6, 0, -15.4, -1.2];             // Chase steps in toward Chase (2040) for the plan
   const L_IN = [6.2, 0, -13.0, -1.62], C_IN = [7.0, 0, -12.35, -1.5];   // a few steps into the room
   const L40_GLASS = [-5.3, 0, -11.95, 0];            // he walks to the glass: just west of his pop-up, the city before him
-  // at the glass: in profile from the east along the glass (the pop-up's edge glowing at frame left) / from the room
-  const GLASS_PROFILE = (dur) => glide([-2.3, 1.66, -12.35], [-5.3, 1.6, -11.98], 40, { pos: [-2.55, 1.66, -12.33], look: [-5.3, 1.6, -11.98], fov: 38 }, dur);
-  const GLASS_WIDE = (dur) => glide([-0.75, 1.78, -15.25], [-4.7, 1.55, -12.15], 45, { pos: [-1.0, 1.76, -15.0], look: [-4.7, 1.55, -12.15], fov: 44 }, dur);
+  // at the glass, facing the city: his face from between him and the glass (the room, the drones, his past self's side
+  // behind him): from his left, low / from his right / from his left, high
+  const GLASS_FACE_L = (dur, push = 0.06) => glide([-4.95, 1.55, -11.45], [-5.3, 1.62, -11.98], 44, { pos: [-4.95 - 0.35 * push, 1.55, -11.45 - 0.53 * push], look: [-5.3, 1.62, -11.98], fov: 44 }, dur);
+  const GLASS_FACE_R = (dur, push = 0.06) => glide([-5.65, 1.6, -11.42], [-5.3, 1.6, -11.98], 46, { pos: [-5.65 + 0.35 * push, 1.6, -11.42 - 0.56 * push], look: [-5.3, 1.6, -11.98], fov: 46 }, dur);
+  const GLASS_FACE_H = (dur) => glide([-4.7, 1.72, -11.5], [-5.35, 1.56, -12.0], 52, { pos: [-4.74, 1.71, -11.53], look: [-5.35, 1.56, -12.0], fov: 50 }, dur);
   function climb(c, id, delay, dropTo) {
     const a = act(c, id), top = SETS.hq_top.marks.s33_ladder_top;
     if (!a) return Promise.resolve();
@@ -695,7 +697,7 @@
     { wait: 0.4 },
     // [WIDE · from behind them] At the far end, the figure in the long coat stands at the glass, back to them. The
     // drones turn their lights toward the three intruders, but don't move.
-    glide([10.8, 1.78, -13.55], [-9.6, 1.45, -12.1], 34, { pos: [10.5, 1.76, -13.53], look: [-9.6, 1.45, -12.1], fov: 32 }, 9),
+    glide([10.9, 2.05, -13.2], [-9.6, 1.4, -12.1], 27, { pos: [10.7, 2.02, -13.19], look: [-9.6, 1.4, -12.1], fov: 25 }, 9),
     { wait: 0.8 },
     DRONE_WATCH(8.4, 1.4, -13.0, 1.4),
     { sfx: 'drone_scan', vol: 0.35 },
@@ -812,7 +814,7 @@
     // [TWO-SHOT · Luka and Luka (2040), the length of the office between them] (3 s.)
     put('luka40', 'mgr_turn'), put('luka', L_IN),
     expr('luka', 'worried'),
-    glide([-1.6, 2.0, -22.6], [-1.8, 1.45, -12.5], 54, { pos: [-1.6, 1.96, -22.2], look: [-1.8, 1.45, -12.5], fov: 53 }, 9),
+    glide([7.6, 1.75, -13.6], [-9.6, 1.5, -12.0], 26, { pos: [7.45, 1.74, -13.58], look: [-9.6, 1.5, -12.0], fov: 24 }, 9),
     { wait: 3.0 },
     slow('luka40', 'So this is where we went.'),
     CLOSE('chase40', { dist: 0.95, push: 0.06, dur: 5 }),
@@ -861,23 +863,25 @@
     glide([-0.4, 1.8, -15.6], [-4.6, 1.55, -12.2], 46, { pos: [-0.75, 1.78, -15.25], look: [-4.7, 1.55, -12.15], fov: 45 }, 14),
     { move: 'luka40', to: L40_GLASS },
     expr('luka40', 'still'),
-    say('luka40', "I rang him. That Sunday. Six in the morning. 'I'll do it, I just need another pair of hands.' ^ And I watched his hand— ^ ^ I did that. Me. Being the one who could."),
+    GLASS_FACE_L(14),
+    cue(say('luka40', "I rang him. That Sunday. Six in the morning. 'I'll do it, I just need another pair of hands.' ^ And I watched his hand— ^ ^ I did that. Me. Being the one who could."),
+      'And I watched', (c) => closeOn(c, 'chase40', { dist: 0.95, push: 0.06, dur: 8 })),
     glide([-4.82, 1.66, -11.42], [-5.3, 1.6, -11.98], 48, { pos: [-4.86, 1.66, -11.44], look: [-5.3, 1.6, -11.98], fov: 45 }, 12),
     say('luka40', "When the roof came down, I walked out the back. Nobody saw. And I thought: good. ^ Let him think I'm gone. He's safer. Everyone's safer."),
     { par: [
       say('luka40', "And then I couldn't stop seeing it. Every line we sell is a way for someone to get hurt. Every call. Every message. Every 'I'll be there' that isn't. ^ Six years of watching people hurt each other down cables I'm responsible for."),
       { do: (c) => c.runSteps([{ wait: 3.4 }, CLOSE('luka', { dist: 0.95, push: 0.08, dur: 8 })]) },
     ] },
-    GLASS_PROFILE(10),
+    GLASS_FACE_R(10),
     say('luka40', 'In seventeen minutes it stops. ^ Nobody reaches anybody. ^ Nobody gets hurt.'),
     CLOSE('luka', { dist: 0.9, push: 0.05, dur: 5 }),
     say('luka', 'Nobody gets anything.'),
-    GLASS_WIDE(6),
+    GLASS_FACE_H(6),
     say('luka40', 'Exactly.'),
     CLOSE('luka', { dist: 0.9, push: 0.15, dur: 12 }),
     expr('luka', 'sad'),
     slow('luka', 'I nearly did it. Last night. ^ I nearly left him to keep him safe.'),
-    GLASS_PROFILE(6),
+    GLASS_FACE_R(6, 0.04),
     say('luka40', 'Then you know I\'m right.'),
     CLOSE('luka', { dist: 0.85, push: 0.04, dur: 5 }),
     say('luka', "I know you're scared."),
@@ -897,7 +901,7 @@
     anchor('console', { push: 0.1, dur: 4 }),
     { wait: 2.2 },
     { do: (c) => { const cn = ud(c, 'console'); if (cn) cn.port(true); } },
-    glide([2.05, 1.14, -14.85], [1.21, 0.84, -15.4], 36, { pos: [1.75, 1.02, -15.08], look: [1.21, 0.82, -15.4], fov: 32 }, 3.5, 'out'),
+    glide([2.05, 1.14, -14.85], [1.21, 0.84, -15.4], 36, { pos: [1.75, 0.92, -15.3], look: [1.21, 0.8, -15.4], fov: 24 }, 3.5, 'out'),   // (ends on the set's usb_port lens)
     { sfx: 'spotless_chime', vol: 0.08, rate: 1.6 },
     { wait: 2.4 },
     // [CLOSE · Luka] He's seen it.
@@ -927,14 +931,30 @@
     // [ORBIT · around Chase (2040), speeding up, the move from Rue] The first time in fourteen years. The music kicks in
     // under it: the "two" groove, driving.
     play('chase40', 'idle'),
-    { do: (c) => { if (!sk(c)) c.cam.shot({ shot: 'ORBIT', size: 'MID', on: 'chase40', dist: 2.5, height: 0.05, from: 35, to: -55, ease: 'in', dur: 12, spin: true }); } },
+    { do: (c) => {   // (the spot from above in front of him: he stands in the dark by the north wall)
+      if (SETS.hq_top.lamp) SETS.hq_top.lamp('off');
+      const s = c.world.torch;
+      if (s) { c.world.torchAuto = false; s.position.set(6.4, 3.4, -15.4); s.target.position.set(6.4, 1.3, -17.6); s.target.updateMatrixWorld(); s.angle = 0.5; s.penumbra = 0.7; s.distance = 8; s.color.setHex(0xdfe8ff); s.intensity = 6; }
+      // speeding up over 5 s (then it keeps spinning at that speed through the plan): the idea engine is back
+      if (!sk(c)) c.cam.shot({ shot: 'ORBIT', size: 'MID', on: 'chase40', dist: 2.0, height: 0.15, from: 40, to: -60, ease: 'in', dur: 5, spin: true });
+    } },
     { music: 'boss', fade: 0.6 },
     { wait: 1.6 },
     say('chase', '…He does the thing.', { tag: 'whisper' }),
     expr('chase40', 'talk'),
     say('chase40', "You plug in. We keep them off you. Me and— ^ me. Swap when one of us gets tired. Don't stop for anything."),
     { move: 'chase', to: C_GROUP, nowait: true },
-    { do: (c) => { if (!sk(c)) c.cam.shot({ shot: 'TWO', on: ['chase', 'chase40'], move: 'push', amount: 0.9, dur: 9 }); } },
+    { do: (c) => {   // the two Chases face to face, side on (Chase walks into his place, C_GROUP), the side away from Luka
+      const b = act(c, 'chase40'), l = act(c, 'luka');
+      if (!b || sk(c)) return;
+      const mx = (C_GROUP[0] + b.pos.x) / 2, mz = (C_GROUP[2] + b.pos.z) / 2;
+      let dx = b.pos.x - C_GROUP[0], dz = b.pos.z - C_GROUP[2];
+      const n = Math.hypot(dx, dz) || 1; dx /= n; dz /= n;
+      let px = dz, pz = -dx;
+      if (l && (l.pos.x - mx) * px + (l.pos.z - mz) * pz > 0) { px = -px; pz = -pz; }
+      const d = 1.2 + n * 0.75;
+      c.cam.shot({ shot: 'CAM', pos: [mx + px * d, 1.6, mz + pz * d], look: [mx, 1.5, mz], fov: 40, to: { pos: [mx + px * (d - 0.3), 1.6, mz + pz * (d - 0.3)], look: [mx, 1.52, mz], fov: 40 }, dur: 9, ease: 'linear' });
+    } },
     { face: 'chase40', to: 'chase', dur: 0.4 },
     say('chase', "That's the whole plan?"),
     say('chase40', "It's a first draft."),
@@ -944,6 +964,7 @@
     // [MID · Luka at the console] He pulls his 2026 phone and a USB-C cable from his pocket. Plugs in. A password
     // field appears on the console glass.
     put('luka', [1.6, 0, -17.6, -0.4]),
+    { do: () => { if (SETS.hq_top.lamp) SETS.hq_top.lamp('console'); } },
     glide([2.3, 1.62, -14.35], [0.8, 1.12, -16.0], 42, { pos: [2.15, 1.6, -14.5], look: [0.8, 1.1, -16.0], fov: 40 }, 8),
     { move: 'luka', to: L_TYPE },
     play('luka', 'type_phone'),
