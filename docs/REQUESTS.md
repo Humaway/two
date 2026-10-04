@@ -118,8 +118,8 @@ Source reports are in `docs/reports/`.
 
 Engine (63c4619 etc.):
 - 63: drop `Object.assign(CHARACTERS, …)` for MAN/KID/WOMAN (now in 01-config). — done (polish).
-- 3.7: drop the one-tick wait before computed lenses; drop manual `rig.seated` resets; drop the bar slide during STORAGE FULL; `s37_*` anims → engine names (`kneel_work`, `lean_rail`, `wipe_face`, `hand_rest`, `peer`, `limp`, `lean_back`).
-- 3.5: drop `s3_still`/`s3_hurt` wrappers; `rig.ghost(['handR','foreR'], a)` instead of scaling the hand bone. 3.6: `phones_off`.
+- 3.7: drop the one-tick wait before computed lenses; drop manual `rig.seated` resets; drop the bar slide during STORAGE FULL; `s37_*` anims → engine names (`kneel_work`, `lean_rail`, `wipe_face`, `hand_rest`, `peer`, `limp`, `lean_back`). — done (polish): all of them (no content `s37_*` anims left).
+- 3.5: drop `s3_still`/`s3_hurt` wrappers; `rig.ghost(['handR','foreR'], a)` instead of scaling the hand bone. 3.6: `phones_off`. — done (polish): engine `still` / `hurt_stand` with explicit `expr`, the erased hand dithers with `rig.ghost` (over the pop-up's [YES]), Future Luka lifts the headphones off with `phones_off`.
 - 2.4: `kettle: [steps]` instead of the hand-rolled kettle; `walk_rail` / `hand_rail` for Rue. 2.5: `laugh_cry` expression; drop autoplay follower walks. 2.7: `say('passenger', …, { actor })`.
 - 2.1: spawn `chase40` with `{ look: 'chase40_tee' }` (dawn T-shirt) instead of hiding coat/lanyard/headphones.
 - 1.5 / 2.6: `rig.attach.card` + `paint` + `hold_card` instead of content-built card meshes. — 1.5 done (polish) for Chase (2040): his own `attach.card`, painted (a CRED face), `hold_card`; Jordan's hand-over keeps the small content card (`jordan40`'s look has no `card` attachment: see Act One polish below).
@@ -135,7 +135,7 @@ Sets (12 set commits):
 - 1.6: `A16` → `s16_addr_*`, `s16_jordan_close`. — done (polish).
 - 2.1–2.3: `s23_plaque`; `s22_drone_piano`, `s22_piano_cam`; 2.1 sleepers lie down via `SETS.flat.lie(true)` + `s21_couch_lie` / `s21_bed_lie`; `s21_dawn_wide`, `s21_box`; optional 2.3 save `{ at: 'urn_w', r: 1.2, kettle: true }`.
 - 2.6: sample spot `s26_sample_sizzle`.
-- 3.1/3.2: `invite` prop hold/home; `spawnDrones(floor)`; `SETS.hq_floors.reset()` after `dress32`.
-- 3.3: `lamp('mgr')` for the badge insert. 3.7: `ARC` → `s37_st_*`; crane start `s37_crane_a`.
+- 3.1/3.2: `invite` prop hold/home; `spawnDrones(floor)`; `SETS.hq_floors.reset()` after `dress32`. — done (polish): 3.1's card mesh is gone (the set's `invite`, homed on `flow:stop` too), L21/L30 spawn through `S.spawnDrones(floor)` (3.2's local `spawnDrone` is gone), `S.reset()` right after `dress32` (nothing slides on arrival after a Continue).
+- 3.3: `lamp('mgr')` for the badge insert. 3.7: `ARC` → `s37_st_*`; crane start `s37_crane_a`. — done (polish): all three (3.7's `ARC` now names the set's `s37_st_*` marks; `CRANE` glides `s37_crane_a` → `s37_crane_b`).
 - A1: `ring(true, { sfx: 'phone_ring', every: 2.5, max: 2 })`; coda shot → `counter_phone`. — done (polish): the set plays the ring (with `'trill'`, every 2 s, max 2: the counter phone's 1.2 double trill, in A1 and B1 alike, and B1's match cut uses `every: 1.6` as 1.2); the coda uses `counter_phone` (re-aimed a little steeper in the set so both hands come in from the sides; PC's HOLD insert sits under its card either way).
 - B1/B2: B2 cups → parade `coffees.show('both')`; B1 `HEROIC` → `s12_heroic`; 2037 frame `screens_all.caption('THE MANAGER')`. — done (polish): all three (B2's content-built cups are gone; the 2037 date card no longer repeats THE MANAGER: the screens say it).
