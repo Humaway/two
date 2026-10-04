@@ -69,15 +69,6 @@
   function reach(r, k, sd, x, hM, zM, px = 0.5, py = -1, pz = -0.4) { toT(r, k.hipsY(r, hM) - r.parts.hips.position.y, k.hipsY(r, zM)); k.arm(r, sd, x, TY, TZ, px, py, pz); }
   function def(n, fn, o) { if (ANIMS[n]) return; ANIMS[n] = fn; if (o && o.upper) fn.upper = true; if (o && o.shows) fn.shows = o.shows; }
   function defAnims() {
-    // Chase at the Remote on the present (top ~0.7 m, 0.55 m ahead), leaning in, a hand on the brick phone; p.dial taps
-    def('b1_dial', (r, t, p) => {
-      const k = K(); if (!k) return ANIMS.idle(r, t, p);
-      k.base(r, t); const Pt = r.parts, tap = p.dial ? 0.02 * Math.max(0, Math.sin(t * 13)) : 0;
-      Pt.torso.rotation.x = 0.4 + 0.01 * Math.sin(t * 1.3);
-      reach(r, k, -1, 0.08, 0.76 - tap, 0.44, 0.5, -1, -0.4);
-      reach(r, k, 1, 0.16, 0.72, 0.4, 0.5, -1, -0.4);
-      Pt.handL.rotation.x = 0.5; Pt.handR.rotation.x = 0.7; Pt.head.rotation.x = 0.36; Pt.neck.rotation.x = 0.1;
-    });
     // Chase (2040) reading the slate in his right hand, held up in front of his chest, head down (standing or seated)
     def('b1_slate', (r, t, p) => {
       const k = K(); if (!k) return ANIMS.idle(r, t, p);
@@ -176,8 +167,8 @@
   defAnims();
 
   // ============================================================ small props built at load time (ART_KIT, shared material)
-  // the knot in Luka's lanyard (home and after); the snapped lanyard in his fist (the roof); two takeaway coffees (B2);
-  // the 2035 funeral room (a hall: rows of mourners' backs, a lectern, a photo on an easel, flowers)
+  // the knot in Luka's lanyard (home and after); the snapped lanyard in his fist (the roof); the 2035 funeral room
+  // (a hall: rows of mourners' backs, a lectern, a photo on an easel, flowers)
   const KIT = (() => {
     if (typeof ART_KIT === 'undefined' || !ART_KIT.kit) return {};
     const kit = ART_KIT.kit, LC = '#82aac4', LCD = '#6c93ad';
@@ -189,12 +180,6 @@
       .box(0.012, 0.014, 0.008, '#b8bcc2', 0, -0.205, 0).box(0.072, 0.046, 0.006, '#e8e8e4', 0, -0.24, 0)
       .box(0.06, 0.012, 0.0065, '#5c86b0', 0, -0.228, 0).done();
     snapped.name = 'b1_snapped';
-    function cup() {
-      return kit().cyl(0.036, 0.03, 0.105, 10, '#f2f0ea', 0, 0.0525, 0).cyl(0.0375, 0.033, 0.04, 10, '#9a6a42', 0, 0.05, 0)
-        .cyl(0.039, 0.039, 0.012, 10, '#2a2a2c', 0, 0.111, 0).done();
-    }
-    const cups = [cup(), cup()];
-    cups[0].name = 'b2_cup_l40'; cups[1].name = 'b2_cup_c40';
     // the hall (local metres: x -4.2..4.2, z -6.6..6.6, y 0..3.6; the lectern at the north end -Z, the door at +Z)
     const hall = new THREE.Group(); hall.name = 'b1_hall';
     const k = kit();
@@ -234,7 +219,7 @@
       }
     }
     hall.add(k.done());
-    return { knot, snapped, cups, hall };
+    return { knot, snapped, hall };
   })();
   // a kit prop needs a home (hold(null) puts things back where they came from): parked under the current set's scene
   function home(c, o) {
@@ -255,7 +240,6 @@
     if (KIT.hall && KIT.hall.parent) KIT.hall.parent.remove(KIT.hall);
     if (typeof world !== 'undefined') for (const id of ['chase', 'luke', 'luka']) { const a = world.actor(id); if (a && a.held && (a.held === KIT.snapped || a.held.name === 'store_phone')) a.hold(null); }
     if (KIT.snapped) { if (KIT.snapped.parent) KIT.snapped.parent.remove(KIT.snapped); delete KIT.snapped.userData.home; }
-    for (const cup of KIT.cups || []) if (cup.parent) cup.parent.remove(cup);
     if (D.blur && typeof renderer !== 'undefined') renderer.domElement.style.filter = '';
     D.blur = false;
     if (D.meter && typeof ui !== 'undefined') ui.meter(null, null);
@@ -266,8 +250,9 @@
     if (D.flick) { removeUpdate(D.flick); D.flick = null; }
     for (const r of D.rigs) {
       r.seated = false; r.floorSit = false;
+      if (r.fade) r.fade(1, 0);
       if (r.root) r.root.rotation.set(0, 0, 0);
-      if (r.show) r.show('hood', false);
+      if (r.show) { r.show('hood', false); r.show('santa_hat', false); }
       if (r.face && r.face.over) { r.face.over = null; if (r.face.redraw) r.face.redraw(); }
     }
     D.rigs.length = 0;
@@ -389,26 +374,6 @@
     }
   };
   CARDS.b1_laptop.size = [960, 660];
-  // 49. 2031 — A festival poster, Redcliffe jetty stage, 4:10 pm: PUDDING. A sticker slapped across it: CANCELLED.
-  CARDS.b1_poster = (cx, w, h) => {
-    cx.save(); cx.translate(w / 2, h / 2); cx.rotate(-0.015); cx.translate(-w / 2, -h / 2);
-    shadow(cx, 24, 8, 0.35);
-    const g = cx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#2f9ad8'); g.addColorStop(0.6, '#f2a98c'); g.addColorStop(1, '#f3e2b0');
-    cx.fillStyle = g; cx.fillRect(30, 20, w - 60, h - 40); noShadow(cx);
-    txt(cx, 'REDCLIFFE FESTIVAL 2031', w / 2, 72, 30, '#ffffff', 'center', '800', SYS, w - 100);
-    txt(cx, 'JETTY STAGE', w / 2, 112, 24, '#141d3a', 'center', '700');
-    cx.fillStyle = '#141d3a'; for (let i = 0; i < 9; i++) cx.fillRect(110 + i * 32, h * 0.62 - (i % 2) * 6, 10, h * 0.25);
-    cx.fillRect(90, h * 0.62 + h * 0.18, w - 180, 12);
-    txt(cx, 'PUDDING', w / 2, h * 0.36, 78, '#141d3a', 'center', '900', SYS, w - 90);
-    txt(cx, '4:10 pm', w / 2, h * 0.47, 34, '#ffffff', 'center', '800');
-    cx.restore();
-    cx.save(); cx.translate(w / 2, h * 0.42); cx.rotate(-0.42);
-    shadow(cx, 10, 4, 0.35); cx.fillStyle = '#d8323a'; cx.fillRect(-w * 0.5, -40, w, 80); noShadow(cx);
-    cx.strokeStyle = '#ffffff'; cx.lineWidth = 4; cx.strokeRect(-w * 0.5 + 10, -32, w - 20, 64);
-    txt(cx, 'CANCELLED', 0, 2, 54, '#ffffff', 'center', '900');
-    cx.restore();
-  };
-  CARDS.b1_poster.size = [440, 640];
   // 50. 2031 — Rue's corkboard: Sundays ticked, one after another. LADS. LADS. LADS.
   CARDS.b1_cork = (cx, w, h) => {
     shadow(cx, 26, 10, 0.4);
@@ -502,21 +467,21 @@
   const JCAM = { shot: 'JARVIS', at: [RX, RY, RZ], from: [-0.12, 1.12, -19.5], on: FOUR, size: 'CLOSE', move: 'push', amount: 0.94, dur: 12, ease: 'linear' };
   // the pairs (each a short two-shot): the Lukas east of the Remote, the Chases west, face to face, turned a little to
   // their lens (north of them: the ring's south arc, the parapet and the city behind)
-  const E_IN = [0.6, 0, -17.5, H + 0.3], E_OUT = [1.36, 0, -17.38, -H - 0.3];
-  const W_IN = [-0.6, 0, -17.5, -H - 0.3], W_OUT = [-1.36, 0, -17.38, H + 0.3];
+  const E_IN = [0.6, 0, -17.5, H + 0.5], E_OUT = [1.36, 0, -17.38, -H - 0.5];
+  const W_IN = [-0.6, 0, -17.5, -H - 0.5], W_OUT = [-1.36, 0, -17.38, H + 0.5];
   const LENS_E = glide([1.0, 1.56, -19.55], [1.0, 1.42, -17.42], 36, [1.0, 1.55, -19.25], null, 36, 9);
   const LENS_W = glide([-1.0, 1.56, -19.55], [-1.0, 1.42, -17.42], 36, [-1.0, 1.55, -19.25], null, 36, 9);
-  const LENS_E_TIGHT = glide([0.98, 1.56, -19.05], [0.98, 1.3, -17.44], 40, [0.98, 1.54, -18.9], [0.98, 1.3, -17.44], 39, 6);
+  const LENS_E_TIGHT = glide([0.98, 1.62, -19.05], [0.98, 1.42, -17.44], 44, [0.98, 1.6, -18.9], [0.98, 1.42, -17.44], 42, 6);
   // [WIDE · the roof] low, from outside the ring to the north-west
   const WIDE_LOW = glide([-3.7, 1.95, -21.9], [0.0, 1.15, -17.5], 44, [-3.45, 1.9, -21.55], [0.0, 1.15, -17.5], 44, 9);
   // the call
   const DIAL = { luka: [-0.68, 0, -18.12, toRemote(-0.68, -18.12)], luka40: [1.45, 0, -17.95, toRemote(1.45, -17.95)], chase40: [-1.25, 0, -17.55, toRemote(-1.25, -17.55)] };
-  // [MID] Chase at the brick phone: from just past the Remote, the present in the foreground, his face over it
-  const DIAL_MID = glide([0.32, 1.3, -19.8], [0.0, 1.12, -18.35], 46, [0.3, 1.28, -19.65], [0.0, 1.12, -18.35], 44, 7);
+  // [MID] over his shoulder at the Remote: his hands on the brick phone (the set's pre-call check lens, as 3.7's)
+  const DIAL_MID = lensPush('s37_check', 0.84, 7);
   const SPLIT_L = { shot: 'INSERT', at: 'a1_split_roof', move: 'push', amount: 0.9, dur: 30, ease: 'linear' };
   const SPLIT_L_PUSH = glide([-0.2, 1.42, -20.75], [-0.3, 0.95, -18.0], 46, [-0.2, 1.38, -20.5], [-0.3, 0.95, -18.0], 46, 6);
   const SPLIT_R = { shot: 'INSERT', at: 'a1_split_store' };
-  const LUKE_MID = { shot: 'CAM', half: 'right', pos: [6.45, 1.6, -7.35], look: [7.05, 1.42, -9.95], fov: 34, to: { pos: [6.55, 1.58, -7.75], look: [7.05, 1.45, -9.95], fov: 34 }, dur: 10, ease: 'linear' };
+  const LUKE_MID = { shot: 'CAM', half: 'right', pos: [6.3, 1.85, -7.4], look: [7.05, 1.47, -9.95], fov: 34, to: { pos: [6.4, 1.82, -7.75], look: [7.05, 1.49, -9.95], fov: 34 }, dur: 10, ease: 'linear' };   // a little above the till and the monitor
 
   // ============================================================ SCENE B1 — "Again"
   function dressB1(c) {
@@ -609,7 +574,7 @@
     slow('chase40', "Because if you leave a tape, you'll know. ^ And if you know, you won't get here."),
     // 10.
     { expr: [['luka40', 'still']] },
-    CLOSE('luka40', { yaw: -0.55, dist: 1.1, push: 0.12, dur: 7, fov: 34 }),
+    CLOSE('luka40', { yaw: -0.7, dist: 1.1, push: 0.12, dur: 7, fov: 34 }),
     { wait: 0.6 },
     slow('luka40', 'Let them wonder.'),
     { wait: 0.8 },
@@ -668,7 +633,7 @@
     say('luka', "It's a phone call. ^ A minute at a time."),
     // 20.
     { expr: [['luka40', 'sad']] },
-    CLOSE('luka40', { yaw: -0.55, dist: 1.05, push: 0.12, dur: 8, fov: 34 }),
+    CLOSE('luka40', { yaw: -0.7, dist: 1.05, push: 0.12, dur: 8, fov: 34 }),
     slow('luka40', "You're going to go back in. Into the fire."),
     // 21.
     CLOSE('luka', { yaw: 0.6, dist: 1.0, push: 0.08, dur: 5, fov: 34 }),
@@ -713,21 +678,12 @@
   ];
 
   // ------------------------------------------------------------ "B1_call": exactly as A1 steps 19-25; white
-  // (Luke's cheap Santa hat: PROPS.santa_hat, warmed at boot, on his head bone for the call and home)
-  const HAT = { obj: null };
+  // (Luke's cheap Santa hat: his rig's fitted santa_hat attachment; every spawn's dress() takes it off again)
   function hatOn(c) {
     const a = act(c, 'luke');
-    if (!a) return;
-    if (!HAT.obj && typeof PROPS !== 'undefined' && PROPS.santa_hat) { HAT.obj = PROPS.santa_hat(); HAT.obj.name = 'b1_luke_hat'; }
-    if (!HAT.obj) return;
-    const hd = a.rig.parts.head, d = a.rig.d || {}, hs = d.hs || 1, s = d.s || 1;
-    hd.add(HAT.obj);
-    HAT.obj.position.set(0.0, 0.168 * hs, -0.014 * hs); HAT.obj.rotation.set(-0.22, 0.0, 0.1); HAT.obj.scale.setScalar(1.06 * hs / s);
-    HAT.obj.visible = true;
+    if (a) a.rig.show('santa_hat', true);
     touch(c, ['luke']);
   }
-  function hatOff() { if (HAT.obj && HAT.obj.parent) HAT.obj.parent.remove(HAT.obj); }
-  if (typeof on === 'function') on('flow:stop', hatOff);
   function storeSide(c) {
     const S = SETS.reddy26;
     if (S && S.dress) S.dress('home');
@@ -737,11 +693,11 @@
     if (lk) { lk.place('a1_luke_count'); lk.visible = true; lk.setExpr('tired'); lk.play('type'); }
     hatOn(c);
   }
+  // the counter phone rings twice (the 2026 landline's double trill, as in 1.2: the set plays it at the phone)
   async function storeRings(c) {
     const sid = c.flow.sceneId, ph = ud(c, 'store_phone', 'reddy26');
-    if (ph && ph.ring) ph.ring(true);
+    if (ph && ph.ring) ph.ring(true, { sfx: 'trill', every: 2.0, vol: 0.4, max: 2 });
     for (let i = 0; i < 2 && !sk(c); i++) {
-      c.sfx('trill', { vol: 0.4 });
       await c.wait(2.0);
       if (c.flow.sceneId !== sid) return;
       if (i === 0) { const lk = act(c, 'luke'); if (lk) { lk.play('look_up'); lk.setExpr('neutral'); } }
@@ -765,16 +721,14 @@
   function goneWhite(c) { for (const id of ['luka', 'chase']) { const a = act(c, id); if (a && a.set && a.set.id === 'hq_roof') a.visible = false; } }
   CUTSCENES.B1_call = [
     put('chase', 'a1_dial'), put('luka', DIAL.luka), put('luka40', DIAL.luka40), put('chase40', DIAL.chase40),
-    up([['luka', 'hurt_stand'], ['luka40', 'idle'], ['chase40', 'idle'], ['chase', 'b1_dial']]),
+    up([['luka', 'hurt_stand'], ['luka40', 'idle'], ['chase40', 'idle'], ['chase', 'kneel_work', { h: 0.72, z: 0.43 }]]),
     { expr: [['chase', 'determined'], ['luka', 'worried'], ['luka40', 'still'], ['chase40', 'still']] },
     { do: (c) => { const rg = ud(c, 'remote_rig'); if (rg) rg.screen('call'); } },
     // 19. [MID] Chase dials on the brick phone. The double trill.
     DIAL_MID,
     { wait: 0.6 },
-    { act: [['chase', 'b1_dial', { dial: true }]] },
     sfx('key_beep', { vol: 0.3, at: [0.1, 0.72, -18.9] }), { wait: 0.22 }, sfx('key_beep', { vol: 0.3, rate: 1.1, at: [0.1, 0.72, -18.9] }), { wait: 0.22 },
     sfx('key_beep', { vol: 0.3, rate: 0.95, at: [0.1, 0.72, -18.9] }), { wait: 0.22 }, sfx('key_beep', { vol: 0.3, rate: 1.05, at: [0.1, 0.72, -18.9] }), { wait: 0.4 },
-    { act: [['chase', 'b1_dial']] },
     { do: (c) => { const rg = ud(c, 'remote_rig'); if (rg) rg.trill(true); const ring = ud(c, 'ring'); if (ring) ring.pulse(0.4); } },
     sfx('trill', { vol: 0.45 }),
     { wait: 1.3 },
@@ -820,12 +774,22 @@
 
   // ------------------------------------------------------------ "B1_home" (27-42): Rue's Act One frame, no memories
   const FLOOR_L = [5.85, 0, -27.25, 0.0], FLOOR_C = [6.85, 0, -27.25, 0.0];
-  const TOP_TWO = glide([6.35, 2.75, -27.8], [6.35, 0.0, -27.82], 44, [6.35, 2.45, -27.85], [6.35, 0.0, -27.87], 44, 12);
-  const TOP_LUKA = glide([5.85, 1.45, -27.82], [5.85, 0.0, -27.84], 40, [5.85, 1.3, -27.84], [5.85, 0.0, -27.86], 40, 8);
-  const FROM_DOOR = glide([6.4, 1.75, -25.0], [6.35, 0.2, -27.3], 44, [6.4, 1.72, -25.25], [6.35, 0.2, -27.3], 42, 6);
-  const UP_AT_LUKE = glide([6.15, 0.45, -26.4], [6.4, 1.6, -24.55], 40, [6.17, 0.45, -26.2], [6.4, 1.6, -24.55], 38, 6);
-  // [CLOSE · Luka's hand] on his chest: the lanyard, snapped and knotted back together
-  const HAND_CHEST = glide([5.9, 0.98, -27.25], [5.85, 0.2, -27.78], 38, [5.9, 0.9, -27.32], [5.85, 0.2, -27.78], 36, 6);
+  // [TOP-DOWN] turned a quarter: the two of them lying across the wide frame, heads to the right, Luka above Chase (the
+  // dialogue box clear of them), feet to the shoes: it reads as two men on a floor, not two men against a wall
+  const TOP_TWO = glide([6.57, 2.7, -27.55], [6.55, 0.0, -27.55], 56, [6.57, 2.55, -27.55], [6.55, 0.0, -27.55], 54, 12);
+  const TOP_LUKA = glide([5.87, 1.45, -27.8], [5.85, 0.0, -27.8], 42, [5.87, 1.32, -27.8], [5.85, 0.0, -27.8], 42, 8);   // (the same way up)
+  // Luke's eyeline: over his shoulder in the doorway, down onto the two of them on the floor
+  const FROM_DOOR = glide([6.88, 1.92, -24.12], [6.3, 0.15, -27.3], 46, [6.86, 1.9, -24.2], [6.3, 0.15, -27.3], 44, 6);
+  // from the floor up at Luke in the doorway: on his right, so his mug hand is the far one
+  const UP_AT_LUKE = glide([6.62, 0.45, -26.4], [6.4, 1.6, -24.55], 40, [6.6, 0.45, -26.2], [6.4, 1.6, -24.55], 38, 6);
+  // [CLOSE · Luka's hand] on his chest: the lanyard, snapped and knotted back together (aimed at the knot, read at step
+  // time: from above and a little toward his feet, his hand and the badge in frame)
+  const HAND_CHEST = { do: (c) => {
+    if (sk(c) || !KIT.knot || !KIT.knot.parent) return;
+    KIT.knot.getWorldPosition(V1);
+    c.cam.shot({ shot: 'CAM', pos: [V1.x + 0.1, V1.y + 0.62, V1.z + 0.34], look: [V1.x, V1.y - 0.02, V1.z + 0.04], fov: 38,
+      to: { pos: [V1.x + 0.09, V1.y + 0.52, V1.z + 0.29], look: [V1.x, V1.y - 0.02, V1.z + 0.04], fov: 36 }, dur: 6, ease: 'linear' });
+  } };
   function dressHome(c) {
     const S = SETS.reddy26;
     if (S && S.dress) S.dress('home');
@@ -842,11 +806,14 @@
     knotOn(c);   // (knotted back together somewhere they don't remember)
     touch(c, ['luka', 'chase', 'luke']);
   }
+  // they come up out of the smoke as A1's do (rig.fade from nothing; the originals back at the end)
   function arrive(c) {
     const sm = ud(c, 'smoke_backroom', 'reddy26'), tb = ud(c, 'tube', 'reddy26');
     if (sm && sm.amount) sm.amount(0.12, sk(c) ? 0 : 4.5);
     if (tb && tb.flicker && !sk(c)) tb.flicker(4);
-    for (const id of ['luka', 'chase']) { const a = act(c, id); if (a) a.visible = true; }
+    const rigs = [];
+    for (const id of ['luka', 'chase']) { const a = act(c, id); if (a) { if (a.rig.fade) { rigs.push(a.rig); a.rig.fade(0, 0.7); } a.visible = true; } }
+    tween(c, 3.2, (u) => { for (const r of rigs) r.fade(u, 0.7 * (1 - u) * (1 - u)); if (u >= 1) for (const r of rigs) r.fade(1, 0); });
   }
   function bang(c) {
     const d = ud(c, 'backroom_door', 'reddy26'); if (d && d.bang) d.bang();
@@ -963,27 +930,32 @@
     tween(c, 3.2, (u) => { const p = Math.round(84 + 14 * u); if (p !== last) { last = p; c.ui.meter(SHINE[p], p / 100); } });
   }
   const meterOff = { do: (c) => { c.ui.meter(null, null); D.meter = false; } };
+  // the one smudge he leaves: on the glass in front of him, scaled up to read (as 1.1's)
+  const SMUDGE_AT = [5.78, -5.62, 2.2];
   function dressFloor(c) {
     const S = SETS.reddy26;
     if (S && S.dress) S.dress('home_night');
-    const t = ud(c, 'hero_table', 'reddy26'); if (t) { if (t.set) t.set('new'); if (t.smudge1) t.smudge1(true); }
-    const lk = act(c, 'luke'); if (lk) lk.visible = false;
-    hatOff();
+    const t = ud(c, 'hero_table', 'reddy26');
+    if (t) { if (t.set) t.set('new'); if (t.smudge1At) t.smudge1At(SMUDGE_AT[0], SMUDGE_AT[1], SMUDGE_AT[2]); if (t.smudge1) t.smudge1(true); }
+    const lk = act(c, 'luke'); if (lk) { lk.visible = false; lk.rig.show('santa_hat', false); }
     const l = act(c, 'luka'), h = act(c, 'chase');
-    if (l) { l.rig.root.rotation.set(0, 0, 0); l.rig.seated = false; l.place('b1_luka_polish'); l.play('polish'); l.setExpr('still'); l.visible = true; knotOn(c); }
-    if (h) { h.place([6.9, 0, -9.0, 0]); h.rig.seated = true; h.play('hum', { h: 1.0 }); h.setExpr('hum'); h.visible = true; }
-    lamp(c, [6.2, 3.1, -6.4], [6.1, 0.9, -7.3], 0xfff2d6, 3.4, 0.85);
+    if (l) { l.rig.root.rotation.set(0, 0, 0); l.rig.seated = false; l.place('b1_luka_polish'); l.play('polish', { h: 0.95 }); l.setExpr('still'); l.visible = true; knotOn(c); }
+    // on the counter's front edge (the till behind him), his feet down the customer side
+    if (h) { h.place(CHASE_SIT); h.play('sit', { h: 1.0 }); h.play('hum'); h.setExpr('hum'); h.visible = true; }
+    // the table's downlight from the customer side: Luka's face over the glass, Chase on the counter behind
+    lamp(c, [5.7, 3.05, -4.7], [6.3, 0.9, -7.6], 0xfff2d6, 4.2, 0.8);
     touch(c, ['luka', 'chase']);
   }
-  // [CLOSE] the smudge on the glass (the polish frame's angle, from the customer side, low)
+  const CHASE_SIT = [6.95, 0, -8.72, 0];
   // [WIDE] from the store's right side, so the table (Luka) and the counter (Chase) don't line up
   const FLOOR_WIDE = glide([8.8, 1.65, -2.6], [6.2, 1.15, -7.7], 46, [8.6, 1.6, -3.0], [6.2, 1.15, -7.7], 44, 14);
   const FLOOR_WIDE2 = glide([8.6, 1.6, -3.0], [6.2, 1.15, -7.7], 44, [8.4, 1.58, -3.3], [6.2, 1.15, -7.7], 43, 8);
-  const SMUDGE = glide([6.18, 1.12, -4.4], [5.9, 1.12, -6.3], 46, [6.16, 1.11, -4.5], [5.9, 1.12, -6.3], 44, 7);
+  // [CLOSE] the smudge on the glass, from the customer side and above: his cloth hand stopped beside it
+  const SMUDGE = glide([5.86, 1.62, -4.62], [5.8, 0.95, -5.66], 36, [5.85, 1.55, -4.72], [5.8, 0.95, -5.66], 34, 7);
   CUTSCENES.B1_floor = [
     // 43. [WIDE · later, the dark shop floor] Luke has gone. Luka stands at the new Hero Table with a cloth. Chase sits
     // on the counter, humming a melody, the bridge of "two", without noticing.
-    { set: 'reddy26', env: 'night', spawn: { luka: 'b1_luka_polish', chase: [6.9, 0, -9.0, 0] } },
+    { set: 'reddy26', env: 'night', spawn: { luka: 'b1_luka_polish', chase: CHASE_SIT } },
     { do: dressFloor },
     { hud: null },
     FLOOR_WIDE,
@@ -997,12 +969,12 @@
     say('luka', "What's that?"),
     // 45.
     { do: humStop },
-    { act: [['chase', 'idle', { h: 1.0 }]] },
+    { act: [['chase', 'sit', { h: 1.0 }]] },
     { expr: [['chase', 'neutral']] },
     CLOSE('chase', { yaw: 0.25, dist: 1.25, push: 0.1, dur: 8, fov: 36 }),
     say('chase', '…Dunno. ^ Something I\'m working on.'),
     // 46. (Luka polishes. At 98% he stops at a smudge, looks at it for a while, and leaves it. He doesn't know why.)
-    { act: [['luka', 'polish'], ['chase', 'hum', { h: 1.0 }]] },
+    { act: [['luka', 'polish', { h: 0.95 }], ['chase', 'hum']] },
     { expr: [['luka', 'still'], ['chase', 'hum']] },
     { do: (c) => { hum(c); } },
     lensPush('a2_polish', 0.86, 9),
@@ -1037,7 +1009,7 @@
   const rise = { fade: 'in', dur: 0.32 };
   const S26 = (st, o) => { const S = SETS.reddy26; if (S && S.dress) S.dress(st, o || {}); };
   // 47. 2027 (low from the staff aisle: Luka up the ladder against the Yes wall, Jordan looking up at him)
-  const LADDER27 = glide([6.9, 1.2, -9.6], [4.25, 2.0, -11.7], 52, [6.8, 1.2, -9.75], [4.25, 2.0, -11.7], 50, 4);
+  const LADDER27 = lensPush('a2_ladder', 0.94, 4);   // the set's frame for A2's ladder too: the same frame, roles reversed
   function f2027(c) {
     S26('xmas27');
     const l = act(c, 'luka'), h = act(c, 'chase'), j = act(c, 'jordan');
@@ -1057,6 +1029,8 @@
   // 50. 2031 Rue's corkboard (no people: nobody is home)
   function f2031b(c) { const S = SETS.rue_house; if (S && S.dress) S.dress('cork31'); }
   // 51. 2033 Woody Point jetty, sunset (the face-down photo)
+  // the photo's angle (3.5's face-down photo): in front of them on the jetty, the two of them mid-laugh
+  const JETTY33 = glide([-273.55, 0.62, 24.55], [-274.05, 0.42, 21.75], 40, [-273.6, 0.6, 24.3], [-274.05, 0.42, 21.75], 38, 4);
   function f2033(c) {
     const S = SETS.parade; if (S && S.dress) S.dress('sunset33');
     years(c);
@@ -1100,6 +1074,8 @@
   }
   // 54. 2035 — A funeral. Chase at a lectern, silent. At the very back, a figure in a long coat.
   const HX = HALL_AT[0], HY = HALL_AT[1], HZ = HALL_AT[2];
+  // the very back: behind the last row, in the lens's right foreground, his back to us, hood up, facing the lectern
+  const L40_BACK = [HX + 1.78, HY, HZ + 4.4, PI + 0.1];
   const HALL = glide([HX + 1.15, HY + 1.62, HZ + 6.1], [HX - 0.1, HY + 1.3, HZ - 5.4], 40, [HX + 1.1, HY + 1.6, HZ + 5.8], [HX - 0.1, HY + 1.3, HZ - 5.4], 39, 4);
   function f2035(c) {
     lampOff(c);
@@ -1107,23 +1083,24 @@
     c.world.env('night', 0);
     if (KIT.hall && c.world.scene) { c.world.scene.add(KIT.hall); KIT.hall.position.set(HX, HY, HZ); KIT.hall.visible = true; D.hall = true; }
     for (const id of ['luka', 'chase', 'jordan']) { const a = act(c, id); if (a) a.visible = false; }
-    const h = c.world.spawn('chase40', [HX, HY + 0.18, HZ - 5.1, 0]), l = c.world.spawn('luka40', [HX + 1.95, HY, HZ + 5.15, PI]);
+    const h = c.world.spawn('chase40', [HX, HY + 0.18, HZ - 5.1, 0]), l = c.world.spawn('luka40', L40_BACK);
     if (h) { h.rig.dress(c.state); h.place([HX, HY + 0.18, HZ - 5.1, 0]); h.play('b1_lectern'); h.setExpr('still'); }
-    if (l) { l.rig.dress(c.state); l.rig.show('hood', true); l.place([HX + 1.95, HY, HZ + 5.15, PI + 0.12]); l.play('idle'); l.setExpr('still'); }
+    if (l) { l.rig.dress(c.state); l.rig.show('hood', true); l.place(L40_BACK); l.play('still'); l.setExpr('still'); }
     lamp(c, [HX, HY + 3.4, HZ - 3.6], [HX - 0.3, HY + 1.0, HZ - 5.4], 0xffe2b8, 6, 0.55);
     touch(c, ['chase40', 'luka40']);
   }
   function hallOff(c) { if (KIT.hall && KIT.hall.parent) KIT.hall.parent.remove(KIT.hall); D.hall = false; lampOff(c); }
   // 55. 2037 — Every screen in the country: a silhouette at a desk. THE MANAGER. (the 2040 store's screens, all of them)
-  const SCREENS = glide([3.4, 1.62, -2.4], [-1.6, 1.75, -14.3], 46, [3.1, 1.62, -3.0], [-1.6, 1.75, -14.3], 44, 4);
+  const SCREENS = glide([1.3, 1.5, -5.9], [-1.95, 1.8, -14.35], 36, [1.15, 1.5, -6.3], [-1.95, 1.8, -14.35], 34, 4);   // the big screen, a local watching it
   function f2037(c) {
     const S = SETS.reddy40; if (S && S.dress) S.dress('address');
     const all = ud(c, 'screens_all', 'reddy40'); if (all && all.show) all.show('address');
+    if (all && all.caption) all.caption('THE MANAGER');
     const bs = ud(c, 'big_screen', 'reddy40'); if (bs && bs.glance) bs.glance(0);
   }
   // 56. 2040, Saturday 22 December — Chase, older, in the Redcliffe backroom, wiring four display chips into a machine.
   // The kettle's screen asks him to name it. He thinks. Types DES.
-  const DES_SIDE = glide([5.45, 1.5, -24.75], [4.25, 1.3, -24.85], 40, [5.35, 1.5, -24.8], [4.25, 1.3, -24.85], 38, 6);
+  const DES_SIDE = glide([4.98, 1.86, -25.78], [4.24, 1.06, -24.45], 36, [4.92, 1.82, -25.68], [4.24, 1.06, -24.45], 34, 6);
   // the match: LOW, up past the edge of the bench at his face (the angle 1.2 opens on, a lifetime earlier)
   const LOW40 = glide([4.0, 1.0, -24.62], [4.25, 1.62, -25.12], 43, [4.0, 1.02, -24.66], [4.25, 1.64, -25.12], 41, 3);
   function f2040(c) {
@@ -1135,7 +1112,7 @@
   }
   // 57. [MATCH CUT · the exact frame of 1.2, step 1] Tuesday 22 December 2026, 11:58.
   const LUKA_START = [5.6, 0, -6.72, 0], LUKA_ADMIRE = [5.6, 0, -7.05, 0], J12 = [-1.3, 0, -8.2, 1.1];
-  const HEROIC = { shot: 'CAM', pos: [5.3, 1.02, -4.48], look: [5.6, 1.56, -7.05], fov: 43, to: { pos: [5.33, 1.05, -4.62], look: [5.6, 1.6, -7.05], fov: 40 }, dur: 6, ease: 'linear' };
+  const HEROIC = { shot: 'INSERT', at: 's12_heroic', move: 'push', amount: 0.9, dur: 6, ease: 'linear' };   // 1.2's first frame
   const RING = { shot: 'CAM', pos: [7.25, 1.42, -8.55], look: [7.55, 1.03, -9.22], fov: 32, to: { pos: [7.28, 1.38, -8.65], look: [7.55, 1.03, -9.22], fov: 30 }, dur: 3, ease: 'linear' };
   const TWOSHOT = { shot: 'CAM', pos: [6.95, 1.45, -5.3], look: [6.1, 1.4, -8.4], fov: 46, to: { pos: [6.9, 1.45, -5.45], look: [6.1, 1.41, -8.4], fov: 45 }, dur: 8, ease: 'linear' };
   function f1158(c) {
@@ -1158,12 +1135,10 @@
     const z0 = LUKA_START[2], z1 = LUKA_ADMIRE[2];
     tween(c, 0.9, (k) => { a.pos.x = LUKA_START[0]; a.pos.z = z0 + (z1 - z0) * k; });
   }
-  async function ring2(c) {
-    if (sk(c)) return;
-    const ph = ud(c, 'store_phone', 'reddy26'), sid = c.flow.sceneId;
-    if (ph && ph.ring) ph.ring(true);
-    for (let i = 0; i < 2; i++) { c.sfx('trill', { vol: 0.55 }); await c.wait(1.2); if (c.flow.sceneId !== sid || sk(c)) break; }
-    if (ph && ph.ring) ph.ring(false);
+  // the phone rings (1.2's ring: the double trill every 1.6 s, at the phone) until Chase picks it up
+  function ring2(c, on) {
+    const ph = ud(c, 'store_phone', 'reddy26');
+    if (ph && ph.ring) ph.ring(!!on && !sk(c), { sfx: 'trill', every: 1.6, vol: 0.55, max: 2 });
   }
   CUTSCENES.B1_again = [
     { hud: null },
@@ -1190,7 +1165,7 @@
     // 49. 2031 — A festival poster, Redcliffe jetty stage, 4:10 pm: PUDDING. A sticker slapped across it: CANCELLED.
     { set: 'parade', env: 'day' },
     { do: f2031a },
-    lensPush('b1_2031_poster', 0.9, 4, { card: ['b1_poster', {}] }),
+    lensPush('b1_2031_poster', 0.9, 4),
     rise,
     { do: (c) => { card(c, '2031'); } },
     { wait: 2.7 },
@@ -1198,7 +1173,7 @@
     // 50. 2031 — Rue's corkboard: Sundays ticked, one after another. LADS. LADS. LADS.
     { set: 'rue_house', env: 'cork31' },
     { do: f2031b },
-    lensPush('b1_cork31', 0.9, 4, { card: ['b1_cork', {}] }),
+    lensPush('b1_room31', 0.92, 4, { card: ['b1_cork', {}] }),
     rise,
     { do: (c) => { card(c, '2031'); } },
     { wait: 2.7 },
@@ -1206,7 +1181,7 @@
     // 51. 2033 — Woody Point jetty, sunset. Luka and Chase laughing so hard they blur. (The face-down photo.)
     { set: 'parade', env: 'wp_sunset', spawn: { luka: 'b1_33_luka', chase: 'b1_33_chase' } },
     { do: f2033 },
-    lensPush('b1_2033_jetty', 0.92, 4),
+    JETTY33,
     { do: (c) => { blur(c, true); } },
     rise,
     { do: (c) => { card(c, '2033'); if (!sk(c) && c.AUDIO && c.AUDIO.laugh) c.AUDIO.laugh({ vol: 0.35 }); } },
@@ -1246,7 +1221,7 @@
     { do: f2037 },
     SCREENS,
     rise,
-    { do: (c) => { card(c, '2037', 'THE MANAGER'); } },
+    { do: (c) => { card(c, '2037'); } },
     { wait: 2.8 },
     dip,
     // 56. 2040, Saturday 22 December — Chase, older, in the Redcliffe backroom, wiring the machine. The kettle's screen
@@ -1287,8 +1262,9 @@
     say('luka', 'Spotless.'),
     // The phone rings.
     RING,
-    { do: (c) => { ring2(c); } },
+    { do: (c) => { ring2(c, true); } },
     { wait: 2.4 },
+    { do: (c) => { ring2(c, false); } },
     { hold: 'chase', prop: 'store_phone', hand: 'R' },
     { act: [['chase', 'phone']] },
     sfx('clunk', { vol: 0.25 }),
@@ -1313,9 +1289,16 @@
   const BX = -300;   // Region W's bench (world x)
   const FRONT2 = glide([BX - 0.32, 1.12, 2.35], [BX - 0.32, 0.98, 0.1], 38, [BX - 0.32, 1.1, 2.1], null, 37, 12);
   const SLATE_SHOT = lensPush('b2_slate', 0.9, 7);
-  const WIDE_PATH = lensPush('b2_wide_path', 0.95, 10);
-  const CRANE = { shot: 'CAM', pos: [-299.0, 2.4, -11.0], look: [-300.5, 0.8, 2.0], fov: 40, to: { pos: [-296.0, 34.0, -40.0], look: [-300.0, 0.0, 60.0], fov: 46 }, dur: 12, ease: 'in' };
+  // [INSERT · the slate] behind the card: high and in front of him, his head bowed over the slate in his lap
+  const SLATE_LAP = glide([BX - 0.52, 1.52, 1.05], [BX - 0.64, 0.86, 0.3], 42, [BX - 0.54, 1.47, 0.95], [BX - 0.64, 0.86, 0.3], 40, 9);
+  // [WIDE] from over the railing's east end: the path, the bench, the small crowd gathering, the pelican on the rail
+  const WIDE_PATH = glide([BX + 10.8, 2.4, 10.2], [BX - 0.5, 0.9, -6.0], 50, [BX + 10.4, 2.35, 9.7], [BX - 0.5, 0.9, -6.0], 48, 10);
+  // [CRANE · slowly up and away] it ends with everything in the one frame: the bench and the small crowd in the lower
+  // third, the pelican on the rail, the bay, the bridge on the horizon (the title sits over the water)
+  const CRANE = { shot: 'CAM', pos: [-299.0, 2.4, -11.0], look: [-300.5, 0.8, 2.0], fov: 40, to: { pos: [-296.5, 18.0, -30.0], look: [-300.0, 0.0, 35.0], fov: 48 }, dur: 12, ease: 'in' };
   const CROWD = ['local40_a', 'local40_b', 'local40_c', 'local40_d', 'local40_e'];
+  // where they stop: off the path, a loose half-ring on the grass behind the bench, facing it (clear of the wide's lens)
+  const C_STOP = [[BX - 3.8, 0, -3.4, 0.8], [BX - 2.4, 0, -4.1, 0.47], [BX + 1.4, 0, -3.9, -0.41], [BX + 2.7, 0, -3.2, -0.75], [BX + 3.8, 0, -2.2, -1.08]];
   function dressB2(c) {
     cleanup(); D.active = true;
     const S = SETS.parade; if (S && S.dress) S.dress('xmas40');
@@ -1328,9 +1311,7 @@
     if (l) { l.rig.show('hood', false); l.place('b2_luka40'); l.setExpr('still'); }
     if (h) { h.place('b2_c40'); h.setExpr('tired'); h.rig.show('brick', false); }
     const sl = P(c, 'slate_speaker'); if (sl) { sl.visible = false; if (sl.userData.screen) sl.userData.screen('off'); }
-    const cups = KIT.cups || [];
-    if (cups[0] && c.world.scene) { c.world.scene.add(cups[0]); cups[0].position.set(BX + 0.42, 0.45, 0.06); cups[0].visible = true; }
-    if (cups[1] && c.world.scene) { c.world.scene.add(cups[1]); cups[1].position.set(BX - 0.86, 0.0, 0.42); cups[1].visible = true; }
+    const cf = ud(c, 'coffees'); if (cf && cf.show) cf.show('both', true);   // the two takeaway coffees (the set's)
     for (let i = 0; i < CROWD.length; i++) c.world.despawn(CROWD[i]);
     c.world.despawn('kid');
     touch(c, ['luka40', 'chase40']);
@@ -1389,7 +1370,7 @@
     // 4. [INSERT · the slate] Drafts. One draft fourteen years old. He attaches two.wav and types: Sorry for the wait. Sent.
     seat([['chase40', 'b1_slate', { h: 0.48 }]]),
     { expr: [['chase40', 'still']] },
-    CLOSE('chase40', { yaw: 0.35, dist: 1.0, push: 0.06, dur: 9, fov: 40, ly: -0.25, dy: 0.1 }),
+    SLATE_LAP,
     { do: email },
     { wait: 7.6 },
     { do: (c) => { c.ui.card(null); const sl = P(c, 'slate_speaker'); if (sl && sl.userData.screen) sl.userData.screen('sent'); } },
@@ -1424,7 +1405,7 @@
       const id = CROWD[i], a = c.world.spawn(id, 'b2_crowd_' + (i + 1));
       if (!a) continue;
       a.visible = true; a.play('idle'); a.setExpr('neutral');
-      if (sk(c)) a.place('b2_stop_' + (i + 1)); else a.moveTo('b2_stop_' + (i + 1), { speed: 0.7 + 0.08 * i });
+      if (sk(c)) a.place(C_STOP[i]); else a.moveTo(C_STOP[i], { speed: 0.85 + 0.06 * i });   // (each ends facing the bench)
     }
     const kid = c.world.spawn('kid', 'b2_kid_start', { look: 'kid40' });
     const sb = ud(c, 'skateboard');
@@ -1435,11 +1416,8 @@
     }
     const pel = ud(c, 'pelican_hero'); if (pel && pel.land) pel.land('b2_pelican_land', sk(c) ? 0.01 : 3.2);
     touch(c, CROWD.concat(['kid']));
-    if (sk(c)) { for (let i = 0; i < CROWD.length; i++) { const a = act(c, CROWD[i]); if (a) a.face('chase40', 0); } chipOff(c, true); if (kid) { kid.walkAnim = 'walk'; kid.play('idle'); } return; }
-    await c.wait(4.6);
-    if (c.flow.sceneId !== sid) return;
-    for (let i = 0; i < CROWD.length; i++) { const a = act(c, CROWD[i]); if (a) a.face([BX, 0.5, 0], 0.6); }
-    await c.wait(1.0);
+    if (sk(c)) { chipOff(c, true); if (kid) { kid.walkAnim = 'walk'; kid.play('idle'); } return; }
+    await c.wait(5.6);
     if (c.flow.sceneId === sid) chipOff(c, false);
   }
   function chipOff(c, now) {
@@ -1486,7 +1464,7 @@
     say('luka40', "I've got time."),
     // 14. [CLOSE · Chase (2040)] He looks at him.
     { expr: [['chase40', 'stunned']] },
-    CLOSE('chase40', { yaw: -0.5, dist: 0.95, push: 0.12, dur: 7, fov: 34 }),
+    CLOSE('chase40', { yaw: 0.5, dist: 0.95, push: 0.12, dur: 7, fov: 34 }),
     glance('chase40', 'luka40', 3.4),
     { wait: 2.4 },
     // 15.

@@ -12,9 +12,9 @@
 // No roam, no kettle hotspot (A1/A2 are cutscene only), no samples. Story flags: hurt, lanyard_snapped, bandaged (Luka
 // comes home bandaged, his own lanyard snapped); Future Luka's hood is down; item lanyard40 (Future Luka's faded
 // lanyard, 1158) is handed over in A1 step 4 and is in Luka's hands from then on (his rig holds the real one).
-// The 2040 selves fading (and Luka and Chase fading into the white): per-rig transparent copies of every material on
-// the rig, compiled at boot (this file wraps world.adopt for the four looks), swapped in only while a fade runs, with
-// a warm wash on the emissive ("like a photo left in the sun"); nothing compiles mid-game.
+// The 2040 selves fading (and Luka and Chase fading into the white): rig.fade(k, wash), the engine's per-rig transparent
+// copies (compiled at boot for the four heroes), with a warm wash ("like a photo left in the sun"); nothing compiles
+// mid-game.
 (() => {
   const PI = Math.PI, H = PI / 2;
   const say = (id, text, o) => Object.assign({ say: id, text }, o);
@@ -77,125 +77,46 @@
     });
   }
   // ============================================================ the fade ("like a photo left in the sun")
-  // Every mesh on a rig gets a per-rig transparent copy of its material (the face, the body's skinned atlas, the coat,
-  // the badge, the chip light, the blob shadow...). The copies are compiled at boot (world.adopt, below), so swapping
-  // them in mid-game picks programs that already exist. Opacity k (0..1) and a warm emissive wash w; at k = 1 / w = 0
-  // the originals go back on.
-  const FADE_LOOKS = { luka: 1, chase: 1, luka40: 1, chase40: 1 };
-  const FD = new Map();                                           // rig -> entry
-  const WASH = new THREE.Color(0xfff0d6);
-  function fentry(rig) {
-    let e = FD.get(rig);
-    if (!e) { e = { rig, map: new Map(), meshes: [], orig: [], copy: [], uniq: [], on: false, k: 1 }; FD.set(rig, e); }
-    return e;
+  // rig.fade(k, wash): every mesh on the rig swaps to its own transparent copy (built and compiled at boot for the four
+  // heroes, so nothing compiles mid-game), opacity k (0..1) and a warm emissive wash; k = 1 / wash = 0 puts the
+  // originals back. FADED: the rigs this file has faded (restored on flow:stop).
+  const FADED = [];
+  function applyFade(rig, k, w) {
+    if (!FADED.includes(rig)) FADED.push(rig);
+    rig.fade(k, w);
   }
-  function copyOf(e, m, skinned) {
-    const key = m.uuid + (skinned ? '|s' : '|m');
-    let f = e.map.get(key);
-    if (!f) {
-      f = m.clone();
-      if (m.defaultAttributeValues) f.defaultAttributeValues = m.defaultAttributeValues;
-      f.transparent = true; f.depthWrite = true; f.forceSinglePass = true;
-      f.userData.a1 = { src: m, op: m.opacity, em: f.emissive ? new THREE.Color() : null };
-      e.map.set(key, f);
-    }
-    return f;
-  }
-  function swapOut(e) {
-    if (!e.on) return;
-    for (let i = 0; i < e.meshes.length; i++) if (e.meshes[i].material === e.copy[i]) e.meshes[i].material = e.orig[i];
-    e.on = false; e.k = 1;
-  }
-  function swapIn(e) {
-    if (e.on) swapOut(e);
-    e.meshes.length = 0; e.orig.length = 0; e.copy.length = 0; e.uniq.length = 0;
-    e.rig.root.traverse((o) => {
-      const m = o.material;
-      if (!o.isMesh || !m || Array.isArray(m) || (m.userData && m.userData.a1)) return;
-      const f = copyOf(e, m, !!o.isSkinnedMesh);
-      e.meshes.push(o); e.orig.push(m); e.copy.push(f);
-      if (!e.uniq.includes(f)) {
-        e.uniq.push(f);
-        const b = f.userData.a1; b.op = m.opacity; f.color.copy(m.color);
-        if (b.em && m.emissive) { b.em.copy(m.emissive); f.emissiveIntensity = m.emissiveIntensity; }
-      }
-      o.material = f;
-    });
-    e.on = true;
-  }
-  function applyFade(e, k, w) {
-    if (!e.on) swapIn(e);
-    e.k = k;
-    for (let i = 0; i < e.uniq.length; i++) {
-      const f = e.uniq[i], b = f.userData.a1;
-      f.opacity = b.op * k;
-      if (b.em) f.emissive.copy(b.em).lerp(WASH, w);
-    }
-  }
-  // boot: compile the transparent programs for the four rigs (one mini scene mirroring the sets' light rig + fog)
-  let FSC = null;
-  function fadeScene() {
-    if (FSC) return FSC;
-    const sc = new THREE.Scene();
-    sc.background = new THREE.Color(0x404858); sc.fog = new THREE.FogExp2(0x404858, 0.002);
-    sc.add(new THREE.HemisphereLight(0xffffff, 0x404058, 1.2));
-    const dl = new THREE.DirectionalLight(0xffffff, 1.4); dl.position.set(1, 2.5, 3); sc.add(dl);
-    const sp = new THREE.SpotLight(0xffffff, 0); sc.add(sp, sp.target);
-    const cam = new THREE.PerspectiveCamera(30, 1, 0.05, 30); cam.position.set(0, 1.2, 3); cam.lookAt(0, 1, 0);
-    return (FSC = { sc, cam });
-  }
-  function warmFade(rig) {
-    if (typeof renderer === 'undefined' || !rig || !rig.root) return;
-    const e = fentry(rig), W = fadeScene(), ms = [], os = [];
-    rig.root.traverse((o) => { const m = o.material; if (o.isMesh && m && !Array.isArray(m)) { ms.push(o); os.push(m); o.material = copyOf(e, m, !!o.isSkinnedMesh); } });
-    const par = rig.root.parent;
-    W.sc.add(rig.root); rig.root.updateMatrixWorld(true);
-    try { renderer.compile(W.sc, W.cam); } finally {
-      W.sc.remove(rig.root); if (par) par.add(rig.root);
-      for (let i = 0; i < ms.length; i++) ms[i].material = os[i];
-    }
-  }
-  const RIGS = {};                                                // the boot rig of each faded look (luka40's lanyard lives on his)
-  if (typeof world !== 'undefined' && world && typeof world.adopt === 'function' && !world.adopt.a1fade) {
-    const adopt0 = world.adopt;
-    const adopt = function (look, rig) {
-      if (FADE_LOOKS[look]) { if (!RIGS[look]) RIGS[look] = rig; try { warmFade(rig); } catch (err) { console.warn('TWO: A1 fade warm-up failed', err); } }
-      return adopt0.call(this, look, rig);
-    };
-    adopt.a1fade = true;
-    world.adopt = adopt;
-  }
-  // running fades (allocation-free tick)
-  const FT = [];
+  // running fades (allocation-free tick); K_OF: each rig's current opacity (1 when not fading)
+  const FT = [], K_OF = new Map();
   function fadeTick(dt) {
     for (let i = FT.length - 1; i >= 0; i--) {
       const f = FT[i];
       f.t += dt;
       const u = flow.skipping || f.dur <= 0 ? 1 : Math.min(1, f.t / f.dur), k = lerp(f.from, f.to, f.ease ? smooth(u) : u);
-      applyFade(f.e, k, f.wash * (1 - k) * (1 - k));
-      if (u >= 1) { FT.splice(i, 1); fadeDone(f.e, f.a, k); }
+      applyFade(f.r, k, f.wash * (1 - k) * (1 - k)); K_OF.set(f.r, k);
+      if (u >= 1) { FT.splice(i, 1); fadeDone(f.r, f.a, k); }
     }
     if (!FT.length) removeUpdate(fadeTick);
   }
-  function fadeDone(e, a, k) {
-    if (k <= 0.001) { if (a) a.visible = false; swapOut(e); }
-    else if (k >= 0.999) swapOut(e);
+  function fadeDone(r, a, k) {
+    if (k <= 0.001) { if (a) a.visible = false; r.fade(1, 0); K_OF.set(r, 0); }
+    else if (k >= 0.999) { r.fade(1, 0); K_OF.set(r, 1); }
   }
   // fadeRig(c, id, to, dur, wash, ease): from wherever he is now (1 if not fading) to `to`; skipping snaps
   function fadeRig(c, id, to, dur, wash = 0.45, o = {}) {
     const a = act(c, id);
-    if (!a) return;
-    const e = fentry(a.rig);
-    for (let i = FT.length - 1; i >= 0; i--) if (FT[i].e === e) FT.splice(i, 1);
-    const from = o.from ?? (e.on ? e.k : 1);
-    if (o.from != null) { a.visible = true; applyFade(e, o.from, wash * (1 - o.from) * (1 - o.from)); }
-    if (sk(c) || !(dur > 0)) { applyFade(e, to, wash * (1 - to) * (1 - to)); fadeDone(e, a, to); return; }
-    FT.push({ e, a, from, to, t: 0, dur, wash, ease: o.ease !== false });
+    if (!a || !a.rig.fade) return;
+    const r = a.rig;
+    for (let i = FT.length - 1; i >= 0; i--) if (FT[i].r === r) FT.splice(i, 1);
+    const from = o.from ?? (K_OF.has(r) ? K_OF.get(r) : 1);
+    if (o.from != null) { a.visible = true; applyFade(r, o.from, wash * (1 - o.from) * (1 - o.from)); K_OF.set(r, o.from); }
+    if (sk(c) || !(dur > 0)) { applyFade(r, to, wash * (1 - to) * (1 - to)); K_OF.set(r, to); fadeDone(r, a, to); return; }
+    FT.push({ r, a, from, to, t: 0, dur, wash, ease: o.ease !== false });
     addUpdate(fadeTick);
   }
   function fadeReset() {
     FT.length = 0; removeUpdate(fadeTick);
-    for (const e of FD.values()) swapOut(e);
+    for (const r of FADED) r.fade(1, 0);
+    FADED.length = 0; K_OF.clear();
   }
 
   // ============================================================ hand props and wardrobe this file borrows (restored on flow:stop)
@@ -204,7 +125,7 @@
   const L40 = { obj: null };
   function lanyard40Obj(c) {
     if (L40.obj) return L40.obj;
-    const a = act(c, 'luka40'), r = a ? a.rig : RIGS.luka40;
+    const a = act(c, 'luka40'), r = a ? a.rig : (c.world.rigsOf ? c.world.rigsOf('luka40')[0] : null);
     if (r && r.attach && r.attach.lanyard) L40.obj = r.attach.lanyard;
     return L40.obj;
   }
@@ -285,19 +206,14 @@
     l.position.copy(OWN.pos); l.quaternion.copy(OWN.quat); l.scale.copy(OWN.scl); l.visible = OWN.vis;
     OWN.obj = null; OWN.parent = null;
   }
-  // Luke's cheap Santa hat (PROPS.santa_hat: shared cached geometry and material, warmed at boot), on his head bone
-  const HAT = { obj: null, on: null };
+  // Luke's cheap Santa hat: his rig's fitted santa_hat attachment (every spawn's dress() takes it off again)
+  const HAT = { on: null };
   function hatOn(c) {
     const a = act(c, 'luke');
     if (!a) return;
-    if (!HAT.obj && typeof PROPS !== 'undefined' && PROPS.santa_hat) { HAT.obj = PROPS.santa_hat(); HAT.obj.name = 'a1_luke_hat'; }
-    if (!HAT.obj) return;
-    const hd = a.rig.parts.head, d = a.rig.d || {}, hs = d.hs || 1, s = d.s || 1;
-    hd.add(HAT.obj);
-    HAT.obj.position.set(0.0, 0.168 * hs, -0.014 * hs); HAT.obj.rotation.set(-0.22, 0.0, 0.1); HAT.obj.scale.setScalar(1.06 * hs / s);
-    HAT.obj.visible = true; HAT.on = a.rig;
+    a.rig.show('santa_hat', true); HAT.on = a.rig;
   }
-  function hatOff() { if (HAT.obj && HAT.obj.parent) HAT.obj.parent.remove(HAT.obj); HAT.on = null; }
+  function hatOff() { if (HAT.on) HAT.on.show('santa_hat', false); HAT.on = null; }
   // pooled rigs leave the way they came: standing, dressed by flags on their next spawn, with their own materials
   const TOUCHED = [];
   const touch = (c, ids) => { for (const id of ids) { const a = act(c, id); if (a && !TOUCHED.includes(a.rig)) TOUCHED.push(a.rig); } };
@@ -340,6 +256,7 @@
     slatePainted = null;
     for (const r of TOUCHED) {
       r.seated = false; r.floorSit = false;
+      if (r.ghosted && r.ghost) r.ghost(null, 1);
       if (r.attach.earbud) r.attach.earbud.visible = false;
       if (r.attach.slate) r.attach.slate.visible = false;
     }
@@ -799,23 +716,26 @@
   const JCAM = { shot: 'JARVIS', at: [RX, RY, RZ], from: [-0.12, 1.12, -19.5], on: FOUR, size: 'CLOSE', move: 'push', amount: 0.94, dur: 10, ease: 'linear' };
   // the goodbyes: two pairs facing each other a pace apart, each turned a little toward its lens (north of them, so the
   // ring's south arc, the parapet and the city are behind them). The older two swap pairs for lines 14-18.
-  const E_IN = [0.6, 0, -17.5, H + 0.3], E_OUT = [1.36, 0, -17.38, -H - 0.3];
-  const W_IN = [-0.6, 0, -17.5, -H - 0.3], W_OUT = [-1.36, 0, -17.38, H + 0.3];
+  const E_IN = [0.6, 0, -17.5, H + 0.5], E_OUT = [1.36, 0, -17.38, -H - 0.5];
+  const W_IN = [-0.6, 0, -17.5, -H - 0.5], W_OUT = [-1.36, 0, -17.38, H + 0.5];
   const LENS_E = glide([1.0, 1.56, -19.55], [1.0, 1.42, -17.42], 36, [1.0, 1.55, -19.25], null, 36, 9);
   const LENS_W = glide([-1.0, 1.56, -19.55], [-1.0, 1.42, -17.42], 36, [-1.0, 1.55, -19.25], null, 36, 9);
   // the lanyard changes hands: the same two-shot, closer, their faces and the hands between them
-  const LENS_E_TIGHT = glide([0.98, 1.5, -19.0], [0.98, 1.27, -17.44], 38, [0.98, 1.48, -18.85], [0.98, 1.26, -17.44], 37, 5);
-  // [WIDE · the roof] low, from outside the ring to the north-west: the four round the Remote, the Valley beyond
-  const WIDE_LOW = glide([-3.7, 1.95, -21.9], [0.0, 1.15, -17.5], 44, [-3.45, 1.9, -21.55], [0.0, 1.15, -17.5], 44, 9);
+  const LENS_E_TIGHT = glide([0.98, 1.6, -19.05], [0.98, 1.36, -17.44], 44, [0.98, 1.58, -18.9], [0.98, 1.36, -17.44], 42, 5);
+  // [WIDE · the roof] from the ring's north edge, a little west: the four round the Remote side by side (none hidden
+  // behind another), the present in the foreground, the parapet and the city beyond
+  const WIDE_LOW = glide([-1.6, 1.85, -21.7], [0.1, 1.2, -17.5], 44, [-1.5, 1.82, -21.4], [0.1, 1.2, -17.5], 44, 9);
   // the older two crossing between the pairs: from the Yes sign's side, a little higher
   const CROSS = glide([-3.7, 1.95, -21.9], [0.0, 1.1, -17.4], 44, [-3.5, 1.9, -21.6], [0.0, 1.1, -17.4], 44, 5);
   // the call
   const DIAL = { luka: [-0.68, 0, -18.12, toRemote(-0.68, -18.12)], luka40: [1.45, 0, -17.95, toRemote(1.45, -17.95)], chase40: [-1.25, 0, -17.55, toRemote(-1.25, -17.55)] };
+  // [MID] over his shoulder at the Remote: his hands on the brick phone (the set's pre-call check lens, as 3.7's)
+  const DIAL_MID = lensPush('s37_check', 0.84, 7);
   const SPLIT_L = { shot: 'INSERT', at: 'a1_split_roof', move: 'push', amount: 0.9, dur: 30, ease: 'linear' };
   // the white pours from the Remote: closer, the four round it (left half)
   const SPLIT_L_PUSH = glide([-0.2, 1.42, -20.75], [-0.3, 0.95, -18.0], 46, [-0.2, 1.38, -20.5], [-0.3, 0.95, -18.0], 46, 6);
   // the right half: Luke at the till, across the counter (waist up, the receiver at his ear)
-  const LUKE_MID = { shot: 'CAM', half: 'right', pos: [6.45, 1.6, -7.35], look: [7.05, 1.42, -9.95], fov: 34, to: { pos: [6.55, 1.58, -7.75], look: [7.05, 1.45, -9.95], fov: 34 }, dur: 10, ease: 'linear' };
+  const LUKE_MID = { shot: 'CAM', half: 'right', pos: [6.3, 1.85, -7.4], look: [7.05, 1.47, -9.95], fov: 34, to: { pos: [6.4, 1.82, -7.75], look: [7.05, 1.49, -9.95], fov: 34 }, dur: 10, ease: 'linear' };   // a little above the till and the monitor
   const SPLIT_R = { shot: 'INSERT', at: 'a1_split_store' };
   // the After: two men on the parapet cap, shoulder to shoulder, facing the city
   const SIT_L40 = [-0.3, 1.2, -11.25, 0], SIT_C40 = [0.3, 1.2, -11.25, 0];
@@ -828,11 +748,14 @@
   const EARBUDS = lensPush('a1_earbuds', 0.9, 3.5);
   // Home: the backroom (reddy26). Rue's exact frame, then from above.
   const FLOOR_L = [5.85, 0, -27.25, 0.0], FLOOR_C = [6.85, 0, -27.25, 0.0];
-  const TOP_TWO = glide([6.35, 2.62, -27.5], [6.35, 0.0, -27.52], 44, [6.35, 2.3, -27.6], [6.35, 0.0, -27.62], 44, 12);
-  const TOP_LUKA = glide([5.85, 1.7, -27.55], [5.85, 0.0, -27.57], 40, [5.85, 1.55, -27.55], [5.85, 0.0, -27.57], 40, 8);
-  // Luke's eyeline from the doorway down onto them, and the floor's view up at him
-  const FROM_DOOR = glide([6.4, 1.75, -25.0], [6.35, 0.2, -27.3], 44, [6.4, 1.72, -25.25], [6.35, 0.2, -27.3], 42, 6);
-  const UP_AT_LUKE = glide([6.15, 0.45, -26.4], [6.4, 1.6, -24.55], 40, [6.17, 0.45, -26.2], [6.4, 1.6, -24.55], 38, 6);
+  // [TOP-DOWN] turned a quarter: the two of them lying across the wide frame, heads to the right, Luka above Chase (the
+  // dialogue box clear of them): it reads as two men on a floor, not two men against a wall
+  const TOP_TWO = glide([6.57, 2.7, -27.55], [6.55, 0.0, -27.55], 56, [6.57, 2.55, -27.55], [6.55, 0.0, -27.55], 54, 12);
+  const TOP_LUKA = glide([5.87, 1.5, -27.75], [5.85, 0.0, -27.75], 42, [5.87, 1.36, -27.75], [5.85, 0.0, -27.75], 42, 8);   // his face and the lanyards, the same way up
+  // Luke's eyeline (over his shoulder in the doorway, down onto them), and the floor's view up at him (on his right, so
+  // his mug hand is the far one)
+  const FROM_DOOR = glide([6.88, 1.92, -24.12], [6.3, 0.15, -27.3], 46, [6.86, 1.9, -24.2], [6.3, 0.15, -27.3], 44, 6);
+  const UP_AT_LUKE = glide([6.62, 0.45, -26.4], [6.4, 1.6, -24.55], 40, [6.6, 0.45, -26.2], [6.4, 1.6, -24.55], 38, 6);
 
   // ------------------------------------------------------------ A1 dressing (Continue / Chapter Select restart at step 0)
   function dressA1(c) {
@@ -936,7 +859,7 @@
     { act: [['luka', 'a1_hurt'], ['luka40', 'idle']] },
     say('luka', "I won't."),
     // 7.
-    CLOSE('luka40', { yaw: -0.55, dist: 1.05, push: 0.1, dur: 6, fov: 34 }),
+    CLOSE('luka40', { yaw: -0.7, dist: 1.05, push: 0.1, dur: 6, fov: 34 }),
     { expr: [['luka40', 'fond']] },
     say('luka40', 'You will. ^ Just not as much.'),
     // 8. (to Chase)
@@ -1004,12 +927,12 @@
     hatOn(c);
     touch(c, ['luke']);
   }
+  // the counter phone rings twice (the 2026 landline's double trill, as in 1.2: the set plays it at the phone)
   async function storeRings(c) {
     const sid = c.flow.sceneId, ph = ud(c, 'store_phone', 'reddy26');
-    if (ph && ph.ring) ph.ring(true);
+    if (ph && ph.ring) ph.ring(true, { sfx: 'trill', every: 2.0, vol: 0.4, max: 2 });
     for (let i = 0; i < 2 && !sk(c); i++) {
-      c.sfx('phone_ring', { vol: 0.32 });
-      await c.wait(2.5);
+      await c.wait(2.0);
       if (c.flow.sceneId !== sid) return;
       if (i === 0) { const lk = act(c, 'luke'); if (lk) { lk.play('look_up'); lk.setExpr('neutral'); } }
     }
@@ -1038,7 +961,7 @@
     { expr: [['chase', 'determined'], ['luka', 'worried'], ['luka40', 'still'], ['chase40', 'still']] },
     screen('call'),
     // 19. [MID] Chase dials on the brick phone. The double trill.
-    lensPush('s37_check', 0.84, 7),
+    DIAL_MID,
     { wait: 0.6 },
     { act: [['chase', 'a1_dial', { dial: true }]] },
     { sfx: 'key_beep', vol: 0.3, at: [0.1, 0.72, -18.9] }, { wait: 0.22 }, { sfx: 'key_beep', vol: 0.3, rate: 1.1, at: [0.1, 0.72, -18.9] }, { wait: 0.22 },
@@ -1064,7 +987,7 @@
     // 21.
     say('operator', 'You have a reverse-charge call from Chase and Luka, Optus Redcliffe. ^ 2040. ^ Will you accept the charges?', { tag: 'down the line' }),
     // 22. [RIGHT HALF · CLOSE · Luke] A very long sigh.
-    { do: (c) => { closeOn(c, 'luke', { half: 'right', yaw: 0.35, dist: 0.95, push: 0.14, dur: 8, fov: 38 }); } },
+    { do: (c) => { closeOn(c, 'luke', { half: 'right', yaw: 0.35, dist: 1.12, push: 0.14, dur: 8, fov: 38 }); } },
     { act: [['luke', 'a1_sigh', { dur: 2.8, loop: false }]] },
     { wait: 3.2 },
     // 23.
@@ -1110,6 +1033,24 @@
     // full while they listen; the earbuds' tinny bleed waits silently in sync, for when they've gone
     songPair(c, { from: 'FINAL', speakerB: 'bleed', gainA: 0.95, fade: 1.2 });
   }
+  // He looks at his hand: in front of him and off his left shoulder, the raised hand big in the foreground, his face
+  // behind it (read at step time, the pose up)
+  function handLens(c) {
+    if (sk(c)) return;
+    const a = act(c, 'luka40'); if (!a) return;
+    a.rig.parts.handL.getWorldPosition(V2); a.eyePos(V1);
+    const mx = (V1.x + V2.x) / 2, my = (V1.y + V2.y) / 2, mz = (V1.z + V2.z) / 2, sx = Math.sin(a.rotY + 0.55), sz = Math.cos(a.rotY + 0.55);
+    c.cam.shot({ shot: 'CAM', pos: [V2.x + sx * 0.95, V2.y + 0.06, V2.z + sz * 0.95], look: [mx, my, mz], fov: 38,
+      to: { pos: [V2.x + sx * 0.8, V2.y + 0.05, V2.z + sz * 0.8], look: [mx, my, mz], fov: 36 }, dur: 5, ease: 'linear' });
+  }
+  // "the edges of it are starting to fade": his left glove and forearm dither out first (rig.ghost; dress() resets it)
+  const HAND_L = ['handL', 'foreL'];
+  function handFade(c, to, dur) {
+    const a = act(c, 'luka40');
+    if (!a || !a.rig.ghost) return;
+    touch(c, ['luka40']);
+    tween(c, dur, (u) => { a.rig.ghost(HAND_L, 1 - (1 - to) * smooth(u)); });
+  }
   function budsIn(c) {
     for (const id of ['luka40', 'chase40']) { const a = act(c, id); if (a && a.rig.attach.earbud) a.rig.attach.earbud.visible = true; }
   }
@@ -1143,9 +1084,9 @@
     say('luka40', 'We\'ve got—', { auto: 0.25 }),
     { expr: [['luka40', 'still']] },
     { act: [['luka40', 'a1_perch', { m: 3 }]] },
-    { wait: 0.6 },
-    CLOSE('luka40', { yaw: 0.4, dist: 1.4, push: 0.2, dur: 5, fov: 40, dy: -0.04, ly: -0.2 }),
-    { do: (c) => { fadeRig(c, 'luka40', 0.86, 2.4, 0.3); } },
+    { wait: 1.0 },
+    { do: handLens },
+    { do: (c) => { fadeRig(c, 'luka40', 0.86, 2.4, 0.3); handFade(c, 0.42, 2.4); } },
     { wait: 2.6 },
     CLOSE('luka40', { yaw: 0.28, dist: 1.05, push: 0.12, dur: 7, fov: 34 }),
     { act: [['luka40', 'a1_perch', { m: 0 }]] },
@@ -1580,7 +1521,7 @@
     { wait: 0.8 },
     // — Jordan up the ladder taking the tinsel down. Luka at the bottom, holding the ladder, letting him.
     { do: frame2 },
-    glide([6.95, 1.72, -9.55], [4.1, 2.2, -11.8], 52, [6.75, 1.74, -9.75], [4.1, 2.2, -11.8], 52, 6),
+    lensPush('a2_ladder', 0.94, 6),   // (the set's frame: B1's 2027 is the same frame, roles reversed)
     { wait: 4.2 },
     // — The Wall. The 1987 Polaroid. The PUDDING cassette. And a new print: four men on a rooftop at golden hour inside a
     // ring of yellow lights. A drone took it. The two older men are faint in it, like a double exposure, but they're there.
@@ -1610,7 +1551,7 @@
   // (prebuild it during the credits: world.prebuild('reddy26')), dresses it for the night, and ends on black.
   const CODA_L = [7.84, 0, -9.74, -0.48], CODA_C = [7.25, 0, -9.74, 0.52];
   const CODA_REACH_L = { sd: -1, go: false, x: 0.0, h: 1.07, z: 0.6 }, CODA_REACH_C = { sd: 1, go: false, x: 0.0, h: 1.07, z: 0.6 };
-  const CODA_SHOT = { shot: 'CAM', pos: [7.5, 1.64, -8.5], look: [7.55, 1.05, -9.3], fov: 34, locked: true };   // over the counter, steep: hands, no faces
+  const CODA_SHOT = { shot: 'INSERT', at: 'counter_phone', locked: true };   // over the counter, steep: hands, no faces
   function codaDress(c) {
     begin(c);
     const S = SETS.reddy26;

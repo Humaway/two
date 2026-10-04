@@ -26,7 +26,7 @@
   const lerp = (a, b, u) => a + (b - a) * u;
   const smooth = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
   const glide = (pos, look, fov, pos2, look2, fov2, dur) => ({ shot: 'CAM', pos, look, fov, to: { pos: pos2, look: look2 || look, fov: fov2 || fov }, dur, ease: 'linear' });
-  const V1 = new THREE.Vector3(), Q1 = new THREE.Quaternion(), Q2 = new THREE.Quaternion(), M4 = new THREE.Matrix4(), AX = new THREE.Vector3(1, 0, 0);
+  const V1 = new THREE.Vector3();
   const isPC = (c) => c.flow.sceneId === 'PC';
 
   // a tween on the game clock (fn gets 0..1 eased); snaps to the end while skipping or when the scene changes
@@ -103,16 +103,14 @@
   // door hinge (9.4, −12.62), his desk pc_luke_desk (9.25, −16.35)). Marks: pc_jordan_mid, pc_jordan_phone,
   // pc_ladder_pick, pc_ladder_path, pc_ladder_set, s11_jordan_top.
   const J_MID = [6.0, 0, -6.9, -0.25];                    // pc_jordan_mid, turned to the crater (his face to the wide)
-  const J_PHONE = [7.15, 0, -8.05, PI - 0.22];            // over the counter to the phone (pc_jordan_phone, 0.35 m left: clear of the ladder)
   const PHONE = [7.55, 1.05, -9.2], CRATER = [5.6, 0, -5.3];
   const HANDSET_DOWN = [6.92, 1.022, -8.68];                // laid on the counter by the front edge, left of the radio
   const HOLD_AT = [6.92, 1.06, -8.68];
   const TOP = [4.05, 1.26, -11.7, PI];                      // s11_jordan_top: on the third tread
 
   // [WIDE · locked] the shop floor from the front right corner: the wreck and its smoke, tinsel on the floor, the
-  // counter, the Yes wall and the ladder, and Luke's open office door on the right with Luke in it (the set's
-  // floor_wreck_wide looks past the door: Luke at his desk isn't in its sightline)
-  const WIDE = { shot: 'CAM', pos: [10.4, 2.5, -1.7], look: [6.4, 1.0, -10.0], fov: 52 };
+  // counter, the Yes wall and the ladder, and Luke's open office door on the right with Luke at his desk in it
+  const WIDE = { shot: 'INSERT', at: 'floor_wreck_wide', locked: true };
   // the ringing phone's view of him (he looks at it the way you'd look at a snake)
   const SNAKE = CLOSE('jordan', { dist: 1.25, push: 0.22, dur: 4.5, fov: 34, dy: -0.06 });
   // MID over the counter from the staff side: he comes to the phone and answers it (the JARVIS screens left)
@@ -146,22 +144,14 @@
     const u = ud(c, 'store_phone'); if (u && u.ring) u.ring(false);
   }
 
-  // the carried ladder: in his root at his right side, its length along his heading, its width upright, its rails square
-  // (the A-frame's front leans 0.29 rad: undone first). One-time maths per pickup (module scratch, nothing per frame).
-  const CARRY_C = [-0.36, 0.58, 0.1];   // the ladder's centre in his root (right = −X): the top rail at his hand (0.86 m)
-  M4.set(0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1);   // local X (width) -> up, Y (length) -> ahead, Z (depth) -> his left
-  Q1.setFromRotationMatrix(M4);
-  Q2.setFromAxisAngle(AX, -0.29); Q1.multiply(Q2);
+  // the carried ladder: in his hands, then the set's 'carried' state lays it along his right side (the top rail at his
+  // right hand, 0.86 m up)
   function carryLadder(c) {
     const j = act(c, 'jordan'), lad = P(c, 'ladder');
     if (!j || !lad) return;
-    if (lad.userData.set) lad.userData.set('carried');
     if (j.held !== lad) j.hold(lad);
     if (j.held !== lad) return;
-    // hold() centred it at (0, 1.0, 0.45) with no rotation: its own centre is what it moved by
-    V1.set(-lad.position.x, 1.0 - lad.position.y, 0.45 - lad.position.z).applyQuaternion(Q1);
-    lad.quaternion.copy(Q1);
-    lad.position.set(CARRY_C[0] - V1.x, CARRY_C[1] - V1.y, CARRY_C[2] - V1.z);
+    if (lad.userData.set) lad.userData.set('carried');
     j.play('pc_ladder');
   }
   // the ladder stood open at the Yes wall (from his hands, or straight there when skipped / on Continue)
@@ -282,7 +272,7 @@
     expr('jordan', 'worried'),
     ANSWER,
     play('jordan', 'idle'),
-    { move: 'jordan', to: J_PHONE, speed: 0.85 },
+    { move: 'jordan', to: 'pc_jordan_phone', speed: 0.85 },
     { wait: 0.35 },
     { do: ringOff },
     { hold: 'jordan', prop: 'store_phone', hand: 'R' },

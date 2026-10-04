@@ -39,7 +39,7 @@
 //   tinsel_sign · tinsel_static · tinsel_strand · fairy_lights power(k) (instanced 160) · snow_spray
 //   xmas_tree set('up'|'fallen'|'gone') fall() · aframe_sign · door_l hold(true|false|null) · door_r · door_sign
 //     set(open) flip() · store_radio playing · store_phone ring(on, {sfx, every, vol, max}) · cash_tray · monitor_screen show(mode)
-//   ladder set('yes_wall'|'folded'|'carried'|'hidden') wobble() · clock_floor_hands · clock_hands set(h, m)
+//   ladder set('yes_wall'|'folded'|'carried'|'hidden') wobble() ('carried' after actor.hold(ladder): along his right side) · clock_floor_hands · clock_hands set(h, m)
 //   calendar set(day, month, weekday, year) · office_door open · swivel_chair spin · cust26_a/b (ambient rigs)
 //   the_wall · print4 · backroom_door open request() bang() solid(on) · tube off flicker(n) · scorch count(n) · do_not_paint
 //   kettle · rue_mug · tv_screen show('xmas'|'off') · laptop · wall_phone ring(on) · wall_phone_handset · jbox_lid open
@@ -1504,6 +1504,26 @@ SETS.reddy26 = (() => {
       R.tyesState = st;
       R.tyL.visible = st === 'half' || st === 'hung'; R.tyR.visible = st === 'hung'; R.tyF.visible = st === 'fallen';
     }
+    // 'carried' (call it after actor.hold(ladder), which parents it to his root): folded, carried along his right side
+    // (its length along his heading, its width upright, the upper rail at his right hand, 0.86 m up). Not held: folded,
+    // its collider off, left where it stands. The folded ladder's own centre + the carry turn: worked out once.
+    const LAD_CARRY = [-0.36, 0.58, 0.1];   // the folded ladder's centre in the holder's root (right = −X, ahead = +Z)
+    let ladC = null; const ladQ = new THREE.Quaternion(), ladV = new THREE.Vector3();
+    function ladCarryPose() {
+      const L = R.ladder;
+      if (!ladC) {
+        const par = L.parent; if (par) par.remove(L);
+        L.position.set(0, 0, 0); L.quaternion.identity(); L.updateMatrixWorld(true);
+        ladC = new THREE.Box3().setFromObject(L).getCenter(new THREE.Vector3());
+        if (par) par.add(L);
+        // local X (width) -> up, Y (length) -> ahead, Z (depth) -> his left; the A-frame front's 0.29 rad lean undone first
+        ladQ.setFromRotationMatrix(new THREE.Matrix4().set(0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1))
+          .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -0.29));
+      }
+      L.quaternion.copy(ladQ);
+      ladV.copy(ladC).applyQuaternion(ladQ);
+      L.position.set(LAD_CARRY[0] - ladV.x, LAD_CARRY[1] - ladV.y, LAD_CARRY[2] - ladV.z);
+    }
     function setLadder(st) {
       if (!R.ladder) return;
       R.ladState = st;
@@ -1512,7 +1532,10 @@ SETS.reddy26 = (() => {
       R.ladder.visible = st !== 'hidden';
       if (st === 'yes_wall') { R.ladder.position.set(4.05, 0, -11.75); R.ladder.rotation.set(0, PI, 0); R.ladBack.rotation.x = 0; R.ladSpread.visible = true; setBox(C.ladder, 3.78, -12.22, 4.32, -11.28); }
       else if (st === 'folded') { R.ladder.position.set(7.71, 0, -8.7); R.ladder.rotation.set(0, -H, 0); R.ladBack.rotation.x = 0.508; R.ladSpread.visible = false; setBox(C.ladder, 7.84, -9.0, 8.25, -8.4); }
-      else { if (st === 'carried') { R.ladBack.rotation.x = 0.508; R.ladSpread.visible = false; } park(C.ladder); }
+      else {
+        if (st === 'carried') { R.ladBack.rotation.x = 0.508; R.ladSpread.visible = false; if (R.ladder.parent && R.ladder.parent !== R.root) ladCarryPose(); }
+        park(C.ladder);
+      }
     }
     // the sad plastic tree by the plant (2040: the same tree, faded, still on the floor): set('up'|'fallen'|'gone'), fall()
     function propsTree() {
@@ -2100,7 +2123,7 @@ SETS.reddy26 = (() => {
       s13_call_c40: [4.3, 0, -24.65, 0], s13_call_luka: [3.55, 0, -24.95, 0.35], s13_call_chase: [5.05, 0, -24.95, -0.35],
       s13_luke_out: [6.4, 0, -12.0, 0], s13_jordan_ladder: [4.6, 0, -11.25, -2.8],
       // PC
-      pc_jordan_mid: [6.0, 0, -6.9, -2.6], pc_jordan_phone: [7.5, 0, -8.05, PI], pc_luke_desk: [9.25, 0, -16.35, 0],
+      pc_jordan_mid: [6.0, 0, -6.9, -2.6], pc_jordan_phone: [7.15, 0, -8.05, PI - 0.22], pc_luke_desk: [9.25, 0, -16.35, 0],
       pc_ladder_pick: [8.35, 0, -8.25, -2.2], pc_ladder_path: [9.3, 0, -10.3, -1.9], pc_ladder_set: [4.05, 0, -11.15, PI],
       // endings
       a1_luke_count: [7.05, 0, -9.95, 0], a1_luke_door: [6.4, 0, -24.55, PI], b1_luka_polish: [5.6, 0, -6.35, 0], b1_chase_sit: [6.9, 1.0, -9.0, 0],
@@ -2180,10 +2203,10 @@ SETS.reddy26 = (() => {
       wall_phone:     { at: [4.3, 1.45, -24.0], from: [4.5, 1.5, -24.75], fov: 36 },
       split_a:        { at: [4.4, 1.55, -24.3], from: [8.4, 1.65, -29.3], fov: 50 },
       split_b:        { at: [6.4, 1.3, -27.5], from: [4.0, 1.6, -24.4], fov: 52 },
-      floor_wreck_wide: { at: [6.6, 0.05, -8.2], from: [1.6, 2.45, -1.4], fov: 52 },   // the wreck above the dialogue box
+      floor_wreck_wide: { at: [6.4, 1.0, -10.0], from: [10.4, 2.5, -1.7], fov: 52 },   // PC: the wreck, the counter, the Yes wall, Luke at his desk through the open office door
       // PC, endings
       counter_phone:  { at: [7.55, 1.05, -9.3], from: [7.5, 1.64, -8.5], fov: 34 },    // over the counter, steep (the A coda's lens)
-      a1_split_store: { at: [6.6, 1.15, -9.2], from: [9.4, 1.9, -3.0], fov: 50 },
+      a1_split_store: { at: [5.86, 1.1, -8.45], from: [8.2, 2.0, -0.8], fov: 50 },   // the split's right half: the wrapped table left, Luke at the till right
       home_door:      { at: [6.4, 1.35, -24.0], from: [7.4, 1.25, -28.9], fov: 46 },
       b1_night_floor: { at: [6.0, 1.1, -8.0], from: [2.0, 1.55, -2.4], fov: 46 },
       table_downlight:{ at: [5.6, 0.95, -5.3], from: [5.6, 3.1, -5.0] },
