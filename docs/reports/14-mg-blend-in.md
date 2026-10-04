@@ -1,0 +1,6 @@
+# Mini-game report: blend_in + secret_santa (commit aee32a6)
+
+Both run as roam + systems over the live hq_atrium set (they set flow.roaming/flow.swap and restore them; the set's h31_* festive/Santa hotspots are lifted out of the scene's list during the game). Enter as scene steps (not from a hotspot), all three playable, swap: true, Luka dressed as Santa (flags.santa). Missing actors (hr, priya, gaz=staff_c, tom=staff_a, wen=staff_b, nadia) are spawned at their gift_<id> marks.
+- `['minigame','blend_in',{ need, until, idle, cp:'s31_cp', path, speed, keepDrone:true, flag:'s31_blended', testCorner }]` → {done, logged, asks, yes, strikes, corners, acts}. Two strikes → api.fail() + safeRoom({variant:'quiet'}) → retry at cp. MINIGAMES.blend_in.stopMonitor().
+- `['minigame','secret_santa',{ intro:true (HR line + "…Ho ho."), monitor:true, idle, cp:'hr_meet', chipOn, keepDrone:false, order, callouts, flag:'s31_santa' }]` → {done, delivered:5, nadia:true, wrong, strikes, corners}. The fifth gift (Nadia) ends it immediately with no line; at the end the scene is staged for 3.1_nadia: Luka at give_nadia holding gift_parcel facing Nadia at gift_nadia; chase40 at s31_c40_nadia; chase at s31_chase_nadia.
+- Registers CHARACTERS priya/gaz/tom/wen if missing (move to 01-config.js later). Extra call-outs written for Gaz, Tom, Wen, Nadia.
